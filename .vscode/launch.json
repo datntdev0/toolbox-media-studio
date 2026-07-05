@@ -1,0 +1,21 @@
+{
+  // Debug configurations for the repo. See https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Auto-reload on code change. Uvicorn runs the app in a child process,
+      // so subProcess:true is required for breakpoints to bind to the worker.
+      "name": "API: FastAPI (uvicorn --reload)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8000", "--reload"],
+      "cwd": "${workspaceFolder}/srcs/api",
+      "python": "${workspaceFolder}/srcs/api/.venv/Scripts/python.exe",
+      "envFile": "${workspaceFolder}/srcs/api/.env",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "subProcess": true
+    }
+  ]
+}

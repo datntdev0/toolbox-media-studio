@@ -1,0 +1,10 @@
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/.venv": true,
+        "**/*_cache": true,
+        "**/*.egg-info": true,
+        "**/__pycache__": true,
+        "**/node_modules": true,
+    }
+}
