@@ -1,0 +1,42 @@
+services:
+  cosmosdb:
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-latest
+    container_name: toolbox-cosmosdb
+    command:
+      - --protocol
+      - http
+    ports:
+      - "8081:8081"
+      - "8080:8080"
+      - "1234:1234"
+    volumes:
+      - cosmosdb-data:/data
+    restart: unless-stopped
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: toolbox-azurite
+    command:
+      - azurite
+      - --silent
+      - --blobHost
+      - 0.0.0.0
+      - --queueHost
+      - 0.0.0.0
+      - --tableHost
+      - 0.0.0.0
+      - --location
+      - /data
+      - --debug
+      - /data/azurite.log
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+    volumes:
+      - azurite-data:/data
+    restart: unless-stopped
+
+volumes:
+  cosmosdb-data:
+  azurite-data:

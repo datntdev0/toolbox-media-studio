@@ -26,6 +26,15 @@ class Settings(BaseSettings):
     # CORS — the Nuxt web app origin (only origin allowed).
     cors_allowed_origin: str = "http://localhost:3000"
 
+    # Runtime environment name. Use "localhost" to relax emulator TLS checks.
+    environment: str = "production"
+
+    # Azure local/dev infrastructure.
+    az_cosmosdb_connection_string: str
+    az_cosmosdb_database_name: str = "mediastudio"
+    az_storage_blob_connection_string: str
+    az_storage_queue_connection_string: str
+
 
 @lru_cache
 def get_settings() -> Settings:
