@@ -36,7 +36,7 @@ def test_cosmos_connection_verification_is_disabled_for_localhost(
     _check_cosmos(
         Settings(
             admin_email="admin@example.com",
-            admin_password="change-me",
+            admin_password="SecurePassword123!",
             jwt_signing_key="test-signing-key",
             az_cosmosdb_connection_string="AccountEndpoint=https://localhost:8081/;AccountKey=test;",
             az_storage_blob_connection_string="UseDevelopmentStorage=true",
@@ -62,7 +62,7 @@ def test_configure_logging_creates_file_handler(tmp_path: Path) -> None:
     configured_logger = configure_logging(
         Settings(
             admin_email="admin@example.com",
-            admin_password="change-me",
+            admin_password="SecurePassword123!",
             jwt_signing_key="test-signing-key",
             az_cosmosdb_connection_string="AccountEndpoint=https://localhost:8081/;AccountKey=test;",
             az_storage_blob_connection_string="UseDevelopmentStorage=true",
