@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     # Runtime environment name. Use "localhost" to relax emulator TLS checks.
     environment: str = "production"
 
+    # Logging
+    log_level: str = "INFO"
+    log_file_path: str = "logs/api.log"
+
     # Azure local/dev infrastructure.
     az_cosmosdb_connection_string: str
     az_cosmosdb_database_name: str = "mediastudio"

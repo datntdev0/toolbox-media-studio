@@ -9,7 +9,7 @@ from azure.core import MatchConditions
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 
 from app.core.config import Settings
-from app.core.startup_checks import _should_verify_connection
+from app.core.startup import _should_verify_connection
 from app.domain.users import User, UserPage, UserRole, UserStatus
 from app.repositories.user_repository import (
     UserAlreadyExistsError,

@@ -26,6 +26,18 @@ Examples:
 - `GET /auth/me`
 - `GET /health`
 
+## Authentication Convention
+
+The application uses login credentials through `POST /auth/login` to issue a bearer access token.
+
+Swagger UI should expose plain HTTP Bearer authentication:
+
+- users call `POST /auth/login`
+- users copy the returned `access_token`
+- users paste that token into Swagger's `Authorize` dialog
+
+Do not add a Swagger-only token adapter endpoint unless there is a strong compatibility reason.
+
 ## Path Parameter Naming
 
 For resource identifiers in routes, use `id` as the path parameter name by default.

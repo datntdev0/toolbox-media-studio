@@ -19,6 +19,15 @@ def test_login_success_returns_token(client: TestClient) -> None:
     assert body["access_token"]
 
 
+def test_openapi_uses_http_bearer_security_scheme(client: TestClient) -> None:
+    resp = client.get("/openapi.json")
+
+    assert resp.status_code == 200
+    schema = resp.json()
+    assert schema["components"]["securitySchemes"]["HTTPBearer"]["type"] == "http"
+    assert schema["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"
+
+
 def test_login_wrong_password_is_401(client: TestClient) -> None:
     resp = client.post("/auth/login", json={"email": ADMIN_EMAIL, "password": "nope"})
     assert resp.status_code == 401

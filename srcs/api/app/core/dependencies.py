@@ -3,7 +3,7 @@
 from typing import Annotated, cast
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import Settings, get_settings
 from app.core.security import JWTError, decode_access_token
@@ -12,7 +12,7 @@ from app.repositories.user_repository import UserRepository
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
-_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+_bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def get_user_repository(request: Request) -> UserRepository:
@@ -28,7 +28,7 @@ UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
 
 
 def get_current_user(
-    token: Annotated[str, Depends(_oauth2_scheme)],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)],
     settings: SettingsDep,
     user_repository: UserRepositoryDep,
 ) -> User:
@@ -38,8 +38,11 @@ def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    if credentials is None:
+        raise credentials_error
+
     try:
-        payload = decode_access_token(token, settings)
+        payload = decode_access_token(credentials.credentials, settings)
     except JWTError as exc:
         raise credentials_error from exc
 

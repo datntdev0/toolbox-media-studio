@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.core.config import Settings
+from app.core.logging import get_logger
 from app.core.security import hash_password
 from app.domain.requests import UserCreateRequest, UserUpdateRequest
 from app.domain.users import User, UserPage, UserRole, UserStatus
@@ -17,6 +18,7 @@ from app.repositories.user_repository import (
 )
 
 SEED_ACTOR = "seed"
+logger = get_logger("user_service")
 
 
 class CannotDeleteCurrentUserError(Exception):
@@ -106,6 +108,7 @@ def delete_user(
 def seed_admin_user(settings: Settings, user_repository: UserRepository) -> User | None:
     """Seed the default admin user if it is missing."""
 
+    logger.info("Ensuring default admin user exists", extra={"admin_email": settings.admin_email})
     now = datetime.now(UTC)
     normalized_email = settings.admin_email.lower()
     seed_user = User(
@@ -121,7 +124,16 @@ def seed_admin_user(settings: Settings, user_repository: UserRepository) -> User
         updated_by=SEED_ACTOR,
         updated_at=now,
     )
-    return user_repository.seed_admin(seed_user)
+    created_user = user_repository.seed_admin(seed_user)
+    if created_user is None:
+        logger.info(
+            "Default admin user already exists",
+            extra={"admin_email": settings.admin_email},
+        )
+        return None
+
+    logger.info("Default admin user seeded", extra={"admin_email": settings.admin_email})
+    return created_user
 
 
 __all__ = [

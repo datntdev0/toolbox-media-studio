@@ -19,6 +19,8 @@ def _env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ADMIN_PASSWORD", ADMIN_PASSWORD)
     monkeypatch.setenv("JWT_SIGNING_KEY", "test-signing-key-please-ignore")
     monkeypatch.setenv("JWT_EXPIRE_MINUTES", "60")
+    monkeypatch.setenv("LOG_LEVEL", "INFO")
+    monkeypatch.setenv("LOG_FILE_PATH", "logs/test-api.log")
     monkeypatch.setenv("ENVIRONMENT", "localhost")
     monkeypatch.setenv(
         "AZ_COSMOSDB_CONNECTION_STRING",
@@ -41,7 +43,7 @@ def _env(monkeypatch: pytest.MonkeyPatch) -> None:
         "KBHBeksoGMGw==;QueueEndpoint=http://localhost:10001/devstoreaccount1;",
     )
     monkeypatch.setattr(
-        "app.core.startup_checks.validate_external_connections",
+        "app.core.startup.validate_external_connections",
         lambda settings: None,
     )
 
