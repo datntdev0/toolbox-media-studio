@@ -1,5 +1,31 @@
 <script setup>
+import { ref } from 'vue'
+
 definePageMeta({ layout: 'auth' })
+
+const router = useRouter()
+
+const { signIn } = useAuth()
+
+const email = ref('')
+const password = ref('')
+const isLoading = ref(false)
+const errorMessage = ref('')
+
+const handleSignIn = async () => {
+  errorMessage.value = ''
+  isLoading.value = true
+  
+  const result = await signIn(email.value, password.value)
+  
+  if (result.success) {
+    router.push('/dashboard')
+  } else {
+    errorMessage.value = result.message
+  }
+  
+  isLoading.value = false
+}
 </script>
 
 <template>
