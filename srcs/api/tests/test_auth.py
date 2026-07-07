@@ -38,8 +38,10 @@ def test_me_with_valid_token(client: TestClient) -> None:
     resp = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     body = resp.json()
+    assert body["id"]
     assert body["email"] == ADMIN_EMAIL
     assert body["role"] == "admin"
+    assert body["status"] == "active"
 
 
 def test_me_without_token_is_401(client: TestClient) -> None:

@@ -1,5 +1,6 @@
 """JWT issuing/validation and password verification."""
 
+import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -9,13 +10,16 @@ from jose import JWTError, jwt
 from app.core.config import Settings
 
 
-def verify_password(plain: str, expected: str) -> bool:
-    """Constant-time comparison of a plaintext password against the expected value.
+def hash_password(plain: str) -> str:
+    """Return the SHA-256 digest for the supplied password."""
 
-    Credentials are supplied via config as plaintext this iteration, so we compare
-    directly. When persistence is added this becomes a bcrypt hash verification.
-    """
-    return secrets.compare_digest(plain.encode(), expected.encode())
+    return hashlib.sha256(plain.encode("utf-8")).hexdigest()
+
+
+def verify_password(plain: str, expected_hash: str) -> bool:
+    """Constant-time comparison of a plaintext password against its expected SHA-256 digest."""
+
+    return secrets.compare_digest(hash_password(plain), expected_hash)
 
 
 def create_access_token(subject: str, settings: Settings, **claims: Any) -> str:
@@ -39,5 +43,6 @@ __all__ = [
     "JWTError",
     "create_access_token",
     "decode_access_token",
+    "hash_password",
     "verify_password",
 ]

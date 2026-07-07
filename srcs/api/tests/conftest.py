@@ -2,6 +2,8 @@
 
 import pytest
 
+from app.repositories.user_repository import InMemoryUserRepository
+
 ADMIN_EMAIL = "admin@example.com"
 ADMIN_PASSWORD = "s3cret-pass"
 
@@ -45,7 +47,14 @@ def _env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
-def client(_env: None):
+def user_repository() -> InMemoryUserRepository:
+    """Shared in-memory repository for a test app instance."""
+
+    return InMemoryUserRepository()
+
+
+@pytest.fixture
+def client(_env: None, user_repository: InMemoryUserRepository):
     """A TestClient with a fresh app and cleared settings cache."""
     from fastapi.testclient import TestClient
 
@@ -53,4 +62,6 @@ def client(_env: None):
     from app.main import create_app
 
     get_settings.cache_clear()
-    return TestClient(create_app())
+    with TestClient(create_app(user_repository=user_repository)) as test_client:
+        yield test_client
+    get_settings.cache_clear()
