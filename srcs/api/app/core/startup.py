@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from app.core.config import Settings
 from app.core.logging import get_logger
+from app.repositories.novel_repository import NovelRepository
 from app.repositories.user_repository import UserRepository
 from app.services.user_service import seed_admin_user
 
@@ -27,7 +28,8 @@ logger = get_logger("startup")
 
 def build_lifespan(
     settings: Settings,
-    provided_repository: UserRepository | None,
+    provided_user_repository: UserRepository | None,
+    provided_novel_repository: NovelRepository | None,
 ) -> Callable[[FastAPI], Any]:
     """Create the FastAPI lifespan function for startup orchestration."""
 
@@ -36,10 +38,11 @@ def build_lifespan(
         logger.info("Application startup initiated")
         validate_external_connections(settings)
         logger.info("External infrastructure validation succeeded")
-        repository = provided_repository or _build_default_user_repository(settings)
-        app.state.user_repository = repository
-        logger.info("User repository is ready")
-        seed_admin_user(settings, repository)
+        user_repository = provided_user_repository or _build_default_user_repository(settings)
+        novel_repository = provided_novel_repository or _build_default_novel_repository(settings)
+        app.state.user_repository = user_repository
+        app.state.novel_repository = novel_repository
+        seed_admin_user(settings, user_repository)
         logger.info("Application startup completed")
         yield
 
@@ -108,6 +111,12 @@ def _build_default_user_repository(settings: Settings) -> UserRepository:
     from app.repositories.cosmosdb.cosmos_user_repository import build_cosmos_user_repository
 
     return build_cosmos_user_repository(settings)
+
+
+def _build_default_novel_repository(settings: Settings) -> NovelRepository:
+    from app.repositories.cosmosdb.cosmos_novel_repository import build_cosmos_novel_repository
+
+    return build_cosmos_novel_repository(settings)
 
 
 def _should_verify_connection(settings: Settings) -> bool:

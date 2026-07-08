@@ -2,6 +2,7 @@
 
 import pytest
 
+from app.repositories.novel_repository import InMemoryNovelRepository
 from app.repositories.user_repository import InMemoryUserRepository
 
 ADMIN_EMAIL = "admin@example.com"
@@ -56,7 +57,18 @@ def user_repository() -> InMemoryUserRepository:
 
 
 @pytest.fixture
-def client(_env: None, user_repository: InMemoryUserRepository):
+def novel_repository() -> InMemoryNovelRepository:
+    """Shared in-memory novel repository for a test app instance."""
+
+    return InMemoryNovelRepository()
+
+
+@pytest.fixture
+def client(
+    _env: None,
+    user_repository: InMemoryUserRepository,
+    novel_repository: InMemoryNovelRepository,
+):
     """A TestClient with a fresh app and cleared settings cache."""
     from fastapi.testclient import TestClient
 
@@ -64,6 +76,8 @@ def client(_env: None, user_repository: InMemoryUserRepository):
     from app.main import create_app
 
     get_settings.cache_clear()
-    with TestClient(create_app(user_repository=user_repository)) as test_client:
+    with TestClient(
+        create_app(user_repository=user_repository, novel_repository=novel_repository)
+    ) as test_client:
         yield test_client
     get_settings.cache_clear()

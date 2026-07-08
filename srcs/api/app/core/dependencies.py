@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import Settings, get_settings
 from app.core.security import JWTError, decode_access_token
+from app.repositories.novel_repository import NovelRepository
 from app.domain.users import User, UserRole, UserStatus
 from app.repositories.user_repository import UserRepository
 
@@ -25,6 +26,18 @@ def get_user_repository(request: Request) -> UserRepository:
 
 
 UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
+
+
+def get_novel_repository(request: Request) -> NovelRepository:
+    """Resolve the configured novel repository from app state."""
+
+    repository = getattr(request.app.state, "novel_repository", None)
+    if repository is None:
+        raise RuntimeError("Novel repository is not configured")
+    return cast(NovelRepository, repository)
+
+
+NovelRepositoryDep = Annotated[NovelRepository, Depends(get_novel_repository)]
 
 
 def get_current_user(
