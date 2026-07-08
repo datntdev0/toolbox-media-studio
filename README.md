@@ -30,7 +30,7 @@ Novel Media Studio is a cloud-native, multi-stage content generation platform th
 - **Node.js** 20+ and **pnpm** 9+ (for frontend)
 - **Python** 3.12+ and **pip** (for backend)
 - **Docker Desktop** (for local Azure emulators)
-- **Git** (for version control)
+- **[Azure Functions Core Tools v4](https://learn.microsoft.com/azure/azure-functions/functions-run-local)**
 
 ### 1. Clone the Repository
 
@@ -44,7 +44,7 @@ cd toolbox-media-studio
 Start the Azure CosmosDB Emulator and Azurite (Blob/Queue emulator):
 
 ```bash
-docker compose -f deploy/dockercompose.local.infra.yml up -d
+docker compose -f deploy/dockercompose.local.infra.yml -p datntdev_media_studio_infra up -d
 ```
 
 This starts:
@@ -138,7 +138,7 @@ npx playwright show-report
 │   │   ├── components/   # Reusable UI components
 │   │   └── nuxt.config.ts
 │   │
-│   ├── workers/          # Azure Durable Functions (planned)
+│   ├── azfunc/           # Azure Durable Functions
 │   └── shared/           # Shared schemas & contracts (planned)
 │
 ├── tests/                # E2E tests (Playwright)

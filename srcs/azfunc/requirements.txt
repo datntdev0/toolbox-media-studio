@@ -1,0 +1,3 @@
+# Azure Functions
+azure-functions==1.18.0
+azure-functions-durable==1.2.9

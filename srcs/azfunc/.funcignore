@@ -1,0 +1,17 @@
+.git*
+.vscode
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+.env
+local.settings.json
+test
+.pytest_cache
+.coverage
+htmlcov
+.mypy_cache
+README.md

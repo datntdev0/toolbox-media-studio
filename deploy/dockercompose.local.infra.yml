@@ -6,8 +6,8 @@ services:
       - --protocol
       - http
     ports:
-      - "8081:8081"
       - "8080:8080"
+      - "8081:8081"
       - "1234:1234"
     volumes:
       - cosmosdb-data:/data
@@ -35,6 +35,14 @@ services:
       - "10002:10002"
     volumes:
       - azurite-data:/data
+    restart: unless-stopped
+
+  azfunctions:
+    image: mcr.microsoft.com/dts/dts-emulator:latest
+    container_name: toolbox-dts-emulator
+    ports:
+      - "8082:8080"
+      - "8083:8081"
     restart: unless-stopped
 
 volumes:
