@@ -15,15 +15,15 @@ const errorMessage = ref('')
 const handleSignIn = async () => {
   errorMessage.value = ''
   isLoading.value = true
-  
+
   const result = await signIn(email.value, password.value)
-  
+
   if (result.success) {
     router.push('/dashboard')
   } else {
     errorMessage.value = result.message
   }
-  
+
   isLoading.value = false
 }
 </script>
@@ -33,8 +33,13 @@ const handleSignIn = async () => {
 
     <AuthTabs />
 
-    <h2 class="text-2xl font-bold text-gray-900 mb-2">Welcome back</h2>
-    <p class="text-sm text-gray-600 mb-8">Continue to your workspace pipeline.</p>
+    <h2 class="font-geist text-headline-lg text-on-background mb-2">
+      Welcome back
+    </h2>
+
+    <p class="font-inter text-body-md text-on-surface-variant mb-8">
+      Continue to your workspace pipeline.
+    </p>
 
     <AuthDivider label="Primary Access" />
 
@@ -47,14 +52,16 @@ const handleSignIn = async () => {
 
     <form @submit.prevent="handleSignIn" class="space-y-4">
 
-      <<AuthBaseInput id="email" label="Email Address" type="email" placeholder="name@company.com" v-model="email" />
+      <AuthBaseInput id="email" label="Email Address" type="email" placeholder="name@company.com" v-model="email" />
 
       <AuthBaseInput id="password" label="Password" type="password" placeholder="••••••••"
         forgot-password-url="/forgot-password" v-model="password" />
 
-      <UButton type="submit" block size="lg" class="mt-4 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold py-3">
+      <UButton type="submit" block size="lg"
+        class="mt-4 bg-primary hover:bg-primary-container text-on-primary font-geist text-headline-sm py-3">
         Sign in
       </UButton>
+
     </form>
 
   </AuthSplitShell>

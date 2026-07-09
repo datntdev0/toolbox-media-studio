@@ -9,10 +9,10 @@ defineProps({
 
 <template>
   <div class="flex items-center mb-6">
-    <div class="grow border-t border-gray-200"></div>
-    <span class="px-4 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
+    <div class="grow border-t border-outline-variant"></div>
+    <span class="px-4 uppercase font-geist text-label-sm text-on-surface-variant">
       {{ label }}
     </span>
-    <div class="grow border-t border-gray-200"></div>
+    <div class="grow border-t border-outline-variant"></div>
   </div>
 </template>
