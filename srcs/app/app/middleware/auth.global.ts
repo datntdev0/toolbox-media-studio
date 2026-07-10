@@ -1,7 +1,12 @@
 export default defineNuxtRouteMiddleware((to, from) => {
-  const accessToken = useCookie('access-token')
+  const { accessToken, clearAccessToken, isAccessTokenExpired } = useAuth()
+  const isAuthPage = to.path === '/signin' || to.path === '/signup'
+
+  if (accessToken.value && isAccessTokenExpired()) {
+    clearAccessToken()
+  }
+
   if (to.path === '/') {
-    console.log(accessToken)
     if (accessToken.value) {
       return navigateTo('/dashboard')
     } else {
@@ -9,13 +14,16 @@ export default defineNuxtRouteMiddleware((to, from) => {
     }
   }
 
-  const isAuthPage = to.path === '/signin' || to.path === '/signup'
-
   if (accessToken.value && isAuthPage) {
     return navigateTo('/dashboard')
   }
 
   if (!accessToken.value && !isAuthPage) {
-    return navigateTo('/signin')
+    return navigateTo({
+      path: '/signin',
+      query: {
+        redirect: to.fullPath
+      }
+    })
   }
 })
