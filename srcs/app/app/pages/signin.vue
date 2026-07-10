@@ -3,7 +3,12 @@ import { ref } from 'vue'
 
 definePageMeta({ layout: 'auth' })
 
+useHead({
+  title: 'Sign In' 
+})
+
 const router = useRouter()
+const route = useRoute()
 
 const { signIn } = useAuth()
 
@@ -12,6 +17,20 @@ const password = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
 
+const getSafeRedirectPath = () => {
+  const redirect = route.query.redirect
+
+  if (typeof redirect !== 'string') {
+    return '/dashboard'
+  }
+
+  if (!redirect.startsWith('/') || redirect.startsWith('//')) {
+    return '/dashboard'
+  }
+
+  return redirect
+}
+
 const handleSignIn = async () => {
   errorMessage.value = ''
   isLoading.value = true
@@ -19,7 +38,7 @@ const handleSignIn = async () => {
   const result = await signIn(email.value, password.value)
 
   if (result.success) {
-    router.push('/dashboard')
+    router.push(getSafeRedirectPath())
   } else {
     errorMessage.value = result.message
   }

@@ -1,5 +1,9 @@
 <script setup>
 definePageMeta({ layout: 'auth' })
+
+useHead({
+  title: "Sign up"
+})
 </script>
 
 <template>
