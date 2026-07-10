@@ -6,11 +6,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
+from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.startup import build_lifespan
 from app.repositories.novel_repository import NovelRepository
 from app.repositories.user_repository import UserRepository
-from app.routers import auth, health, novels, users
+from app.routers import auth, crawlers, health, novels, users
 
 
 def create_app(
@@ -37,10 +38,13 @@ def create_app(
         allow_headers=["*"],
     )
 
+    register_exception_handlers(app)
+
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(users.router)
     app.include_router(novels.router)
+    app.include_router(crawlers.router)
 
     return app
 app = create_app()

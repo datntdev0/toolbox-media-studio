@@ -11,7 +11,7 @@
       "module": "uvicorn",
       "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8000", "--reload"],
       "cwd": "${workspaceFolder}/srcs/api",
-      "python": "${workspaceFolder}/srcs/api/.venv/Scripts/python.exe",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
       "envFile": "${workspaceFolder}/srcs/api/.env",
       "console": "integratedTerminal",
       "justMyCode": false,

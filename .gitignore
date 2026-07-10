@@ -45,3 +45,7 @@ venv/
 
 # Environment
 .env
+
+# Codex
+.agents/
+AGENTS.md

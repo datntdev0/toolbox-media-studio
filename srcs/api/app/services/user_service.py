@@ -108,7 +108,7 @@ def delete_user(
 def seed_admin_user(settings: Settings, user_repository: UserRepository) -> User | None:
     """Seed the default admin user if it is missing."""
 
-    logger.info("Ensuring default admin user exists", extra={"admin_email": settings.admin_email})
+    logger.info("Ensuring default admin user exists...", extra={"admin_email": settings.admin_email})
     now = datetime.now(UTC)
     normalized_email = settings.admin_email.lower()
     seed_user = User(
@@ -125,14 +125,6 @@ def seed_admin_user(settings: Settings, user_repository: UserRepository) -> User
         updated_at=now,
     )
     created_user = user_repository.seed_admin(seed_user)
-    if created_user is None:
-        logger.info(
-            "Default admin user already exists",
-            extra={"admin_email": settings.admin_email},
-        )
-        return None
-
-    logger.info("Default admin user seeded", extra={"admin_email": settings.admin_email})
     return created_user
 
 

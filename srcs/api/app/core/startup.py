@@ -35,15 +35,12 @@ def build_lifespan(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        logger.info("Application startup initiated")
         validate_external_connections(settings)
-        logger.info("External infrastructure validation succeeded")
         user_repository = provided_user_repository or _build_default_user_repository(settings)
         novel_repository = provided_novel_repository or _build_default_novel_repository(settings)
         app.state.user_repository = user_repository
         app.state.novel_repository = novel_repository
         seed_admin_user(settings, user_repository)
-        logger.info("Application startup completed")
         yield
 
     return lifespan
@@ -51,16 +48,14 @@ def build_lifespan(
 
 def validate_external_connections(settings: Settings) -> None:
     """Fail fast if the configured Azure endpoints cannot be reached."""
-
-    logger.info("Validating external infrastructure connections")
     _check_cosmos(settings)
     _check_blob_storage(settings)
     _check_queue_storage(settings)
-    logger.info("External infrastructure connections validated successfully")
 
 
 def _check_cosmos(settings: Settings) -> None:
-    logger.info("Checking Cosmos DB connectivity")
+    logger.info("Checking connectivity to Cosmos DB...")
+
     try:
         client = CosmosClient.from_connection_string(
             settings.az_cosmosdb_connection_string,
@@ -72,11 +67,11 @@ def _check_cosmos(settings: Settings) -> None:
         raise RuntimeError(
             "Unable to connect to Cosmos DB using AZ_COSMOSDB_CONNECTION_STRING."
         ) from exc
-    logger.info("Cosmos DB connectivity check succeeded")
 
 
 def _check_blob_storage(settings: Settings) -> None:
-    logger.info("Checking Blob Storage connectivity")
+    logger.info("Checking connectivity to Blob Storage...")
+
     try:
         client = BlobServiceClient.from_connection_string(
             settings.az_storage_blob_connection_string,
@@ -88,11 +83,11 @@ def _check_blob_storage(settings: Settings) -> None:
         raise RuntimeError(
             "Unable to connect to Blob Storage using AZ_STORAGE_BLOB_CONNECTION_STRING."
         ) from exc
-    logger.info("Blob Storage connectivity check succeeded")
 
 
 def _check_queue_storage(settings: Settings) -> None:
-    logger.info("Checking Queue Storage connectivity")
+    logger.info("Checking connectivity to Queue Storage...")
+
     try:
         client = QueueServiceClient.from_connection_string(
             settings.az_storage_queue_connection_string,
@@ -104,7 +99,6 @@ def _check_queue_storage(settings: Settings) -> None:
         raise RuntimeError(
             "Unable to connect to Queue Storage using AZ_STORAGE_QUEUE_CONNECTION_STRING."
         ) from exc
-    logger.info("Queue Storage connectivity check succeeded")
 
 
 def _build_default_user_repository(settings: Settings) -> UserRepository:
