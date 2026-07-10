@@ -3,7 +3,7 @@
     
     <div class="flex flex-col items-center px-6 py-2 border-b border-outline-variant">
       <div class="flex items-center gap-2">
-        <img src="/logo.svg" alt="StoryForge Logo" class="h-8 w-8" />
+        <img src="/logo.png" alt="StoryForge Logo" class="h-8 w-8" />
         <span class="font-geist text-headline-sm text-primary">StoryForge</span>
       </div>
       <div class="px-6">
