@@ -9,7 +9,13 @@ from app.domain.novels import Novel
 from app.domain.requests import NovelCreateRequest, NovelUpdateRequest
 from app.domain.responses import NovelListResponse, NovelResponse
 from app.repositories.novel_repository import NovelConflictError, NovelNotFoundError
-from app.services.novel_service import create_novel, delete_novel, get_novel, list_novels, update_novel
+from app.services.novel_service import (
+    create_novel,
+    delete_novel,
+    get_novel,
+    list_novels,
+    update_novel,
+)
 
 router = APIRouter(prefix="/api/novels", tags=["novels"])
 
@@ -60,7 +66,10 @@ def get_novel_route(
     try:
         novel = get_novel(id, current_user, novel_repository)
     except NovelNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Novel not found") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Novel not found",
+        ) from exc
     return to_novel_response(novel)
 
 
@@ -77,7 +86,10 @@ def update_novel_route(
     try:
         novel = update_novel(id, body, current_user, novel_repository, if_match)
     except NovelNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Novel not found") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Novel not found",
+        ) from exc
     except NovelConflictError as exc:
         raise HTTPException(
             status_code=status.HTTP_412_PRECONDITION_FAILED,
@@ -98,7 +110,10 @@ def delete_novel_route(
     try:
         delete_novel(id, current_user, novel_repository, if_match)
     except NovelNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Novel not found") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Novel not found",
+        ) from exc
     except NovelConflictError as exc:
         raise HTTPException(
             status_code=status.HTTP_412_PRECONDITION_FAILED,

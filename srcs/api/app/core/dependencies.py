@@ -7,9 +7,11 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import Settings, get_settings
 from app.core.security import JWTError, decode_access_token
-from app.repositories.novel_repository import NovelRepository
 from app.domain.users import User, UserRole, UserStatus
+from app.providers.cache_provider import CacheProvider
+from app.repositories.novel_repository import NovelRepository
 from app.repositories.user_repository import UserRepository
+from app.services.crawler_service import FlareSolverrClientLike
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
@@ -38,6 +40,30 @@ def get_novel_repository(request: Request) -> NovelRepository:
 
 
 NovelRepositoryDep = Annotated[NovelRepository, Depends(get_novel_repository)]
+
+
+def get_cache_provider(request: Request) -> CacheProvider:
+    """Resolve the configured cache provider from app state."""
+
+    cache_provider = getattr(request.app.state, "cache_provider", None)
+    if cache_provider is None:
+        raise RuntimeError("Cache provider is not configured")
+    return cast(CacheProvider, cache_provider)
+
+
+CacheProviderDep = Annotated[CacheProvider, Depends(get_cache_provider)]
+
+
+def get_flaresolverr_client(request: Request) -> FlareSolverrClientLike:
+    """Resolve the configured FlareSolverr client from app state."""
+
+    client = getattr(request.app.state, "flaresolverr_client", None)
+    if client is None:
+        raise RuntimeError("FlareSolverr client is not configured")
+    return cast(FlareSolverrClientLike, client)
+
+
+FlareSolverrClientDep = Annotated[FlareSolverrClientLike, Depends(get_flaresolverr_client)]
 
 
 def get_current_user(

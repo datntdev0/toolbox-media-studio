@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     az_storage_blob_connection_string: str
     az_storage_queue_connection_string: str
 
+    # Crawler infrastructure.
+    flaresolverr_base_url: str = "http://localhost:8191/v1"
+    flaresolverr_max_timeout_ms: int = 60000
+    crawler_cache_ttl_seconds: int = 2_592_000
+
 
 @lru_cache
 def get_settings() -> Settings:

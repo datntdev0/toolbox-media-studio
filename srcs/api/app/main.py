@@ -9,14 +9,18 @@ from app.core.config import get_settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.startup import build_lifespan
+from app.providers.cache_provider import CacheProvider
 from app.repositories.novel_repository import NovelRepository
 from app.repositories.user_repository import UserRepository
 from app.routers import auth, crawlers, health, novels, users
+from app.services.crawler_service import FlareSolverrClientLike
 
 
 def create_app(
     user_repository: UserRepository | None = None,
     novel_repository: NovelRepository | None = None,
+    cache_provider: CacheProvider | None = None,
+    flaresolverr_client: FlareSolverrClientLike | None = None,
 ) -> FastAPI:
     """Build and configure the FastAPI application."""
 
@@ -27,7 +31,13 @@ def create_app(
         title="Novel Media Studio API",
         version="0.1.0",
         summary="Domain API — authentication, user-management, and novel-management slices",
-        lifespan=build_lifespan(settings, user_repository, novel_repository),
+        lifespan=build_lifespan(
+            settings,
+            user_repository,
+            novel_repository,
+            cache_provider,
+            flaresolverr_client,
+        ),
     )
 
     app.add_middleware(
