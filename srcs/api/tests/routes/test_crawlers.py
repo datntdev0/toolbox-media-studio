@@ -7,7 +7,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from app.providers.cache_provider import RepositoryCacheProvider
-from tests.conftest import ADMIN_EMAIL, ADMIN_PASSWORD, FakeFlareSolverrClient
+from tests.conftest import TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD, FakeFlareSolverrClient
 
 SAMPLE_HTML = """
 <html>
@@ -28,7 +28,10 @@ SAMPLE_HTML = """
 
 
 def _login(client: TestClient) -> str:
-    response = client.post("/auth/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
+    response = client.post(
+        "/auth/login",
+        json={"email": TEST_ADMIN_EMAIL, "password": TEST_ADMIN_PASSWORD},
+    )
     assert response.status_code == 200
     return response.json()["access_token"]
 
@@ -181,4 +184,3 @@ def test_metadata_maps_flaresolverr_bad_response_to_502(
     response = client.get(_metadata_url(), headers=_headers(client))
 
     assert response.status_code == 502
-

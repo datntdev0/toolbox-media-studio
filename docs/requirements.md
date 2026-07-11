@@ -47,6 +47,11 @@ Workflow: add a novel to the **Library**.
 - **FR-2.6** The user can view the crawled **content** of each chapter.
 - **FR-2.7** Adding a new source site requires only a new connector implementation
   (no core changes).
+- **FR-2.8** The API can synchronously fetch and return approved source metadata before a full
+  crawl job is created. The first supported source is `novel543`, validated by crawler ID and
+  source URL allowlist.
+- **FR-2.9** Crawler metadata fetches are cached through the generic cache provider to avoid
+  repeated browser-backed fetches for the same source URL.
 
 ## FR-3 — Translation Projects
 
@@ -138,3 +143,5 @@ before any spend.
 - **NFR-4 Extensibility.** Connectors (sources) and provider adapters (LLM/TTS/image/video) are
   pluggable without core changes.
 - **NFR-5 Security.** Credentials live in a secrets vault, referenced (not stored) by config docs.
+- **NFR-6 Crawler safety.** Browser-backed crawler fetches must be restricted to approved crawler
+  IDs and source hosts; the API must not expose a general-purpose proxy.

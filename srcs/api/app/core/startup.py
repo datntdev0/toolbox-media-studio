@@ -75,7 +75,7 @@ def _check_cosmos(settings: Settings) -> None:
     except Exception as exc:  # pragma: no cover - runtime integration path
         logger.exception("Cosmos DB connectivity check failed")
         raise RuntimeError(
-            "Unable to connect to Cosmos DB using AZ_COSMOSDB_CONNECTION_STRING."
+            "Unable to connect to Cosmos DB using FAST_AZ_CONNECTION_STRING_COSMOSDB."
         ) from exc
 
 
@@ -91,7 +91,7 @@ def _check_blob_storage(settings: Settings) -> None:
     except Exception as exc:  # pragma: no cover - runtime integration path
         logger.exception("Blob Storage connectivity check failed")
         raise RuntimeError(
-            "Unable to connect to Blob Storage using AZ_STORAGE_BLOB_CONNECTION_STRING."
+            "Unable to connect to Blob Storage using FAST_AZ_CONNECTION_STRING_STORAGE_BLOB."
         ) from exc
 
 
@@ -107,7 +107,7 @@ def _check_queue_storage(settings: Settings) -> None:
     except Exception as exc:  # pragma: no cover - runtime integration path
         logger.exception("Queue Storage connectivity check failed")
         raise RuntimeError(
-            "Unable to connect to Queue Storage using AZ_STORAGE_QUEUE_CONNECTION_STRING."
+            "Unable to connect to Queue Storage using FAST_AZ_CONNECTION_STRING_STORAGE_QUEUE."
         ) from exc
 
 

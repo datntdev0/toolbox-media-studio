@@ -1,25 +1,28 @@
 # Novel Media Studio — API (FastAPI)
 
-The domain API for Novel Media Studio. This document scopes the **bare-minimum setup for the
-authentication feature only** (FR-1) — the first slice of Phase 0. There is **no database yet**:
-login is validated directly against `ADMIN_EMAIL` / `ADMIN_PASSWORD` from config. Everything
-else (Cosmos, novels, projects, the `job-events` consumer, Durable orchestration) is deliberately
-**out of scope here** and will be layered in later.
+The domain API for Novel Media Studio. It currently includes JWT authentication, user and novel
+management, and the first crawler metadata slice for `novel543` using FlareSolverr plus a generic
+cache provider backed by repositories.
 
 See the design docs for the full picture:
 [`architecture.md`](../../docs/architecture.md) · [`requirements.md`](../../docs/requirements.md) ·
 [`deployment.md`](../../docs/deployment.md).
 
-## Scope (this iteration)
+## Current Scope
 
-In scope — **auth only, no database**:
+Implemented:
 
-- `POST /auth/login` — verify credentials against `ADMIN_EMAIL` / `ADMIN_PASSWORD`, issue a JWT (FR-1.1).
-- `GET /auth/me` — return the current user from a valid JWT (proves the token round-trips).
-- `GET /health` — readiness for deployment verification.
+- `POST /auth/login` and `GET /auth/me` for JWT sessions.
+- `GET /health` readiness.
+- `/api/users` admin user-management routes.
+- `/api/novels` user-scoped novel-management routes.
+- `/api/crawlers` registry and `/api/crawlers/{crawler_id}/metadata` for `novel543`.
+- Cosmos-backed repositories for users, novels, and generic cache records.
+- FlareSolverr-backed metadata fetching through `srcs/shared/flaresolverr_http_client.py`.
+- Novel543 metadata parsing through `srcs/shared/novel543_parser.py`.
 
-Out of scope (added later): Cosmos DB and any persistence, user registration, novels, chapters,
-projects, AI models, connectors, the `job-events` consumer, and Durable Functions integration.
+Still out of scope: chapter body crawling, background crawl orchestration, translation, audio,
+image, and video pipelines.
 
 ## Tech stack
 
@@ -30,6 +33,8 @@ projects, AI models, connectors, the `job-events` consumer, and Durable Function
 | Validation | Pydantic v2 / `pydantic-settings` |
 | Auth | JWT (`python-jose`); credentials compared against config |
 | Dep management | `pyproject.toml` + pip |
+| Crawler fetch | FlareSolverr through shared HTTP client |
+| HTML parsing | BeautifulSoup in shared parser libraries |
 | Tooling | ruff (lint+format), mypy (types), pytest (tests) |
 
 ## Login flow
@@ -42,7 +47,7 @@ sequenceDiagram
     participant Cfg as Settings (env)
 
     U->>A: POST /auth/login { email, password }
-    A->>Cfg: read ADMIN_EMAIL / ADMIN_PASSWORD
+    A->>Cfg: read FAST_SECURITY_DEFAULT_ADMIN_EMAIL / FAST_SECURITY_DEFAULT_ADMIN_PASSWORD
     A->>A: compare credentials, sign JWT
     A-->>U: 200 { access_token }  (or 401)
 
@@ -51,26 +56,34 @@ sequenceDiagram
     A-->>U: 200 { email, role }
 ```
 
-## Layered architecture
+## Layered Architecture
 
-Even for auth, the app keeps the target dependency direction so later features slot in cleanly:
-**router → service**, with cross-cutting infra in `core/`. There is no repository layer yet
-because there is no data store — the service reads the admin credentials straight from settings.
+The API keeps a simple dependency direction:
+
+`routers → services → providers → repositories`
+
+Cross-cutting config, security, logging, and dependency resolution live under `core/`.
+Reusable code that should not depend on FastAPI lives under `srcs/shared`.
 
 ```mermaid
 flowchart TB
-    R["routers/auth.py<br/>HTTP: routing, request/response, status codes"]
-    S["services/auth_service.py<br/>login, JWT issue"]
-    Cfg["core/config.py<br/>ADMIN_EMAIL / ADMIN_PASSWORD / JWT settings"]
+    R["routers/<feature>.py<br/>HTTP contracts/status mapping"]
+    S["services/<feature>_service.py<br/>use-case orchestration"]
+    P["providers/<adapter>_provider.py<br/>runtime adapters"]
+    Repo["repositories/<entity>_repository.py<br/>persistence contracts"]
+    Cosmos["repositories/cosmosdb/<entity>.py<br/>Cosmos implementations"]
+    Shared["../shared<br/>FlareSolverr client · Novel543 parser"]
 
-    R --> S --> Cfg
+    R --> S
+    S --> P --> Repo --> Cosmos
+    S --> Shared
 ```
 
-Rules: routers hold no business logic; the service reads config, not FastAPI internals. When a
-database is added, a `repositories/` layer will sit between the service and the store without
-changing the router or the service contract.
+Rules: routers hold no business logic; services orchestrate use cases; providers adapt runtime
+capabilities such as cache and crawler registries; repositories own persistence contracts and
+Cosmos implementations.
 
-## Directory structure (minimal)
+## Directory Structure
 
 ```
 srcs/api/
@@ -80,70 +93,99 @@ srcs/api/
   app/
     main.py                  # FastAPI app factory; mounts routers
     core/
-      config.py              #   Settings (pydantic-settings) — env-driven
-      security.py            #   JWT encode/decode, password verify
-      dependencies.py        #   get_current_user, get_settings
-    routers/
-      auth.py                #   POST /auth/login, GET /auth/me
-      health.py              #   GET /health
-    services/
-      auth_service.py        #   validate credentials, issue JWT
+      config.py              # Settings (pydantic-settings)
+      security.py            # JWT encode/decode, password verify
+      dependencies.py        # FastAPI dependency providers
     domain/
-      requests.py            #   LoginRequest
-      responses.py           #   TokenResponse, UserResponse
+      crawlers.py            # Crawler response/domain models
+      requests.py            # Inbound request models
+      responses.py           # Common outbound response models
+    providers/
+      cache_provider.py      # Generic cache behavior + TTL enforcement
+      crawler_provider.py    # Supported crawler registry and URL validation
+    repositories/
+      cache_repository.py    # Generic cache persistence contract + in-memory repo
+      cosmosdb/              # Cosmos DB implementations
+    routers/
+      auth.py                # POST /auth/login, GET /auth/me
+      crawlers.py            # crawler registry + metadata endpoint
+      health.py              # GET /health
+      novels.py              # /api/novels
+      users.py               # /api/users
+    services/
+      auth_service.py
+      crawler_service.py
+      novel_service.py
+      user_service.py
   tests/
     conftest.py
-    test_auth.py
+    providers/
+    repositories/
+    routes/
+    services/
+    test_startup.py
 ```
 
 ## Configuration
 
 Env-driven via `core/config.py` (`pydantic-settings`). Copy `.env.example` to `.env` for local
-development. Only what auth needs right now:
+development.
 
 | Variable | Kind | Purpose |
 |---|---|---|
-| `ADMIN_EMAIL` | non-secret | the single accepted login email |
-| `ADMIN_PASSWORD` | secret | the single accepted login password |
-| `JWT_SIGNING_KEY` | secret | key used to sign/verify JWTs |
-| `JWT_EXPIRE_MINUTES` | non-secret | access-token lifetime (e.g. `60`) |
+| `FAST_ENVIRONMENT` | non-secret | runtime environment name; `localhost` relaxes emulator TLS checks |
+| `FAST_LOG_LEVEL` | non-secret | API log level |
+| `FAST_LOG_FILE_PATH` | non-secret/local | API log file path |
+| `FAST_SECURITY_JWT_SIGNING_KEY` | secret | key used to sign/verify JWTs |
+| `FAST_SECURITY_JWT_EXPIRE_MINUTES` | non-secret | access-token lifetime (e.g. `120`) |
+| `FAST_SECURITY_DEFAULT_ADMIN_EMAIL` | non-secret | default admin login email |
+| `FAST_SECURITY_DEFAULT_ADMIN_PASSWORD` | secret | default admin login password |
+| `FAST_SECURITY_CORS_ALLOWED_ORIGIN` | non-secret | allowed Nuxt web origin |
+| `FAST_AZ_CONNECTION_STRING_COSMOSDB` | secret/local | Cosmos DB or emulator connection string |
+| `FAST_AZ_CONNECTION_STRING_STORAGE_BLOB` | secret/local | Blob storage or Azurite connection string |
+| `FAST_AZ_CONNECTION_STRING_STORAGE_QUEUE` | secret/local | Queue storage or Azurite connection string |
+| `FAST_AZ_COSMOSDB_DATABASE_NAME` | non-secret | Cosmos database name |
+| `FAST_FLARESOLVERR_BASE_URL` | non-secret | FlareSolverr `/v1` URL |
+| `FAST_FLARESOLVERR_MAX_TIMEOUT_MS` | non-secret | Max FlareSolverr request timeout |
+| `FAST_CACHE_TTL_SECONDS_CRAWLER` | non-secret | crawler cache freshness window |
 
 > In Azure, secrets resolve from Key Vault via Managed Identity; locally they come from `.env`.
 
 ## Local development
 
-Requires Python 3.12+.
+Requires Python 3.12+, the repository root `.venv`, and local infrastructure from
+`deploy/dockercompose.local.infra.yml`.
 
 ```bash
-# from srcs/api/
-python -m venv .venv
-source .venv/bin/activate                  # Windows: .venv\Scripts\activate
-
-pip install -e ".[dev]"
-
-cp .env.example .env                        # then fill in values
-
-uvicorn app.main:app --reload --port 8000  # docs at http://localhost:8000/docs
+# from the repository root
+scripts/backend.setup.sh
+scripts/backend.start.sh
 ```
+
+`backend.setup.sh` activates the root `.venv`, installs `srcs/api` with dev dependencies, and
+copies `.env.example` to `.env` if needed. `backend.start.sh` activates the same environment and
+runs `uvicorn app.main:app --reload --port 8000` from `srcs/api`.
 
 ## Quality gates
 
 ```bash
-ruff check . && ruff format --check .
-mypy app
 pytest
+ruff check . ../shared
+mypy app
+mypy ../shared
 ```
 
 ## Verification
 
 - `GET /health` returns `200`.
-- `POST /auth/login` with `ADMIN_EMAIL` / `ADMIN_PASSWORD` returns a JWT; any other credentials
-  return `401`.
+- `POST /auth/login` with `FAST_SECURITY_DEFAULT_ADMIN_EMAIL` /
+  `FAST_SECURITY_DEFAULT_ADMIN_PASSWORD` returns a JWT; any other credentials return `401`.
 - `GET /auth/me` with that JWT returns the admin user; a missing/invalid token returns `401`.
+- `GET /api/crawlers/novel543/metadata?url=https://www.novel543.com/0603625457/` returns parsed
+  metadata when FlareSolverr and local infrastructure are running.
 
-## Next steps (out of scope now)
+## Next Steps
 
-Once auth is in place, Phase 0 continues with Cosmos DB (a real `users` store), the `job-events`
-consumer, the Durable client, and the AI Models page — then Phase 1+ adds novels, crawling,
-translation, audio, and video. See the phased roadmap in
-[`architecture.md`](../../docs/architecture.md).
+The next backend slices are chapter body crawling, background crawl orchestration through the
+`job-events` queue and Durable client, AI model configuration, and the translation/audio/image/video
+pipelines. See the phased roadmap in [`architecture.md`](../../docs/architecture.md).

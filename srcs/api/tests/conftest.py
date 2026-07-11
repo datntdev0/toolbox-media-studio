@@ -9,8 +9,8 @@ from app.repositories.cache_repository import InMemoryCacheRepository
 from app.repositories.novel_repository import InMemoryNovelRepository
 from app.repositories.user_repository import InMemoryUserRepository
 
-ADMIN_EMAIL = "admin@example.com"
-ADMIN_PASSWORD = "s3cret-pass"
+TEST_ADMIN_EMAIL = "admin@example.com"
+TEST_ADMIN_PASSWORD = "s3cret-pass"
 
 
 @dataclass(slots=True)
@@ -42,32 +42,32 @@ def _env(monkeypatch: pytest.MonkeyPatch) -> None:
     Environment variables take priority over any local `.env` file in pydantic-settings,
     so these values are what the app sees during tests.
     """
-    monkeypatch.setenv("ADMIN_EMAIL", ADMIN_EMAIL)
-    monkeypatch.setenv("ADMIN_PASSWORD", ADMIN_PASSWORD)
-    monkeypatch.setenv("JWT_SIGNING_KEY", "test-signing-key-please-ignore")
-    monkeypatch.setenv("JWT_EXPIRE_MINUTES", "60")
-    monkeypatch.setenv("LOG_LEVEL", "INFO")
-    monkeypatch.setenv("LOG_FILE_PATH", "logs/test-api.log")
-    monkeypatch.setenv("ENVIRONMENT", "localhost")
-    monkeypatch.setenv("FLARESOLVERR_BASE_URL", "http://localhost:8191/v1")
-    monkeypatch.setenv("FLARESOLVERR_MAX_TIMEOUT_MS", "60000")
-    monkeypatch.setenv("CRAWLER_CACHE_TTL_SECONDS", "2592000")
+    monkeypatch.setenv("FAST_SECURITY_DEFAULT_ADMIN_EMAIL", TEST_ADMIN_EMAIL)
+    monkeypatch.setenv("FAST_SECURITY_DEFAULT_ADMIN_PASSWORD", TEST_ADMIN_PASSWORD)
+    monkeypatch.setenv("FAST_SECURITY_JWT_SIGNING_KEY", "test-signing-key-please-ignore")
+    monkeypatch.setenv("FAST_SECURITY_JWT_EXPIRE_MINUTES", "120")
+    monkeypatch.setenv("FAST_LOG_LEVEL", "INFO")
+    monkeypatch.setenv("FAST_LOG_FILE_PATH", "logs/test-api.log")
+    monkeypatch.setenv("FAST_ENVIRONMENT", "localhost")
+    monkeypatch.setenv("FAST_FLARESOLVERR_BASE_URL", "http://localhost:8191/v1")
+    monkeypatch.setenv("FAST_FLARESOLVERR_MAX_TIMEOUT_MS", "60000")
+    monkeypatch.setenv("FAST_CACHE_TTL_SECONDS_CRAWLER", "2592000")
     monkeypatch.setenv(
-        "AZ_COSMOSDB_CONNECTION_STRING",
+        "FAST_AZ_CONNECTION_STRING_COSMOSDB",
         (
             "AccountEndpoint=https://localhost:8081/;"
             "AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
         ),
     )
-    monkeypatch.setenv("AZ_COSMOSDB_DATABASE_NAME", "mediastudio")
+    monkeypatch.setenv("FAST_AZ_COSMOSDB_DATABASE_NAME", "mediastudio")
     monkeypatch.setenv(
-        "AZ_STORAGE_BLOB_CONNECTION_STRING",
+        "FAST_AZ_CONNECTION_STRING_STORAGE_BLOB",
         "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey="
         "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/"
         "KBHBeksoGMGw==;BlobEndpoint=http://localhost:10000/devstoreaccount1;",
     )
     monkeypatch.setenv(
-        "AZ_STORAGE_QUEUE_CONNECTION_STRING",
+        "FAST_AZ_CONNECTION_STRING_STORAGE_QUEUE",
         "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey="
         "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/"
         "KBHBeksoGMGw==;QueueEndpoint=http://localhost:10001/devstoreaccount1;",
