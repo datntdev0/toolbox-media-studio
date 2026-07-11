@@ -25,7 +25,7 @@ design; see [`deployment.md`](./deployment.md) for infrastructure, CI/CD, and co
 flowchart TB
     Browser["Browser — Vue SPA"]
     Nuxt["Nuxt<br/>App Service #1 (Node)"]
-    API["FastAPI<br/>App Service #2 (Python)<br/>auth · CRUD · start orchestration<br/>job-events consumer (Always On)"]
+    API["FastAPI<br/>App Service #2 (Python)<br/>auth · CRUD · crawler metadata · start orchestration<br/>job-events consumer (Always On)"]
     Queue["Azure Storage Queue<br/><b>job-events</b> — control / lifecycle"]
     DF["Azure Durable Functions (Python, Consumption)<br/>orchestrators + activities · fan-out/fan-in<br/>internal task hub"]
     Cosmos[("Cosmos DB<br/>serverless")]
@@ -64,20 +64,48 @@ Building onto the existing scaffold (`srcs/app` Nuxt, `tests/` Playwright):
 ```
 srcs/
   app/                # Nuxt (exists) — pages/components/layouts/middleware; calls FastAPI directly
-  api/                # FastAPI (NEW): core/ domain/ routers/ services/ repositories/
-                      #   + durable client + job-events consumer (background loop)
-  workers/            # Azure Durable Functions app (NEW, Python):
+  api/                # FastAPI: core/ domain/ providers/ routers/ services/ repositories/
+                      #   + crawler metadata endpoint, durable client, job-events consumer
+  azfunc/             # Azure Durable Functions app (Python):
                       #   host.json, function_app.py
                       #   orchestrators/  (crawl, translate, tts, image, assemble)
                       #   activities/     (fetch_chapter, translate_chapter, tts_segment, gen_image, ffmpeg_assemble, emit_completion)
                       #   providers/      (llm/ tts/ image/ video/ adapters)
-  shared/             # (NEW) pydantic schemas, enums, container names,
-                      #        connector + provider contracts
+  shared/             # Shared libraries with no FastAPI dependency:
+                      #   FlareSolverr HTTP client, Novel543 parser, future schemas/contracts
   infra/              # (NEW) Bicep + CI/CD — see deployment.md
 ```
 
-`api/` and `workers/` both depend on `shared/` so document schemas, enums, connector
+`api/` and `azfunc/` both depend on `shared/` so document schemas, enums, connector
 contracts, and provider adapters never drift.
+
+### FastAPI layering
+
+FastAPI code follows this dependency direction:
+
+```mermaid
+flowchart LR
+    Routes["routers/<feature>.py"]
+    Services["services/<feature>_service.py"]
+    Providers["providers/<adapter>_provider.py"]
+    Repos["repositories/<entity>_repository.py"]
+    CosmosRepos["repositories/cosmosdb/<entity>.py"]
+    Shared["../shared"]
+
+    Routes --> Services
+    Services --> Providers
+    Providers --> Repos --> CosmosRepos
+    Services --> Shared
+```
+
+- **Routers** own HTTP contracts, dependency injection, and status-code mapping.
+- **Services** orchestrate use cases.
+- **Providers** adapt runtime capabilities such as cache behavior and crawler registry
+  validation.
+- **Repositories** define persistence contracts; `repositories/cosmosdb/` contains Cosmos DB
+  implementations.
+- **Shared** contains importable libraries that can be reused by API, workers, and tests without
+  depending on FastAPI.
 
 ## Job lifecycle
 
@@ -161,12 +189,19 @@ binaries go to Blob with a pointer (2 MB item limit; RU cost scales with item si
 | `tasks` | `/jobId` | per-chapter / per-scene unit; status, attempts, output ptr | "all tasks of a job" (fan-out) |
 | `aimodels` | `/userId` | provider/model config; credential = Key Vault ref, never inline | AI Models page list |
 | `connectors` | `/id` | connector registry/display metadata (code is source of truth) | small catalog |
+| `cache` | `/cacheType` | generic app cache records `{cacheKey, value, createdAt}` | point-read cache lookups |
 
 **Access-pattern rules:** progress = point-read on `jobs`; chapter/task lists are
 single-partition; never store chapter text in Cosmos (Blob only); update `jobs` counters with
 patch + ETag. Blob layout: `raw-chapters/{novelId}/{index}.txt`,
 `translations/{projectId}/{chapterId}/{lang}.txt`, `tts/{projectId}/{chapterId}/{seq}.mp3`,
 `images/{projectId}/...`, `video/{projectId}/final.mp4`.
+
+The generic `cache` container is intentionally not crawler-specific. The first crawler metadata
+slice uses cache types such as `crawler:novel543:html` and `crawler:novel543:metadata`, with the
+canonical source URL as `cacheKey`. Cache freshness is enforced in the API cache provider by
+checking `createdAt + FAST_CACHE_TTL_SECONDS_CRAWLER`; Cosmos item TTL is not required for this
+slice.
 
 ## Connector abstraction (pluggable crawling)
 
@@ -187,10 +222,23 @@ class Connector(Protocol):
 - A `BaseConnector` bakes in per-host rate limiting, retry/backoff, and user-agent so new sites
   only implement parsing. Adding a site = one file + one `@register(...)` decorator.
 
+### Current crawler metadata slice
+
+Before full background chapter crawling, the API supports a synchronous metadata endpoint:
+
+- `GET /api/crawlers`
+- `GET /api/crawlers/{crawler_id}/metadata?url=<source_url>`
+
+The first supported crawler is `novel543`. URL validation lives in
+`srcs/api/app/providers/crawler_provider.py`; fetching uses FlareSolverr through
+`srcs/shared/flaresolverr_http_client.py`; parsing lives in `srcs/shared/novel543_parser.py`;
+HTML and parsed metadata are cached through `srcs/api/app/providers/cache_provider.py` and the
+generic `cache` repository.
+
 ## Media pipeline (audio → video)
 
 Runs as Durable Functions activities; ffmpeg uses an Azure Files scratch mount. Provider
-adapters in `srcs/workers/providers/{llm,tts,image,video}/` mirror the connector pattern so
+adapters in `srcs/azfunc/providers/{llm,tts,image,video}/` mirror the connector pattern so
 providers are swappable via `aimodels` config.
 
 1. **Segment** translated chapter text into speeches (per paragraph; per character line for

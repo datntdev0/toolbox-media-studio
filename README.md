@@ -41,7 +41,8 @@ cd toolbox-media-studio
 
 ### 2. Start Local Infrastructure
 
-Start the Azure CosmosDB Emulator and Azurite (Blob/Queue emulator):
+Start the Azure CosmosDB Emulator, Azurite (Blob/Queue emulator), the DTS emulator, and
+FlareSolverr for local crawler metadata fetches:
 
 ```bash
 docker compose -f deploy/dockercompose.local.infra.yml -p datntdev_media_studio_infra up -d
@@ -51,22 +52,22 @@ This starts:
 - CosmosDB Emulator at `http://localhost:8081`
 - Azurite (Blob) at `http://localhost:10000`
 - Azurite (Queue) at `http://localhost:10001`
+- DTS emulator at `http://localhost:8082` / `http://localhost:8083`
+- FlareSolverr at `http://localhost:8191`
 
 ### 3. Setup Backend (FastAPI)
 
 ```bash
-# from srcs/api/
-python -m venv .venv
-source .venv/bin/activate                  # Windows: .venv\Scripts\activate
-
-pip install -e ".[dev]"
-
-cp .env.example .env                        # then fill in values
-
-uvicorn app.main:app --reload --port 8000  # docs at http://localhost:8000/docs
+scripts/backend.setup.sh
+scripts/backend.start.sh
 ```
 
 The API will be available at `http://localhost:8000` with automatic docs at `http://localhost:8000/docs`.
+
+The scripts are thin Bash helpers around the standard commands. `backend.setup.sh` activates the
+root `.venv`, installs the FastAPI package with dev dependencies, and creates `srcs/api/.env` from
+`srcs/api/.env.example` when missing. `backend.start.sh` activates the virtual environment and
+starts Uvicorn from `srcs/api`. You can still run the commands manually if you prefer.
 
 ### 4. Setup Frontend (Nuxt)
 
@@ -125,10 +126,11 @@ npx playwright show-report
 │   │   ├── app/
 │   │   │   ├── core/     # Config, logging, security, startup
 │   │   │   ├── domain/   # Domain models (users, requests, responses)
-│   │   │   ├── routers/  # API endpoints (auth, users, health)
+│   │   │   ├── providers/# Runtime adapters (cache, crawler registry)
+│   │   │   ├── routers/  # API endpoints (auth, users, novels, crawlers, health)
 │   │   │   ├── services/ # Business logic
 │   │   │   └── repositories/ # Data access (Cosmos DB)
-│   │   ├── tests/        # pytest tests
+│   │   ├── tests/        # pytest tests grouped by routes/services/providers/repositories
 │   │   └── pyproject.toml
 │   │
 │   ├── app/              # Nuxt frontend (TypeScript)
@@ -139,7 +141,7 @@ npx playwright show-report
 │   │   └── nuxt.config.ts
 │   │
 │   ├── azfunc/           # Azure Durable Functions
-│   └── shared/           # Shared schemas & contracts (planned)
+│   └── shared/           # Shared libraries (FlareSolverr client, Novel543 parser)
 │
 ├── tests/                # E2E tests (Playwright)
 │   └── api/              # API integration tests
@@ -149,6 +151,10 @@ npx playwright show-report
 │   ├── requirements.md   # Functional requirements
 │   ├── deployment.md     # Azure deployment guide
 │   └── conventions.api.md # API conventions
+│
+├── scripts/              # Developer helpers
+│   ├── backend.setup.sh
+│   └── backend.start.sh
 │
 └── deploy/               # Deployment configs
     └── dockercompose.local.infra.yml

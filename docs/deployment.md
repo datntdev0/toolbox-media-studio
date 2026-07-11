@@ -1,8 +1,9 @@
 # Novel Media Studio — Deployment & Cost
 
 Infrastructure, configuration, CI/CD, and cost for the system described in
-[`architecture.md`](./architecture.md). All resources are Azure; everything is provisioned as
-Bicep under `srcs/infra/` and deployed via GitHub Actions.
+[`architecture.md`](./architecture.md). All resources are Azure; local infrastructure assets
+currently live under `deploy/`, and future Azure IaC should live with those deployment assets and
+be deployed via GitHub Actions.
 
 ## Azure resource inventory
 
@@ -17,6 +18,7 @@ Bicep under `srcs/infra/` and deployed via GitHub Actions.
 | Storage account — `fnhub` | StorageV2, LRS | Durable Functions task hub (required, separate) |
 | Key Vault | Standard | Provider API keys, JWT signing key, connection strings |
 | Application Insights | — | Logs/metrics for `api` and the Function App |
+| FlareSolverr | Container (local/dev now) | Browser-backed fetches for approved crawler metadata URLs |
 
 Notes:
 - **Two web apps, one plan.** An App Service *app* runs a single runtime, so Nuxt (Node) and
@@ -26,6 +28,10 @@ Notes:
   from the `media` account to avoid mixing control traffic with user binaries.
 - **`job-events` queue** lives in the `media` storage account (app-level control channel); the
   Durable control/work-item queues are internal to the task hub and are not managed by us.
+- **FlareSolverr is currently a local development dependency** in
+  `deploy/dockercompose.local.infra.yml`. Production hosting should be explicitly designed before
+  enabling crawler metadata fetching outside trusted environments, because it launches browser
+  instances and must stay limited to approved crawler hosts.
 
 ## Topology
 
@@ -72,12 +78,17 @@ flowchart LR
 - **App settings (non-secret):** Cosmos endpoint, storage account names, `job-events` queue name,
   Durable task-hub name, the Function App's base URL + starter key (as a KV reference), and the
   allowed CORS origin (the `web` app URL).
+- **FastAPI settings:** all FastAPI app settings use the `FAST_` prefix, grouped by domain where
+  useful: `FAST_SECURITY_*`, `FAST_AZ_*`, `FAST_FLARESOLVERR_*`, and cache TTL settings.
+- **Crawler settings:** `FAST_FLARESOLVERR_BASE_URL`, `FAST_FLARESOLVERR_MAX_TIMEOUT_MS`, and
+  `FAST_CACHE_TTL_SECONDS_CRAWLER`. Local development points `FAST_FLARESOLVERR_BASE_URL` at
+  `http://localhost:8191/v1`.
 - **CORS:** FastAPI allows the Nuxt origin only; credentials mode as needed for the JWT.
 
 ## CI/CD (GitHub Actions)
 
 - **Build:** Nuxt (`nuxt build`), FastAPI (package + deps), Functions app (Python worker).
-- **Deploy:** `az deployment group create` for `srcs/infra` (what-if on PRs), then app deploys —
+- **Deploy:** `az deployment group create` for the IaC under `deploy/` (what-if on PRs), then app deploys —
   `web` and `api` via App Service deploy, `functions` via the Functions deploy action.
 - **Environments:** a `dev` slot on F1 (cheap, cold-start-tolerant) and `prod` on B1.
 - **Migrations:** Cosmos containers are created idempotently on `api` startup (or a one-shot
@@ -94,6 +105,24 @@ flowchart LR
   a minimum-instance setting on Flex/Premium removes it (again, a cost trade-off).
 - **Cosmos RUs:** serverless + single-partition access patterns + Blob-backed large content keep
   RU spend near-zero at hobby volume; watch cross-partition queries.
+- **FlareSolverr concurrency:** each cache miss can launch browser work. Keep request volume low,
+  cache successful results, and enforce source allowlists in the API. Do not expose FlareSolverr
+  as a general-purpose proxy.
+
+## Local infrastructure
+
+`deploy/dockercompose.local.infra.yml` starts the local development dependencies:
+
+- Cosmos DB emulator: `http://localhost:8081`
+- Azurite Blob/Queue/Table: `http://localhost:10000`, `10001`, `10002`
+- DTS emulator: `http://localhost:8082` / `8083`
+- FlareSolverr: `http://localhost:8191` and API endpoint `http://localhost:8191/v1`
+
+Start them with:
+
+```bash
+docker compose -f deploy/dockercompose.local.infra.yml -p datntdev_media_studio_infra up -d
+```
 
 ## Cost estimate
 
@@ -147,6 +176,8 @@ Example: 20 chapters, full audio, ~50 illustrations, a few short video scenes. B
   Function App + `fnhub` storage provision, and the `job-events` queue exists.
 - Hit `web` and `api` health endpoints over HTTPS; confirm CORS from the Nuxt origin; log in with
   the seeded admin.
+- In local/dev, confirm FlareSolverr responds at `http://localhost:8191` and a
+  `request.get` call can fetch an approved `novel543` metadata URL.
 - Confirm `api` has **Always On** on and its `job-events` consumer logs startup in App Insights.
 - End-to-end smoke: create a novel → observe `pending`→`running`→`done` on the job doc → chapters
   in Blob. Restart the Function App mid-job and confirm resume-from-checkpoint.

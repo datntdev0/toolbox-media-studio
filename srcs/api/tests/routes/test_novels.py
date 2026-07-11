@@ -2,10 +2,14 @@
 
 from fastapi.testclient import TestClient
 
-from tests.conftest import ADMIN_EMAIL, ADMIN_PASSWORD
+from tests.conftest import TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD
 
 
-def _login(client: TestClient, email: str = ADMIN_EMAIL, password: str = ADMIN_PASSWORD) -> str:
+def _login(
+    client: TestClient,
+    email: str = TEST_ADMIN_EMAIL,
+    password: str = TEST_ADMIN_PASSWORD,
+) -> str:
     response = client.post("/auth/login", json={"email": email, "password": password})
     assert response.status_code == 200
     return response.json()["access_token"]

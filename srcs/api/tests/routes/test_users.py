@@ -2,10 +2,14 @@
 
 from fastapi.testclient import TestClient
 
-from tests.conftest import ADMIN_EMAIL, ADMIN_PASSWORD
+from tests.conftest import TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD
 
 
-def _login(client: TestClient, email: str = ADMIN_EMAIL, password: str = ADMIN_PASSWORD) -> str:
+def _login(
+    client: TestClient,
+    email: str = TEST_ADMIN_EMAIL,
+    password: str = TEST_ADMIN_PASSWORD,
+) -> str:
     response = client.post("/auth/login", json={"email": email, "password": password})
     assert response.status_code == 200
     return response.json()["access_token"]
@@ -22,7 +26,7 @@ def test_seeded_admin_can_be_read_from_me(client: TestClient) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["email"] == ADMIN_EMAIL
+    assert body["email"] == TEST_ADMIN_EMAIL
     assert body["status"] == "active"
     assert body["displayName"] == "Admin"
 
@@ -82,7 +86,7 @@ def test_duplicate_email_returns_409(client: TestClient) -> None:
     response = client.post(
         "/api/users",
         headers=_auth_headers(token),
-        json={"email": ADMIN_EMAIL, "password": "whatever"},
+        json={"email": TEST_ADMIN_EMAIL, "password": "whatever"},
     )
 
     assert response.status_code == 409

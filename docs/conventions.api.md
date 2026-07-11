@@ -90,3 +90,18 @@ Prefer consistent HTTP status mapping across feature routers:
 - `409` for business conflicts such as duplicate identities
 - `412` for stale concurrency tokens such as `etag`
 - `422` for validation failures
+
+## Backend Test Layout
+
+FastAPI tests live under `srcs/api/tests` and are grouped by responsibility:
+
+- `tests/routes/` for HTTP route/API behavior.
+- `tests/services/` for use-case and shared parsing behavior.
+- `tests/providers/` for runtime adapters such as cache and crawler providers.
+- `tests/repositories/` for persistence contract and repository behavior.
+- Root-level tests are reserved for cross-cutting startup/config/logging tests and shared
+  fixtures such as `conftest.py`.
+
+Prefer placing new tests in the narrowest matching directory. Route tests should assert status
+codes and response contracts; provider/repository tests should avoid FastAPI `TestClient` unless
+they are intentionally testing HTTP behavior.
