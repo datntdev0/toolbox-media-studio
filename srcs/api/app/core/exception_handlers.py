@@ -23,7 +23,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 async def _handle_not_implement_exception(
     request: Request,
-    exc: NotImplementException,
+    exc: Exception,
 ) -> JSONResponse:
     """Return a standard 501 response for placeholder endpoints."""
 

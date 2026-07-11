@@ -1,12 +1,38 @@
 """Shared pytest fixtures."""
 
+from dataclasses import dataclass
+
 import pytest
 
+from app.providers.cache_provider import RepositoryCacheProvider
+from app.repositories.cache_repository import InMemoryCacheRepository
 from app.repositories.novel_repository import InMemoryNovelRepository
 from app.repositories.user_repository import InMemoryUserRepository
 
 ADMIN_EMAIL = "admin@example.com"
 ADMIN_PASSWORD = "s3cret-pass"
+
+
+@dataclass(slots=True)
+class FakeFlareSolverrResult:
+    """Minimal fake FlareSolverr result for tests."""
+
+    html: str
+
+
+class FakeFlareSolverrClient:
+    """Controllable fake FlareSolverr client for tests."""
+
+    def __init__(self) -> None:
+        self.html = "<html><body><h1>Test Novel</h1></body></html>"
+        self.calls: list[tuple[str, int | None]] = []
+        self.exception: Exception | None = None
+
+    def get(self, url: str, max_timeout_ms: int | None = None) -> FakeFlareSolverrResult:
+        self.calls.append((url, max_timeout_ms))
+        if self.exception is not None:
+            raise self.exception
+        return FakeFlareSolverrResult(html=self.html)
 
 
 @pytest.fixture(autouse=True)
@@ -23,6 +49,9 @@ def _env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LOG_LEVEL", "INFO")
     monkeypatch.setenv("LOG_FILE_PATH", "logs/test-api.log")
     monkeypatch.setenv("ENVIRONMENT", "localhost")
+    monkeypatch.setenv("FLARESOLVERR_BASE_URL", "http://localhost:8191/v1")
+    monkeypatch.setenv("FLARESOLVERR_MAX_TIMEOUT_MS", "60000")
+    monkeypatch.setenv("CRAWLER_CACHE_TTL_SECONDS", "2592000")
     monkeypatch.setenv(
         "AZ_COSMOSDB_CONNECTION_STRING",
         (
@@ -64,10 +93,29 @@ def novel_repository() -> InMemoryNovelRepository:
 
 
 @pytest.fixture
+def cache_provider() -> RepositoryCacheProvider:
+    """Shared in-memory cache provider for a test app instance."""
+
+    return RepositoryCacheProvider(
+        repository=InMemoryCacheRepository(),
+        ttl_seconds=2_592_000,
+    )
+
+
+@pytest.fixture
+def flaresolverr_client() -> FakeFlareSolverrClient:
+    """Shared fake FlareSolverr client for a test app instance."""
+
+    return FakeFlareSolverrClient()
+
+
+@pytest.fixture
 def client(
     _env: None,
     user_repository: InMemoryUserRepository,
     novel_repository: InMemoryNovelRepository,
+    cache_provider: RepositoryCacheProvider,
+    flaresolverr_client: FakeFlareSolverrClient,
 ):
     """A TestClient with a fresh app and cleared settings cache."""
     from fastapi.testclient import TestClient
@@ -77,7 +125,12 @@ def client(
 
     get_settings.cache_clear()
     with TestClient(
-        create_app(user_repository=user_repository, novel_repository=novel_repository)
+        create_app(
+            user_repository=user_repository,
+            novel_repository=novel_repository,
+            cache_provider=cache_provider,
+            flaresolverr_client=flaresolverr_client,
+        )
     ) as test_client:
         yield test_client
     get_settings.cache_clear()
