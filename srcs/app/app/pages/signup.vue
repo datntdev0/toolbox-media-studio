@@ -1,5 +1,9 @@
 <script setup>
 definePageMeta({ layout: 'auth' })
+
+useHead({
+  title: "Sign up"
+})
 </script>
 
 <template>
@@ -7,22 +11,29 @@ definePageMeta({ layout: 'auth' })
 
     <AuthTabs />
 
-    <h2 class="text-2xl font-bold text-gray-900 mb-2">Create your account</h2>
-    <p class="text-sm text-gray-600 mb-8">Join the StoryForge pipeline and start building.</p>
+    <h2 class="font-geist text-headline-lg text-on-background mb-2">
+      Create your account
+    </h2>
+
+    <p class="font-inter text-body-md text-on-surface-variant mb-8">
+      Join the StoryForge pipeline and start building.
+    </p>
 
     <AuthDivider label="Primary Access" />
+
     <div class="mb-8">
       <div class="grid grid-cols-2 gap-4">
 
         <UButton color="white" variant="solid"
-          class="flex justify-center py-2.5 border border-gray-300 hover:bg-gray-50">
+          class="flex justify-center py-2.5 border border-outline-variant hover:bg-surface-container">
           <Icon name="logos:google-icon" class="h-5 w-5" />
         </UButton>
 
         <UButton color="white" variant="solid"
-          class="flex justify-center py-2.5 border border-gray-300 hover:bg-gray-50">
-          <Icon name="mdi:github" class="h-5 w-5 text-gray-900" />
+          class="flex justify-center py-2.5 border border-outline-variant hover:bg-surface-container">
+          <Icon name="mdi:github" class="h-5 w-5 text-on-background" />
         </UButton>
+
       </div>
     </div>
 
@@ -39,7 +50,8 @@ definePageMeta({ layout: 'auth' })
       <AuthBaseInput id="confirmPassword" label="Confirm Password" type="password" placeholder="••••••••"
         v-model="confirmPassword" />
 
-      <UButton type="submit" block size="lg" class="mt-4 bg-[#2563EB] hover:bg-blue-700 text-white font-semibold py-3">
+      <UButton type="submit" block size="lg"
+        class="mt-4 bg-primary hover:bg-primary-container text-on-primary font-geist text-headline-sm py-3">
         Sign up
       </UButton>
 

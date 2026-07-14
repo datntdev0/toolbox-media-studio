@@ -1,9 +1,9 @@
 <script setup>
 useHead({
-  title: 'Dashboard'
+  title: 'AI Models'
 })
 </script>
 
 <template>
-  <h3>Dashboard</h3>
+  <h3>AI Models</h3>
 </template>

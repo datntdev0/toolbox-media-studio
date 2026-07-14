@@ -1,2 +1,76 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+
+@theme {
+  /* --- Typography --- */
+  --font-geist: 'Geist', sans-serif;
+  --font-inter: 'Inter', sans-serif;
+
+  /* headline-lg */
+  --text-headline-lg: 24px;
+  --text-headline-lg--line-height: 32px;
+  --text-headline-lg--letter-spacing: -0.02em;
+  --text-headline-lg--font-weight: 600;
+
+  /* headline-md */
+  --text-headline-md: 20px;
+  --text-headline-md--line-height: 28px;
+  --text-headline-md--letter-spacing: -0.01em;
+  --text-headline-md--font-weight: 600;
+
+  /* headline-sm */
+  --text-headline-sm: 16px;
+  --text-headline-sm--line-height: 24px;
+  --text-headline-sm--font-weight: 600;
+
+  /* body-lg */
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
+  --text-body-lg--font-weight: 400;
+
+  /* body-md */
+  --text-body-md: 14px;
+  --text-body-md--line-height: 20px;
+  --text-body-md--font-weight: 400;
+
+  /* body-sm */
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 18px;
+  --text-body-sm--font-weight: 400;
+
+  /* label-md */
+  --text-label-md: 12px;
+  --text-label-md--line-height: 16px;
+  --text-label-md--letter-spacing: 0.02em;
+  --text-label-md--font-weight: 500;
+
+  /* label-sm */
+  --text-label-sm: 11px;
+  --text-label-sm--line-height: 14px;
+  --text-label-sm--letter-spacing: 0.03em;
+  --text-label-sm--font-weight: 500;
+
+  /* --- Colors --- */
+  /* The Canvas */
+  --color-background: #f9f9ff;
+  --color-surface-container: #e7eefe;
+  --color-inverse-surface: #2a313d;
+
+  /* Typography & Icons */
+  --color-on-background: #151c27;
+  --color-on-surface-variant: #434655;
+  --color-inverse-on-surface: #ebf1ff;
+
+  /* Brand & Interactive */
+  --color-primary: #004ac6;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #2563eb;
+  --color-on-primary-container: #eeefff;
+
+  /* Structure & Boundaries */
+  --color-outline-variant: #c3c6d7;
+
+  /* Critical Feedback */
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+}
