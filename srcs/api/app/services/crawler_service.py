@@ -5,13 +5,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Protocol
 
-from shared.novel543_parser import ParsedNovelMetadata, parse_novel543_metadata
-
 from app.core.config import Settings
 from app.domain.crawlers import (
     CrawlerChapterResponse,
     CrawlerMetadataResponse,
 )
+from app.parsers.novel543_parser import ParsedNovelMetadata, parse_novel543_metadata
 from app.providers.cache_provider import CacheProvider
 from app.providers.crawler_provider import validate_source
 

@@ -37,14 +37,6 @@ services:
       - azurite-data:/data
     restart: unless-stopped
 
-  azfunctions:
-    image: mcr.microsoft.com/dts/dts-emulator:latest
-    container_name: toolbox-dts-emulator
-    ports:
-      - "8082:8080"
-      - "8083:8081"
-    restart: unless-stopped
-
   flaresolverr:
     image: flaresolverr/flaresolverr
     container_name: toolbox-flaresolverr

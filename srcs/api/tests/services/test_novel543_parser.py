@@ -1,7 +1,8 @@
 """Novel543 parser tests."""
 
 import pytest
-from shared.novel543_parser import Novel543ParseError, parse_novel543_metadata
+
+from app.parsers.novel543_parser import Novel543ParseError, parse_novel543_metadata
 
 SOURCE_URL = "https://www.novel543.com/0603625457/dir"
 

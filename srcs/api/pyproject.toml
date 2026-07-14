@@ -36,16 +36,13 @@ packages = [
     "app",
     "app.core",
     "app.domain",
+    "app.parsers",
     "app.providers",
     "app.repositories",
     "app.repositories.cosmosdb",
     "app.routers",
     "app.services",
-    "shared",
 ]
-
-[tool.setuptools.package-dir]
-shared = "../shared"
 
 [tool.ruff]
 line-length = 100

@@ -133,7 +133,7 @@ def _build_default_cache_provider(settings: Settings) -> CacheProvider:
 
 
 def _build_default_flaresolverr_client(settings: Settings) -> FlareSolverrClientLike:
-    from shared.flaresolverr_http_client import FlareSolverrHttpClient
+    from app.providers.flaresolverr_provider import FlareSolverrHttpClient
 
     return cast(
         FlareSolverrClientLike,

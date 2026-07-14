@@ -18,10 +18,10 @@ Implemented:
 - `/api/novels` user-scoped novel-management routes.
 - `/api/crawlers` registry and `/api/crawlers/{id}/metadata` for `novel543`.
 - Cosmos-backed repositories for users, novels, and generic cache records.
-- FlareSolverr-backed metadata fetching through `srcs/shared/flaresolverr_http_client.py`.
-- Novel543 metadata parsing through `srcs/shared/novel543_parser.py`.
+- FlareSolverr-backed metadata fetching through `app/providers/flaresolverr_provider.py`.
+- Novel543 metadata parsing through `app/parsers/novel543_parser.py`.
 
-Still out of scope: chapter body crawling, background crawl orchestration, translation, audio,
+Still out of scope: chapter body crawling, background crawl jobs, translation, audio,
 image, and video pipelines.
 
 ## Tech stack
@@ -33,8 +33,8 @@ image, and video pipelines.
 | Validation | Pydantic v2 / `pydantic-settings` |
 | Auth | JWT (`python-jose`); credentials compared against config |
 | Dep management | `pyproject.toml` + pip |
-| Crawler fetch | FlareSolverr through shared HTTP client |
-| HTML parsing | BeautifulSoup in shared parser libraries |
+| Crawler fetch | FlareSolverr through API provider |
+| HTML parsing | BeautifulSoup in API parser modules |
 | Tooling | ruff (lint+format), mypy (types), pytest (tests) |
 
 ## Login flow
@@ -63,20 +63,18 @@ The API keeps a simple dependency direction:
 `routers → services → providers → repositories`
 
 Cross-cutting config, security, logging, and dependency resolution live under `core/`.
-Reusable code that should not depend on FastAPI lives under `srcs/shared`.
-
 ```mermaid
 flowchart TB
     R["routers/<feature>.py<br/>HTTP contracts/status mapping"]
     S["services/<feature>_service.py<br/>use-case orchestration"]
     P["providers/<adapter>_provider.py<br/>runtime adapters"]
+    Parsers["parsers/<site>_parser.py<br/>HTML parsing"]
     Repo["repositories/<entity>_repository.py<br/>persistence contracts"]
     Cosmos["repositories/cosmosdb/<entity>.py<br/>Cosmos implementations"]
-    Shared["../shared<br/>FlareSolverr client · Novel543 parser"]
 
     R --> S
     S --> P --> Repo --> Cosmos
-    S --> Shared
+    S --> Parsers
 ```
 
 Rules: routers hold no business logic; services orchestrate use cases; providers adapt runtime
@@ -103,6 +101,9 @@ srcs/api/
     providers/
       cache_provider.py      # Generic cache behavior + TTL enforcement
       crawler_provider.py    # Supported crawler registry and URL validation
+      flaresolverr_provider.py # FlareSolverr HTTP client
+    parsers/
+      novel543_parser.py     # Novel543 metadata parsing
     repositories/
       cache_repository.py    # Generic cache persistence contract + in-memory repo
       cosmosdb/              # Cosmos DB implementations
@@ -170,9 +171,8 @@ runs `uvicorn app.main:app --reload --port 8000` from `srcs/api`.
 
 ```bash
 pytest
-ruff check . ../shared
+ruff check .
 mypy app
-mypy ../shared
 ```
 
 ## Verification
@@ -187,6 +187,6 @@ mypy ../shared
 
 ## Next Steps
 
-The next backend slices are chapter body crawling, background crawl orchestration through the
-`job-events` queue and Durable client, AI model configuration, and the translation/audio/image/video
-pipelines. See the phased roadmap in [`architecture.md`](../../docs/architecture.md).
+The next backend slices are chapter body crawling, background job coordination through the
+`job-events` queue, AI model configuration, and the translation/audio/image/video pipelines. See
+the phased roadmap in [`architecture.md`](../../docs/architecture.md).

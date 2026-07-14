@@ -11,13 +11,13 @@ Novel Media Studio is a cloud-native, multi-stage content generation platform th
 - **Audio Production** — Text-to-speech narration with per-character dubbing support (ElevenLabs, Azure Neural)
 - **Visual Generation** — AI-powered illustrations for characters, scenes, and content passages
 - **Video Assembly** — Automated slideshow creation (ffmpeg) with optional AI-generated video scenes
-- **Novel Video Projects** — Storyboard-driven, end-to-end "novel → animated short drama" pipeline
+- **Novel Video Projects** — Storyboard-driven, end-to-end "novel → animated short drama" workflows
 
 ### Key Features
 
 - 🔐 **JWT-based Authentication** — Secure user sessions with role-based access control
-- 🏗️ **Microservices Architecture** — FastAPI backend, Nuxt frontend, Azure Durable Functions for background processing
-- 🔄 **Async Job Queue** — Event-driven orchestration with fan-out/fan-in patterns for parallel processing
+- 🏗️ **Web Architecture** — FastAPI backend and Nuxt frontend
+- 🔄 **Async Job Queue** — Event-driven job coordination for longer media workflows
 - 🎨 **Provider-Agnostic Design** — Swappable AI providers per project (premium & cost-effective tiers)
 - 📊 **Real-time Progress Tracking** — Monitor crawling, translation, and generation jobs
 - 🧩 **Modular Connectors** — Plugin system for adding new novel source sites
@@ -29,8 +29,7 @@ Novel Media Studio is a cloud-native, multi-stage content generation platform th
 
 - **Node.js** 20+ and **pnpm** 9+ (for frontend)
 - **Python** 3.12+ and **pip** (for backend)
-- **Docker Desktop** (for local Azure emulators)
-- **[Azure Functions Core Tools v4](https://learn.microsoft.com/azure/azure-functions/functions-run-local)**
+- **Docker Desktop** (for local Azure emulators and FlareSolverr)
 
 ### 1. Clone the Repository
 
@@ -41,8 +40,8 @@ cd toolbox-media-studio
 
 ### 2. Start Local Infrastructure
 
-Start the Azure CosmosDB Emulator, Azurite (Blob/Queue emulator), the DTS emulator, and
-FlareSolverr for local crawler metadata fetches:
+Start the Azure CosmosDB Emulator, Azurite (Blob/Queue emulator), and FlareSolverr for local
+crawler metadata fetches:
 
 ```bash
 docker compose -f deploy/dockercompose.local.infra.yml -p datntdev_media_studio_infra up -d
@@ -52,7 +51,6 @@ This starts:
 - CosmosDB Emulator at `http://localhost:8081`
 - Azurite (Blob) at `http://localhost:10000`
 - Azurite (Queue) at `http://localhost:10001`
-- DTS emulator at `http://localhost:8082` / `http://localhost:8083`
 - FlareSolverr at `http://localhost:8191`
 
 ### 3. Setup Backend (FastAPI)
@@ -139,9 +137,6 @@ npx playwright show-report
 │   │   ├── layouts/      # Layout components
 │   │   ├── components/   # Reusable UI components
 │   │   └── nuxt.config.ts
-│   │
-│   ├── azfunc/           # Azure Durable Functions
-│   └── shared/           # Shared libraries (FlareSolverr client, Novel543 parser)
 │
 ├── tests/                # E2E tests (Playwright)
 │   └── api/              # API integration tests

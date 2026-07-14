@@ -12,11 +12,9 @@ design; see [`deployment.md`](./deployment.md) for infrastructure, CI/CD, and co
    cheaper tiers can be chosen without code changes.
 2. **Web tier:** Nuxt and FastAPI each on an Azure App Service (one shared plan). The browser
    calls FastAPI **directly** (CORS + JWT) — no Nitro BFF.
-3. **Background engine:** Azure **Durable Functions (Python)**, Consumption plan, scale-to-zero.
-   It owns the per-chapter/per-scene **fan-out/fan-in**. No Worker App Service, no managed Redis.
-4. **Job lifecycle via a control queue:** a single Azure Storage Queue (`job-events`) decouples
-   the HTTP request from orchestration start and completion (see [Job lifecycle](#job-lifecycle)).
-5. **Video: slideshow first.** Default output is a free ffmpeg "Ken Burns" slideshow
+3. **Job lifecycle via a control queue:** a single Azure Storage Queue (`job-events`) decouples
+   long-running work from request/response paths (see [Job lifecycle](#job-lifecycle)).
+4. **Video: slideshow first.** Default output is a free ffmpeg "Ken Burns" slideshow
    (stills + audio); true per-scene AI video generation is a later, opt-in, metered feature.
 
 ## System diagram
@@ -25,9 +23,8 @@ design; see [`deployment.md`](./deployment.md) for infrastructure, CI/CD, and co
 flowchart TB
     Browser["Browser — Vue SPA"]
     Nuxt["Nuxt<br/>App Service #1 (Node)"]
-    API["FastAPI<br/>App Service #2 (Python)<br/>auth · CRUD · crawler metadata · start orchestration<br/>job-events consumer (Always On)"]
+    API["FastAPI<br/>App Service #2 (Python)<br/>auth · CRUD · crawler metadata<br/>job-events consumer (Always On)"]
     Queue["Azure Storage Queue<br/><b>job-events</b> — control / lifecycle"]
-    DF["Azure Durable Functions (Python, Consumption)<br/>orchestrators + activities · fan-out/fan-in<br/>internal task hub"]
     Cosmos[("Cosmos DB<br/>serverless")]
     Blob[("Blob Storage<br/>all binaries")]
     Files[("Azure Files<br/>ffmpeg scratch")]
@@ -35,25 +32,16 @@ flowchart TB
     Browser -->|load UI| Nuxt
     Browser <-->|HTTPS + JWT / CORS| API
 
-    API -->|publish start event| Queue
-    Queue -->|deliver start / completed| API
-    API -->|HTTP start orchestration| DF
-    DF -->|publish completed / failed| Queue
+    API -->|publish / consume job events| Queue
 
     API --> Cosmos
     API --> Blob
-    DF --> Cosmos
-    DF --> Blob
-    DF --> Files
+    API --> Files
 ```
 
 - **Nuxt** serves the SPA/SSR UI. **FastAPI** is the domain API: auth, CRUD, starting
-  orchestrations, and consuming `job-events`. It never does heavy work inline and never
-  blocks a request on a long job.
-- **Durable Functions** is the background engine: an **orchestrator** fans out one **activity**
-  per chapter/scene and fans in the results; sub-orchestrations chain multi-stage pipelines
-  (tts → assemble). Retries, checkpointing, and the control/work-item queues are handled by the
-  runtime — the `job-events` queue above is a separate, app-level control channel.
+  crawler metadata work, and consuming `job-events`. It should avoid blocking a request on a long
+  job.
 - **Cosmos DB** holds all state (small docs). **Blob** holds all binaries (raw HTML, translated
   text, audio, images, video). **Azure Files** is ffmpeg scratch only.
 
@@ -65,19 +53,9 @@ Building onto the existing scaffold (`srcs/app` Nuxt, `tests/` Playwright):
 srcs/
   app/                # Nuxt (exists) — pages/components/layouts/middleware; calls FastAPI directly
   api/                # FastAPI: core/ domain/ providers/ routers/ services/ repositories/
-                      #   + crawler metadata endpoint, durable client, job-events consumer
-  azfunc/             # Azure Durable Functions app (Python):
-                      #   host.json, function_app.py
-                      #   orchestrators/  (crawl, translate, tts, image, assemble)
-                      #   activities/     (fetch_chapter, translate_chapter, tts_segment, gen_image, ffmpeg_assemble, emit_completion)
-                      #   providers/      (llm/ tts/ image/ video/ adapters)
-  shared/             # Shared libraries with no FastAPI dependency:
-                      #   FlareSolverr HTTP client, Novel543 parser, future schemas/contracts
+                      #   parsers/ + crawler metadata endpoint, job-events consumer
   infra/              # (NEW) Bicep + CI/CD — see deployment.md
 ```
-
-`api/` and `azfunc/` both depend on `shared/` so document schemas, enums, connector
-contracts, and provider adapters never drift.
 
 ### FastAPI layering
 
@@ -88,29 +66,28 @@ flowchart LR
     Routes["routers/<feature>.py"]
     Services["services/<feature>_service.py"]
     Providers["providers/<adapter>_provider.py"]
+    Parsers["parsers/<site>_parser.py"]
     Repos["repositories/<entity>_repository.py"]
     CosmosRepos["repositories/cosmosdb/<entity>.py"]
-    Shared["../shared"]
 
     Routes --> Services
     Services --> Providers
     Providers --> Repos --> CosmosRepos
-    Services --> Shared
+    Services --> Parsers
 ```
 
 - **Routers** own HTTP contracts, dependency injection, and status-code mapping.
 - **Services** orchestrate use cases.
 - **Providers** adapt runtime capabilities such as cache behavior and crawler registry
   validation.
+- **Parsers** normalize source-site HTML into domain metadata.
 - **Repositories** define persistence contracts; `repositories/cosmosdb/` contains Cosmos DB
   implementations.
-- **Shared** contains importable libraries that can be reused by API, workers, and tests without
-  depending on FastAPI.
 
 ## Job lifecycle
 
 Long jobs are never awaited inside an HTTP request. A single control queue (`job-events`)
-carries lifecycle messages `{ jobId, kind, status, instanceId? }`; FastAPI runs a background
+carries lifecycle messages `{ jobId, kind, status }`; FastAPI runs a background
 consumer (works because the web app is Always On). Flow for a crawl job:
 
 ```mermaid
@@ -119,7 +96,6 @@ sequenceDiagram
     participant U as Browser
     participant A as FastAPI
     participant Q as Queue (job-events)
-    participant D as Durable Functions
     participant C as Cosmos DB
 
     U->>A: POST /novels/{id}/crawl
@@ -129,16 +105,10 @@ sequenceDiagram
 
     Note over A,Q: FastAPI background consumer
     Q-->>A: deliver {status:pending}
-    A->>D: start orchestration (HTTP starter)
-    D-->>A: instanceId
-    A->>C: job.status = running, save instanceId
+    A->>C: job.status = running
     A->>Q: delete pending message
 
-    loop fan-out per chapter
-        D->>D: activity fetch_chapter → Blob, patch job counters
-    end
-
-    D->>Q: publish {jobId, status:completed}
+    A->>Q: publish {jobId, status:completed}
     Q-->>A: deliver {status:completed}
     A->>C: job.status = done
     A->>Q: delete completed message
@@ -148,31 +118,26 @@ sequenceDiagram
     A-->>U: status + counters
 ```
 
-- **Start** is decoupled: the request just publishes a `pending` event and returns `202`.
-  The consumer picks it up, starts the orchestration, records the `instanceId`, and moves the
-  job to `running`. If the trigger fails, the message redelivers.
-- **Completion** is a message: the orchestration's final `emit_completion` activity publishes a
-  `completed` (or `failed`) event; the consumer marks the job `done`. (A webhook to FastAPI is
-  an equivalent alternative; the queue keeps it uniform with `start`.)
-- **Progress** is a `GET /jobs/{id}` point-read (~1 RU) merging the job rollup counters
-  (patched by activities) with the Durable runtime status (queried by `instanceId`). An SSE
+- **Start** is decoupled: the request publishes a `pending` event and returns `202`. The consumer
+  picks it up and moves the job to `running`. If the trigger fails, the message redelivers.
+- **Completion** is a message: the job runner publishes a `completed` (or `failed`) event; the
+  consumer marks the job `done`. (A webhook to FastAPI is an equivalent alternative; the queue
+  keeps it uniform with `start`.)
+- **Progress** is a `GET /jobs/{id}` point-read (~1 RU) over the job rollup counters. An SSE
   endpoint that server-side-polls the same status is an optional UX upgrade — not websockets.
-- **Short ops (single-chapter translation preview)** are the one synchronous case: FastAPI
-  starts the orchestration and uses Durable's `wait_for_completion_or_check_status` with a short
-  timeout, returning the result inline.
+- **Short ops (single-chapter translation preview)** can remain synchronous with a short timeout,
+  returning the result inline.
 
 ### Decomposition, retry, idempotency
 
 - Every pipeline = 1 `jobs` doc + N `tasks` docs (per chapter for crawl/translate/tts/image;
-  per scene for video). The orchestrator fans out one activity per task and fans in results.
-- **Retry** is configured on the activity call (`RetryOptions`: max attempts + backoff). Past
-  max, the task is marked `failed`; the orchestrator continues the rest (partial success). The
-  UI "retry failed" re-runs only failed tasks.
+  per scene for video). The job runner processes task batches and records aggregate progress.
+- **Retry** is configured by the job runner with max attempts + backoff. Past max, the task is
+  marked `failed`; the UI "retry failed" re-runs only failed tasks.
 - **Idempotency (mandatory):** each task has a deterministic `idempotencyKey = jobId:chapterId`
   and a deterministic Blob output path. Activities short-circuit if the output already exists,
   so a retry never double-charges a premium LLM/TTS/image call.
-- **Determinism:** all non-deterministic work (API calls, timestamps, randomness) lives in
-  **activities**, never the orchestrator — per Durable's replay model.
+- **Determinism:** external calls write deterministic outputs and can be safely retried.
 
 ## Cosmos DB data model
 
@@ -185,7 +150,7 @@ binaries go to Blob with a pointer (2 MB item limit; RU cost scales with item si
 | `novels` | `/userId` | library entry, connector ref, status, counts | "my library" (single-partition) |
 | `chapters` | `/novelId` | metadata + Blob pointers (`rawBlobPath`, `translations{lang→ptr}`) | "all chapters of a novel" |
 | `projects` | `/novelId` | translation/audio/video project (discriminated by `kind`) | projects viewed per novel |
-| `jobs` | `/jobId` | header + `instanceId` + rollup `{total, completed, failed}` | point-read for progress |
+| `jobs` | `/jobId` | header + rollup `{total, completed, failed}` | point-read for progress |
 | `tasks` | `/jobId` | per-chapter / per-scene unit; status, attempts, output ptr | "all tasks of a job" (fan-out) |
 | `aimodels` | `/userId` | provider/model config; credential = Key Vault ref, never inline | AI Models page list |
 | `connectors` | `/id` | connector registry/display metadata (code is source of truth) | small catalog |
@@ -206,7 +171,7 @@ slice.
 ## Connector abstraction (pluggable crawling)
 
 A **Connector** is a source-site adapter implementing a fixed contract, living in
-`srcs/shared/connectors/impl/<site>.py`, self-registering into a registry:
+`srcs/api/app/connectors/impl/<site>.py`, self-registering into a registry:
 
 ```python
 class Connector(Protocol):
@@ -218,7 +183,7 @@ class Connector(Protocol):
 ```
 
 - `trending` / `search` / `fetch_manifest` run in FastAPI at request time (fast, cached).
-  `fetch_chapter` runs as a Durable activity during crawl jobs (bulk, rate-limited, retried).
+  `fetch_chapter` runs during crawl jobs (bulk, rate-limited, retried).
 - A `BaseConnector` bakes in per-host rate limiting, retry/backoff, and user-agent so new sites
   only implement parsing. Adding a site = one file + one `@register(...)` decorator.
 
@@ -232,44 +197,44 @@ Before full background chapter crawling, the API supports a synchronous metadata
 The first supported crawler is `novel543`. Its source URL must be the full chapter directory,
 ending in `/dir`; metadata responses contain the complete ordered `chapters` list. URL validation lives in
 `srcs/api/app/providers/crawler_provider.py`; fetching uses FlareSolverr through
-`srcs/shared/flaresolverr_http_client.py`; parsing lives in `srcs/shared/novel543_parser.py`;
+`srcs/api/app/providers/flaresolverr_provider.py`; parsing lives in
+`srcs/api/app/parsers/novel543_parser.py`;
 HTML and parsed metadata are cached through `srcs/api/app/providers/cache_provider.py` and the
 generic `cache` repository.
 
 ## Media pipeline (audio → video)
 
-Runs as Durable Functions activities; ffmpeg uses an Azure Files scratch mount. Provider
-adapters in `srcs/azfunc/providers/{llm,tts,image,video}/` mirror the connector pattern so
-providers are swappable via `aimodels` config.
+Long-running media jobs use Blob for persisted artifacts and Azure Files for ffmpeg scratch.
+Provider adapters mirror the connector pattern so providers are swappable via `aimodels` config.
 
 1. **Segment** translated chapter text into speeches (per paragraph; per character line for
    multi-voice dubbing via a `voiceMap`).
 2. **TTS** each segment → audio clip to Blob.
 3. **Image** (optional): auto-illustrate per segment, or use uploaded images grouped with
-   speeches. Character/scene/item generation are typed image activities with a `subject`.
+   speeches. Character/scene/item generation uses typed image tasks with a `subject`.
 4. **Assemble (default, free):** download clips + images to Files scratch; ffmpeg builds a
    Ken Burns slideshow (each image shown for its grouped speech), muxes audio, applies
    enhancement layers (subtitle burn-in, background music, transitions, intro/outro as ordered
-   filter passes) → `video/{projectId}/final.mp4`. **Assemble per chapter** to stay within the
-   Consumption activity timeout (see deployment.md).
+   filter passes) → `video/{projectId}/final.mp4`. **Assemble per chapter** to keep each run
+   bounded (see deployment.md).
 5. **AI video (later phase):** per-scene generation via a video provider, opt-in and metered
    with a cost preview, then a combine step concatenates scenes + enhancement layers.
 
 ## Phased roadmap (app usable after each phase)
 
-- **Phase 0 — Infra, Auth, Shell.** Bicep for 2 App Services (one plan) + Durable Functions app;
+- **Phase 0 — Infra, Auth, Shell.** Bicep for 2 App Services (one plan);
   Blob/Files, Cosmos, Key Vault, `job-events` queue; CI/CD. FastAPI skeleton (config, Cosmos +
-  durable clients, JWT + CORS, `job-events` consumer), `POST /auth/login` + seeded admin. Nuxt
+  JWT + CORS, `job-events` consumer), `POST /auth/login` + seeded admin. Nuxt
   `/login`, layout (left nav + top toolbar), `auth.global.ts`, direct API client. AI Models page
   CRUD (creds → Key Vault). *Deliverable: log in, see the empty sections.*
 - **Phase 1 — Library + Crawling.** Connector abstraction + 1 real connector; trending/search;
-  create novel; crawl orchestrator + fetch-chapter activity; job lifecycle via `job-events`;
+  create novel; crawl job lifecycle via `job-events`;
   progress polling; chapter viewer. *Deliverable: build a library, watch crawl, read chapters.*
 - **Phase 2 — Translation.** Translation project (model + prompts, single-chapter preview via
-  synchronous wait, confirm); translate orchestrator fan-out; translated viewer. *Deliverable:
+  synchronous wait, confirm); batched translation jobs; translated viewer. *Deliverable:
   translate a whole novel and read it.*
-- **Phase 3 — Audio + free slideshow video.** Audio project (language + voice), tts orchestrator
-  + per-segment activities, audio player, manual image grouping; per-chapter ffmpeg slideshow.
+- **Phase 3 — Audio + free slideshow video.** Audio project (language + voice), per-segment TTS
+  tasks, audio player, manual image grouping; per-chapter ffmpeg slideshow.
   *Deliverable: audiobooks and slideshow videos.*
 - **Phase 4 — Image AI.** Image provider adapters; auto-illustration; character/scene/item
   generation; group images with speeches. *Deliverable: illustrated audio/slideshows.*
@@ -279,12 +244,11 @@ providers are swappable via `aimodels` config.
 ## Functional verification
 
 - **Crawl (Phase 1):** create a novel; confirm a `pending` event is published, the consumer
-  starts an orchestration (an `instanceId` lands on the `jobs` doc), counters advance, chapters
+  starts the job, counters advance, chapters
   land in Blob, a `completed` event flips the job to `done`, and the chapter viewer renders.
   Re-run and confirm idempotency (no duplicate fetches).
 - **Translate/Audio (Phase 2–3):** run a single-chapter preview (synchronous wait), then a full
   run; poll status to completion; verify translated text / audio clips in Blob and the slideshow
-  mp4 plays. Restart the Functions app mid-job and confirm the orchestration resumes from its
-  last checkpoint without double-charging.
+  mp4 plays. Restart the job runner mid-job and confirm it resumes without double-charging.
 - **E2E:** wire the existing Playwright suite (`tests/`) to the running app (`webServer` block)
   with specs for login → create novel → crawl → translate.
