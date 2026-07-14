@@ -9,6 +9,8 @@ from app.core.config import Settings, get_settings
 from app.core.security import JWTError, decode_access_token
 from app.domain.users import User, UserRole, UserStatus
 from app.providers.cache_provider import CacheProvider
+from app.providers.queue_provider import QueueProvider
+from app.repositories.job_repository import JobRepository
 from app.repositories.novel_repository import NovelRepository
 from app.repositories.user_repository import UserRepository
 from app.services.crawler_service import FlareSolverrClientLike
@@ -52,6 +54,30 @@ def get_cache_provider(request: Request) -> CacheProvider:
 
 
 CacheProviderDep = Annotated[CacheProvider, Depends(get_cache_provider)]
+
+
+def get_job_repository(request: Request) -> JobRepository:
+    """Resolve the configured job repository from app state."""
+
+    repository = getattr(request.app.state, "job_repository", None)
+    if repository is None:
+        raise RuntimeError("Job repository is not configured")
+    return cast(JobRepository, repository)
+
+
+JobRepositoryDep = Annotated[JobRepository, Depends(get_job_repository)]
+
+
+def get_crawler_queue_provider(request: Request) -> QueueProvider:
+    """Resolve the crawler-job queue provider from app state."""
+
+    provider = getattr(request.app.state, "crawler_queue_provider", None)
+    if provider is None:
+        raise RuntimeError("Crawler queue provider is not configured")
+    return cast(QueueProvider, provider)
+
+
+CrawlerQueueProviderDep = Annotated[QueueProvider, Depends(get_crawler_queue_provider)]
 
 
 def get_flaresolverr_client(request: Request) -> FlareSolverrClientLike:

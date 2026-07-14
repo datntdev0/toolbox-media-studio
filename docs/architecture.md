@@ -12,8 +12,9 @@ design; see [`deployment.md`](./deployment.md) for infrastructure, CI/CD, and co
    cheaper tiers can be chosen without code changes.
 2. **Web tier:** Nuxt and FastAPI each on an Azure App Service (one shared plan). The browser
    calls FastAPI **directly** (CORS + JWT) — no Nitro BFF.
-3. **Job lifecycle via a control queue:** a single Azure Storage Queue (`job-events`) decouples
-   long-running work from request/response paths (see [Job lifecycle](#job-lifecycle)).
+3. **Job lifecycle via API-owned business queues:** Azure Storage Queues decouple long-running
+   work from request/response paths. The first queue is `crawler-jobs`; future capabilities can
+   add their own queues while FastAPI hosts the consumers with APScheduler.
 4. **Video: slideshow first.** Default output is a free ffmpeg "Ken Burns" slideshow
    (stills + audio); true per-scene AI video generation is a later, opt-in, metered feature.
 
@@ -23,8 +24,8 @@ design; see [`deployment.md`](./deployment.md) for infrastructure, CI/CD, and co
 flowchart TB
     Browser["Browser — Vue SPA"]
     Nuxt["Nuxt<br/>App Service #1 (Node)"]
-    API["FastAPI<br/>App Service #2 (Python)<br/>auth · CRUD · crawler metadata<br/>job-events consumer (Always On)"]
-    Queue["Azure Storage Queue<br/><b>job-events</b> — control / lifecycle"]
+    API["FastAPI<br/>App Service #2 (Python)<br/>auth · CRUD · crawler metadata/jobs<br/>queue consumers (Always On)"]
+    Queue["Azure Storage Queues<br/><b>crawler-jobs</b><br/><b>crawler-jobs-dead-letter</b>"]
     Cosmos[("Cosmos DB<br/>serverless")]
     Blob[("Blob Storage<br/>all binaries")]
     Files[("Azure Files<br/>ffmpeg scratch")]
@@ -32,16 +33,16 @@ flowchart TB
     Browser -->|load UI| Nuxt
     Browser <-->|HTTPS + JWT / CORS| API
 
-    API -->|publish / consume job events| Queue
+    API -->|publish / consume business jobs| Queue
 
     API --> Cosmos
     API --> Blob
     API --> Files
 ```
 
-- **Nuxt** serves the SPA/SSR UI. **FastAPI** is the domain API: auth, CRUD, starting
-  crawler metadata work, and consuming `job-events`. It should avoid blocking a request on a long
-  job.
+- **Nuxt** serves the SPA/SSR UI. **FastAPI** is the domain API: auth, CRUD, crawler metadata,
+  crawler-job submission, and APScheduler-backed queue consumers. It should avoid blocking a
+  request on a long job.
 - **Cosmos DB** holds all state (small docs). **Blob** holds all binaries (raw HTML, translated
   text, audio, images, video). **Azure Files** is ffmpeg scratch only.
 
@@ -53,7 +54,7 @@ Building onto the existing scaffold (`srcs/app` Nuxt, `tests/` Playwright):
 srcs/
   app/                # Nuxt (exists) — pages/components/layouts/middleware; calls FastAPI directly
   api/                # FastAPI: core/ domain/ providers/ routers/ services/ repositories/
-                      #   parsers/ + crawler metadata endpoint, job-events consumer
+                      #   parsers/ + crawler metadata/jobs endpoints + queue consumers
   infra/              # (NEW) Bicep + CI/CD — see deployment.md
 ```
 
@@ -86,43 +87,39 @@ flowchart LR
 
 ## Job lifecycle
 
-Long jobs are never awaited inside an HTTP request. A single control queue (`job-events`)
-carries lifecycle messages `{ jobId, kind, status }`; FastAPI runs a background
-consumer (works because the web app is Always On). Flow for a crawl job:
+Long jobs are never awaited inside an HTTP request. FastAPI persists a job, publishes a message to
+the relevant business queue, and runs Always On background consumers inside the API process. The
+first slice uses `crawler-jobs` plus `crawler-jobs-dead-letter`.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant U as Browser
     participant A as FastAPI
-    participant Q as Queue (job-events)
+    participant Q as Queue (crawler-jobs)
     participant C as Cosmos DB
 
-    U->>A: POST /novels/{id}/crawl
+    U->>A: POST /api/crawlers/{id}/jobs
     A->>C: create job (status = queued)
-    A->>Q: publish {jobId, kind:crawl, status:pending}
-    A-->>U: 202 { jobId }
+    A->>Q: publish crawler job message
+    A-->>U: 202 { id, status, reused:false }
 
     Note over A,Q: FastAPI background consumer
-    Q-->>A: deliver {status:pending}
-    A->>C: job.status = running
-    A->>Q: delete pending message
-
-    A->>Q: publish {jobId, status:completed}
-    Q-->>A: deliver {status:completed}
-    A->>C: job.status = done
-    A->>Q: delete completed message
+    Q-->>A: deliver crawler job
+    A->>C: job.status = processing
+    A->>C: job.status = completed
+    A->>Q: delete message
 
     U->>A: GET /jobs/{id}  (UI polls)
     A-->>C: read job doc
     A-->>U: status + counters
 ```
 
-- **Start** is decoupled: the request publishes a `pending` event and returns `202`. The consumer
-  picks it up and moves the job to `running`. If the trigger fails, the message redelivers.
-- **Completion** is a message: the job runner publishes a `completed` (or `failed`) event; the
-  consumer marks the job `done`. (A webhook to FastAPI is an equivalent alternative; the queue
-  keeps it uniform with `start`.)
+- **Start** is decoupled: the request publishes a business queue message and returns `202`. The
+  consumer picks it up and moves the job to `processing`. If the trigger fails, the message
+  redelivers.
+- **Completion** is persisted by the consumer before deleting the source message. Failed messages
+  retry with visibility delays and then move to an application-defined dead-letter queue.
 - **Progress** is a `GET /jobs/{id}` point-read (~1 RU) over the job rollup counters. An SSE
   endpoint that server-side-polls the same status is an optional UX upgrade — not websockets.
 - **Short ops (single-chapter translation preview)** can remain synchronous with a short timeout,
@@ -150,7 +147,7 @@ binaries go to Blob with a pointer (2 MB item limit; RU cost scales with item si
 | `novels` | `/userId` | library entry, connector ref, status, counts | "my library" (single-partition) |
 | `chapters` | `/novelId` | metadata + Blob pointers (`rawBlobPath`, `translations{lang→ptr}`) | "all chapters of a novel" |
 | `projects` | `/novelId` | translation/audio/video project (discriminated by `kind`) | projects viewed per novel |
-| `jobs` | `/jobId` | header + rollup `{total, completed, failed}` | point-read for progress |
+| `jobs` | `/createdBy` | header + active idempotency key + rollup `{total, completed, failed}` | user-scoped jobs and active dedupe |
 | `tasks` | `/jobId` | per-chapter / per-scene unit; status, attempts, output ptr | "all tasks of a job" (fan-out) |
 | `aimodels` | `/userId` | provider/model config; credential = Key Vault ref, never inline | AI Models page list |
 | `connectors` | `/id` | connector registry/display metadata (code is source of truth) | small catalog |
@@ -202,6 +199,11 @@ ending in `/dir`; metadata responses contain the complete ordered `chapters` lis
 HTML and parsed metadata are cached through `srcs/api/app/providers/cache_provider.py` and the
 generic `cache` repository.
 
+Crawler jobs are submitted through `POST /api/crawlers/{id}/jobs`. The endpoint hashes the
+relative route plus canonical payload for idempotency, stores jobs in Cosmos, and publishes new
+work to `crawler-jobs`. FastAPI creates and consumes `crawler-jobs` and
+`crawler-jobs-dead-letter`; there is no separate worker application in this stack.
+
 ## Media pipeline (audio → video)
 
 Long-running media jobs use Blob for persisted artifacts and Azure Files for ffmpeg scratch.
@@ -223,12 +225,12 @@ Provider adapters mirror the connector pattern so providers are swappable via `a
 ## Phased roadmap (app usable after each phase)
 
 - **Phase 0 — Infra, Auth, Shell.** Bicep for 2 App Services (one plan);
-  Blob/Files, Cosmos, Key Vault, `job-events` queue; CI/CD. FastAPI skeleton (config, Cosmos +
-  JWT + CORS, `job-events` consumer), `POST /auth/login` + seeded admin. Nuxt
+  Blob/Files, Cosmos, Key Vault, business queues beginning with `crawler-jobs`; CI/CD. FastAPI
+  skeleton (config, Cosmos + JWT + CORS, queue consumers), `POST /auth/login` + seeded admin. Nuxt
   `/login`, layout (left nav + top toolbar), `auth.global.ts`, direct API client. AI Models page
   CRUD (creds → Key Vault). *Deliverable: log in, see the empty sections.*
 - **Phase 1 — Library + Crawling.** Connector abstraction + 1 real connector; trending/search;
-  create novel; crawl job lifecycle via `job-events`;
+  create novel; crawl job lifecycle via `crawler-jobs`;
   progress polling; chapter viewer. *Deliverable: build a library, watch crawl, read chapters.*
 - **Phase 2 — Translation.** Translation project (model + prompts, single-chapter preview via
   synchronous wait, confirm); batched translation jobs; translated viewer. *Deliverable:

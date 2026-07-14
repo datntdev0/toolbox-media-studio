@@ -6,16 +6,21 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.dependencies import (
     CacheProviderDep,
+    CrawlerQueueProviderDep,
     CurrentUser,
     FlareSolverrClientDep,
+    JobRepositoryDep,
     SettingsDep,
 )
 from app.domain.crawlers import CrawlerListResponse, CrawlerMetadataResponse
+from app.domain.requests import CrawlerJobCreateRequest
+from app.domain.responses import CrawlerJobResponse
 from app.providers.crawler_provider import (
     InvalidCrawlerUrlError,
     UnknownCrawlerError,
     list_crawler_summaries,
 )
+from app.services.crawler_job_service import CrawlerJobPublishError, create_crawler_job
 from app.services.crawler_service import (
     CrawlerFetchError,
     CrawlerFetchTimeoutError,
@@ -71,4 +76,39 @@ def get_crawler_metadata(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Crawler upstream failed",
+        ) from exc
+
+
+@router.post("/{id}/jobs", response_model=CrawlerJobResponse, status_code=status.HTTP_202_ACCEPTED)
+def create_job(
+    id: str,
+    request: CrawlerJobCreateRequest,
+    current_user: CurrentUser,
+    job_repository: JobRepositoryDep,
+    crawler_queue_provider: CrawlerQueueProviderDep,
+) -> CrawlerJobResponse:
+    """Create or reuse an asynchronous crawler job."""
+
+    try:
+        return create_crawler_job(
+            crawler_id=id,
+            request=request,
+            created_by=current_user.id,
+            repository=job_repository,
+            queue_provider=crawler_queue_provider,
+        )
+    except UnknownCrawlerError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Crawler not found",
+        ) from exc
+    except InvalidCrawlerUrlError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except CrawlerJobPublishError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Crawler job could not be queued",
         ) from exc

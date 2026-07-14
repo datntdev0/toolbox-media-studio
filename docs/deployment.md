@@ -11,9 +11,9 @@ be deployed via GitHub Actions.
 |---|---|---|
 | App Service Plan | **B1** (or F1 for dev) | Shared by the two web apps below |
 | App Service — `web` | Node | Nuxt SPA/SSR |
-| App Service — `api` | Python, **Always On** | FastAPI (API + `job-events` consumer loop) |
+| App Service — `api` | Python, **Always On** | FastAPI (API + APScheduler queue consumers) |
 | Cosmos DB | NoSQL, **serverless** | All application state (DB `mediastudio`) |
-| Storage account — `media` | StorageV2, LRS | Blob (binaries) + Azure Files (ffmpeg scratch) + `job-events` queue |
+| Storage account — `media` | StorageV2, LRS | Blob (binaries) + Azure Files (ffmpeg scratch) + business queues |
 | Key Vault | Standard | Provider API keys, JWT signing key, connection strings |
 | Application Insights | — | Logs/metrics for `api` |
 | FlareSolverr | Container (local/dev now) | Browser-backed fetches for approved crawler metadata URLs |
@@ -21,9 +21,10 @@ be deployed via GitHub Actions.
 Notes:
 - **Two web apps, one plan.** An App Service *app* runs a single runtime, so Nuxt (Node) and
   FastAPI (Python) are two apps sharing one **plan** (the billed unit). The `api` app must have
-  **Always On** enabled so its `job-events` background consumer keeps running.
-- **`job-events` queue** lives in the `media` storage account (app-level control channel); the
-  API consumer uses it for longer workflow lifecycle events.
+  **Always On** enabled so its APScheduler queue consumers keep running.
+- **Business queues** live in the `media` storage account. The first queue pair is
+  `crawler-jobs` and `crawler-jobs-dead-letter`; future features should add capability-specific
+  queues instead of a shared control queue.
 - **FlareSolverr is currently a local development dependency** in
   `deploy/dockercompose.local.infra.yml`. Production hosting should be explicitly designed before
   enabling crawler metadata fetching outside trusted environments, because it launches browser
@@ -40,7 +41,7 @@ flowchart LR
     subgraph Media["Storage: media"]
         Blob[(Blob)]
         Files[(Files)]
-        Q[(Queue: job-events)]
+        Q[(Queues: crawler-jobs)]
     end
     Cosmos[("Cosmos DB<br/>serverless")]
     KV["Key Vault"]
@@ -61,13 +62,14 @@ flowchart LR
 - **Secrets in Key Vault:** provider API keys (Anthropic/OpenAI/ElevenLabs/Google/etc.), the JWT
   signing key, and any connection strings. The `aimodels` Cosmos docs store only a Key Vault
   *reference* (`secretRef`), never the raw key.
-- **App settings (non-secret):** Cosmos endpoint, storage account names, `job-events` queue name,
-  and the allowed CORS origin (the `web` app URL).
+- **App settings (non-secret):** Cosmos endpoint, storage account names, and the allowed CORS
+  origin (the `web` app URL).
 - **FastAPI settings:** all FastAPI app settings use the `FAST_` prefix, grouped by domain where
   useful: `FAST_SECURITY_*`, `FAST_AZ_*`, `FAST_FLARESOLVERR_*`, and cache TTL settings.
 - **Crawler settings:** `FAST_FLARESOLVERR_BASE_URL`, `FAST_FLARESOLVERR_MAX_TIMEOUT_MS`, and
-  `FAST_CACHE_TTL_SECONDS_CRAWLER`. Local development points `FAST_FLARESOLVERR_BASE_URL` at
-  `http://localhost:8191/v1`.
+  `FAST_CACHE_TTL_SECONDS_CRAWLER`. Queue names, retry timing, consumer count, visibility timeout,
+  and simulated processing duration are application constants. Local development points
+  `FAST_FLARESOLVERR_BASE_URL` at `http://localhost:8191/v1`.
 - **CORS:** FastAPI allows the Nuxt origin only; credentials mode as needed for the JWT.
 
 ## CI/CD (GitHub Actions)
@@ -122,8 +124,9 @@ before committing a budget.)
 | Key Vault + App Insights | limited free ingest | **~$0–1** |
 | **Infra total** | | **~$0 (F1 dev) to ~$15–18/mo (B1 prod)** |
 
-The `api` app needs **Always On** (its `job-events` consumer must keep running), which is why
-B1 is the realistic production floor. The background engine stays ~$0 on Consumption.
+The `api` app needs **Always On** because its queue consumers run in-process with APScheduler,
+which is why B1 is the realistic production floor. Queue storage itself remains pennies at low
+volume.
 
 ### Per-novel AI usage (premium defaults)
 
@@ -152,11 +155,11 @@ Example: 20 chapters, full audio, ~50 illustrations, a few short video scenes. B
 ## Deployment verification
 
 - `az deployment group what-if` on the Bicep; confirm the two web apps land on one plan and the
-  `job-events` queue exists.
+  `crawler-jobs` and `crawler-jobs-dead-letter` queues exist.
 - Hit `web` and `api` health endpoints over HTTPS; confirm CORS from the Nuxt origin; log in with
   the seeded admin.
 - In local/dev, confirm FlareSolverr responds at `http://localhost:8191` and a
   `request.get` call can fetch an approved `novel543` metadata URL.
-- Confirm `api` has **Always On** on and its `job-events` consumer logs startup in App Insights.
+- Confirm `api` has **Always On** on and its crawler queue consumer logs startup in App Insights.
 - End-to-end smoke: create a novel → observe `pending`→`running`→`done` on the job doc → chapters
   in Blob.

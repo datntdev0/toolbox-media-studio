@@ -63,3 +63,11 @@ class NovelUpdateRequest(BaseModel):
     tags: list[str] | None = None
     notes: str | None = None
     status: NovelStatus | None = None
+
+
+class CrawlerJobCreateRequest(BaseModel):
+    """Payload for creating a crawler job."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    url: str

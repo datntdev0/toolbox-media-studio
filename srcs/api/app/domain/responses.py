@@ -4,6 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.domain.jobs import JobKind, JobStatus
 from app.domain.novels import NovelStatus
 from app.domain.users import UserRole, UserStatus
 
@@ -65,3 +66,19 @@ class NovelListResponse(BaseModel):
 
     items: list[NovelResponse]
     continuation_token: str | None = Field(default=None, alias="continuationToken")
+
+
+class CrawlerJobResponse(BaseModel):
+    """Crawler job payload returned by the crawler-job endpoint."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    kind: JobKind
+    crawler_id: str = Field(alias="crawlerId")
+    url: str
+    status: JobStatus
+    attempts: int
+    reused: bool
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")

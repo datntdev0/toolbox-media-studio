@@ -62,7 +62,6 @@ class Settings(BaseSettings):
         validation_alias="FAST_CACHE_TTL_SECONDS_CRAWLER",
     )
 
-
 @lru_cache
 def get_settings() -> Settings:
     """Return a cached Settings instance."""

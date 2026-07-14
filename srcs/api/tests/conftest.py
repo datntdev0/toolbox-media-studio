@@ -1,11 +1,15 @@
 """Shared pytest fixtures."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
 
 import pytest
 
 from app.providers.cache_provider import RepositoryCacheProvider
+from app.providers.queue_provider import QueueProvider, ReceivedQueueMessage, SentQueueMessage
 from app.repositories.cache_repository import InMemoryCacheRepository
+from app.repositories.job_repository import InMemoryJobRepository
 from app.repositories.novel_repository import InMemoryNovelRepository
 from app.repositories.user_repository import InMemoryUserRepository
 
@@ -33,6 +37,53 @@ class FakeFlareSolverrClient:
         if self.exception is not None:
             raise self.exception
         return FakeFlareSolverrResult(html=self.html)
+
+
+class FakeQueueProvider:
+    """In-memory queue provider for route tests."""
+
+    def __init__(self, queue_name: str) -> None:
+        self._queue_name = queue_name
+        self.messages: list[Mapping[str, Any]] = []
+        self.ensure_count = 0
+        self.raise_on_send: Exception | None = None
+
+    @property
+    def queue_name(self) -> str:
+        return self._queue_name
+
+    def ensure_exists(self) -> None:
+        self.ensure_count += 1
+
+    def send(self, message: Mapping[str, Any]) -> SentQueueMessage:
+        if self.raise_on_send is not None:
+            raise self.raise_on_send
+        self.messages.append(dict(message))
+        return SentQueueMessage(id=str(len(self.messages)))
+
+    def receive_one(self, visibility_timeout: int) -> ReceivedQueueMessage | None:
+        del visibility_timeout
+        return None
+
+    def retry(self, message: ReceivedQueueMessage, visibility_timeout: int) -> None:
+        del message, visibility_timeout
+
+    def delete(self, message: ReceivedQueueMessage) -> None:
+        del message
+
+
+class FakeQueueProviderFactory:
+    """Queue provider factory keyed by queue name."""
+
+    def __init__(self) -> None:
+        self.providers: dict[str, FakeQueueProvider] = {}
+
+    def get(self, queue_name: str) -> QueueProvider:
+        provider = self.providers.get(queue_name)
+        if provider is None:
+            provider = FakeQueueProvider(queue_name)
+            self.providers[queue_name] = provider
+        return provider
 
 
 @pytest.fixture(autouse=True)
@@ -93,6 +144,20 @@ def novel_repository() -> InMemoryNovelRepository:
 
 
 @pytest.fixture
+def job_repository() -> InMemoryJobRepository:
+    """Shared in-memory job repository for a test app instance."""
+
+    return InMemoryJobRepository()
+
+
+@pytest.fixture
+def queue_provider_factory() -> FakeQueueProviderFactory:
+    """Shared fake queue provider factory for a test app instance."""
+
+    return FakeQueueProviderFactory()
+
+
+@pytest.fixture
 def cache_provider() -> RepositoryCacheProvider:
     """Shared in-memory cache provider for a test app instance."""
 
@@ -114,6 +179,8 @@ def client(
     _env: None,
     user_repository: InMemoryUserRepository,
     novel_repository: InMemoryNovelRepository,
+    job_repository: InMemoryJobRepository,
+    queue_provider_factory: FakeQueueProviderFactory,
     cache_provider: RepositoryCacheProvider,
     flaresolverr_client: FakeFlareSolverrClient,
 ):
@@ -130,6 +197,9 @@ def client(
             novel_repository=novel_repository,
             cache_provider=cache_provider,
             flaresolverr_client=flaresolverr_client,
+            job_repository=job_repository,
+            queue_provider_factory=queue_provider_factory,
+            start_consumers=False,
         )
     ) as test_client:
         yield test_client

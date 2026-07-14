@@ -1,8 +1,8 @@
 # Novel Media Studio — API (FastAPI)
 
 The domain API for Novel Media Studio. It currently includes JWT authentication, user and novel
-management, and the first crawler metadata slice for `novel543` using FlareSolverr plus a generic
-cache provider backed by repositories.
+management, and the first crawler metadata/job slice for `novel543` using FlareSolverr, Cosmos,
+and Azure Storage Queues.
 
 See the design docs for the full picture:
 [`architecture.md`](../../docs/architecture.md) · [`requirements.md`](../../docs/requirements.md) ·
@@ -16,13 +16,14 @@ Implemented:
 - `GET /health` readiness.
 - `/api/users` admin user-management routes.
 - `/api/novels` user-scoped novel-management routes.
-- `/api/crawlers` registry and `/api/crawlers/{id}/metadata` for `novel543`.
-- Cosmos-backed repositories for users, novels, and generic cache records.
+- `/api/crawlers` registry, `/api/crawlers/{id}/metadata`, and
+  `POST /api/crawlers/{id}/jobs` for `novel543`.
+- Cosmos-backed repositories for users, novels, jobs, and generic cache records.
+- Azure Storage Queue provider plus API-hosted APScheduler consumers for `crawler-jobs`.
 - FlareSolverr-backed metadata fetching through `app/providers/flaresolverr_provider.py`.
 - Novel543 metadata parsing through `app/parsers/novel543_parser.py`.
 
-Still out of scope: chapter body crawling, background crawl jobs, translation, audio,
-image, and video pipelines.
+Still out of scope: real chapter body crawling, translation, audio, image, and video pipelines.
 
 ## Tech stack
 
@@ -34,6 +35,7 @@ image, and video pipelines.
 | Auth | JWT (`python-jose`); credentials compared against config |
 | Dep management | `pyproject.toml` + pip |
 | Crawler fetch | FlareSolverr through API provider |
+| Background jobs | Azure Storage Queue + APScheduler inside FastAPI |
 | HTML parsing | BeautifulSoup in API parser modules |
 | Tooling | ruff (lint+format), mypy (types), pytest (tests) |
 
@@ -92,8 +94,12 @@ srcs/api/
     main.py                  # FastAPI app factory; mounts routers
     core/
       config.py              # Settings (pydantic-settings)
+      runtime.py             # Runtime composition and background consumer lifecycle
       security.py            # JWT encode/decode, password verify
       dependencies.py        # FastAPI dependency providers
+    consumers/
+      crawler_queue_consumer.py # crawler-jobs consumer
+      queue_consumer.py      # reusable scheduled queue consumer
     domain/
       crawlers.py            # Crawler response/domain models
       requests.py            # Inbound request models
@@ -102,10 +108,12 @@ srcs/api/
       cache_provider.py      # Generic cache behavior + TTL enforcement
       crawler_provider.py    # Supported crawler registry and URL validation
       flaresolverr_provider.py # FlareSolverr HTTP client
+      queue_provider.py      # Azure Storage Queue provider/factory
     parsers/
       novel543_parser.py     # Novel543 metadata parsing
     repositories/
       cache_repository.py    # Generic cache persistence contract + in-memory repo
+      job_repository.py      # Async job persistence contract + in-memory repo
       cosmosdb/              # Cosmos DB implementations
     routers/
       auth.py                # POST /auth/login, GET /auth/me
@@ -149,8 +157,10 @@ development.
 | `FAST_FLARESOLVERR_BASE_URL` | non-secret | FlareSolverr `/v1` URL |
 | `FAST_FLARESOLVERR_MAX_TIMEOUT_MS` | non-secret | Max FlareSolverr request timeout |
 | `FAST_CACHE_TTL_SECONDS_CRAWLER` | non-secret | crawler cache freshness window |
-
 > In Azure, secrets resolve from Key Vault via Managed Identity; locally they come from `.env`.
+
+Crawler queue names, retry timing, consumer count, and simulated processing duration are defined
+as application constants in `app/core/runtime.py`.
 
 ## Local development
 
@@ -184,9 +194,11 @@ mypy app
 - `GET /api/crawlers/novel543/metadata?url=https://www.novel543.com/0603625457/dir` returns parsed
   metadata with the full ordered chapter list when FlareSolverr and local infrastructure are
   running.
+- `POST /api/crawlers/novel543/jobs` with `{ "url": "https://www.novel543.com/0603625457/dir" }`
+  returns `202`, creates or reuses an active job, and enqueues new work to `crawler-jobs`.
 
 ## Next Steps
 
-The next backend slices are chapter body crawling, background job coordination through the
-`job-events` queue, AI model configuration, and the translation/audio/image/video pipelines. See
-the phased roadmap in [`architecture.md`](../../docs/architecture.md).
+The next backend slices are real chapter body crawling, AI model configuration, and the
+translation/audio/image/video pipelines. See the phased roadmap in
+[`architecture.md`](../../docs/architecture.md).

@@ -41,7 +41,7 @@ Workflow: add a novel to the **Library**.
   (a pluggable source-site adapter).
 - **FR-2.2** The connector returns a list of **trending** novels by default.
 - **FR-2.3** The user can **search** or select a novel to crawl.
-- **FR-2.4** The system queues a crawling job to the background worker and processes it
+- **FR-2.4** The system queues a crawling job to a background job queue and processes it
   chapter by chapter.
 - **FR-2.5** The user can view **crawl progress** per chapter.
 - **FR-2.6** The user can view the crawled **content** of each chapter.
@@ -60,7 +60,8 @@ Workflow: translate an existing novel.
 - **FR-3.1** On the **Projects** page, the user creates a new **translation** project for a novel.
 - **FR-3.2** The user selects an AI LLM model and global/system prompts, and **previews** the
   result on a single chapter, then confirms.
-- **FR-3.3** The system runs the translation with the selected configuration via the worker queue.
+- **FR-3.3** The system runs the translation with the selected configuration via a background job
+  queue.
 - **FR-3.4** The user can view **translation progress**.
 - **FR-3.5** The user can view the translated language in the novel's detailed chapter view.
 

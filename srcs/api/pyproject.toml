@@ -13,6 +13,7 @@ dependencies = [
     "azure-cosmos>=4.7",
     "azure-storage-blob>=12.24",
     "azure-storage-queue>=12.11",
+    "apscheduler>=3.11,<4",
     "uvicorn[standard]>=0.30",
     "pydantic[email]>=2.7",
     "pydantic-settings>=2.3",
@@ -34,6 +35,7 @@ dev = [
 [tool.setuptools]
 packages = [
     "app",
+    "app.consumers",
     "app.core",
     "app.domain",
     "app.parsers",
