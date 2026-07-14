@@ -35,8 +35,8 @@ class CrawlerListResponse(BaseModel):
     items: list[CrawlerSummaryResponse]
 
 
-class CrawlerLatestChapterResponse(BaseModel):
-    """Latest chapter metadata returned by the crawler endpoint."""
+class CrawlerChapterResponse(BaseModel):
+    """Chapter metadata returned by the crawler endpoint."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -60,6 +60,6 @@ class CrawlerMetadataResponse(BaseModel):
     protagonists: list[str]
     description: str | None = None
     cover_image_url: str | None = Field(default=None, alias="coverImageUrl")
-    latest_chapters: list[CrawlerLatestChapterResponse] = Field(alias="latestChapters")
+    chapters: list[CrawlerChapterResponse]
     cached: bool
     fetched_at: datetime = Field(alias="fetchedAt")

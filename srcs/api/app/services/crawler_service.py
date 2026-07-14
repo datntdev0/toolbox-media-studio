@@ -9,7 +9,7 @@ from shared.novel543_parser import ParsedNovelMetadata, parse_novel543_metadata
 
 from app.core.config import Settings
 from app.domain.crawlers import (
-    CrawlerLatestChapterResponse,
+    CrawlerChapterResponse,
     CrawlerMetadataResponse,
 )
 from app.providers.cache_provider import CacheProvider
@@ -135,13 +135,13 @@ def _to_response(
         protagonists=parsed.protagonists,
         description=parsed.description,
         cover_image_url=parsed.cover_image_url,
-        latest_chapters=[
-            CrawlerLatestChapterResponse(
+        chapters=[
+            CrawlerChapterResponse(
                 title=chapter.title,
                 url=chapter.url,
                 chapter_number=chapter.chapter_number,
             )
-            for chapter in parsed.latest_chapters
+            for chapter in parsed.chapters
         ],
         cached=cached,
         fetched_at=fetched_at,

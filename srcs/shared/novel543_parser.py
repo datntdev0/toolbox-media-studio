@@ -14,8 +14,8 @@ class Novel543ParseError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
-class ParsedLatestChapter:
-    """Latest chapter metadata parsed from Novel543."""
+class ParsedChapter:
+    """Chapter metadata parsed from a Novel543 directory page."""
 
     title: str
     url: str
@@ -34,10 +34,10 @@ class ParsedNovelMetadata:
     protagonists: list[str]
     description: str | None
     cover_image_url: str | None
-    latest_chapters: list[ParsedLatestChapter]
+    chapters: list[ParsedChapter]
 
 
-_NOVEL_ID_PATTERN = re.compile(r"/(?P<source_novel_id>[0-9]+)/?")
+_NOVEL_ID_PATTERN = re.compile(r"^/(?P<source_novel_id>[0-9]+)/dir$")
 _DATE_PATTERN = re.compile(
     r"(?P<year>[0-9]{4})[-/.年](?P<month>[0-9]{1,2})[-/.月](?P<day>[0-9]{1,2})"
 )
@@ -64,7 +64,7 @@ def parse_novel543_metadata(
     source_novel_id: str | None = None,
     canonical_url: str | None = None,
 ) -> ParsedNovelMetadata:
-    """Parse a Novel543 novel detail page into normalized metadata."""
+    """Parse a Novel543 novel directory page into normalized metadata."""
 
     page_url = canonical_url or source_url
     if page_url is None:
@@ -85,7 +85,7 @@ def parse_novel543_metadata(
         protagonists=_split_people(_extract_labeled_text(soup, _PROTAGONIST_LABELS)),
         description=_extract_description(soup),
         cover_image_url=_extract_cover_image_url(soup, page_url),
-        latest_chapters=_extract_latest_chapters(soup, page_url),
+        chapters=_extract_chapters(soup, page_url, novel_id),
     )
 
 
@@ -237,54 +237,71 @@ def _extract_cover_image_url(soup: BeautifulSoup, source_url: str) -> str | None
     return None
 
 
-def _extract_latest_chapters(soup: BeautifulSoup, source_url: str) -> list[ParsedLatestChapter]:
-    links = _latest_chapter_links(soup)
-    chapters: list[ParsedLatestChapter] = []
+def _extract_chapters(
+    soup: BeautifulSoup,
+    source_url: str,
+    source_novel_id: str,
+) -> list[ParsedChapter]:
+    links = _all_chapter_links(soup)
+    chapters: list[ParsedChapter] = []
     seen_urls: set[str] = set()
     for link in links:
         href = _string_attr(link, "href")
         title = _normalize_space(link.get_text(" ", strip=True))
         if href is None or not title:
             continue
-        chapter_number = _parse_chapter_number(title)
-        if chapter_number is None and "章" not in title:
-            continue
         url = urljoin(source_url, href)
+        if not _is_chapter_url(url, source_url, source_novel_id):
+            continue
         if url in seen_urls:
             continue
-        chapters.append(ParsedLatestChapter(title=title, url=url, chapter_number=chapter_number))
+        chapters.append(
+            ParsedChapter(
+                title=title,
+                url=url,
+                chapter_number=_parse_chapter_number(title),
+            )
+        )
         seen_urls.add(url)
     return chapters
 
 
-def _latest_chapter_links(soup: BeautifulSoup) -> list[Tag]:
-    links: list[Tag] = []
-    for selector in (
-        ".latest-chapters a",
-        ".latestChapter a",
-        ".latest a",
-        ".newest a",
-        ".new-chapter a",
-        ".chapter-list a",
-        "#latest-chapters a",
-    ):
-        links.extend(tag for tag in soup.select(selector) if isinstance(tag, Tag))
-    if links:
-        return links
+def _all_chapter_links(soup: BeautifulSoup) -> list[Tag]:
+    for heading in soup.find_all(("h1", "h2", "h3", "h4", "h5", "h6")):
+        if not isinstance(heading, Tag):
+            continue
+        heading_text = _normalize_space(heading.get_text(" ", strip=True))
+        if "全部章" not in heading_text:
+            continue
+        return [
+            element
+            for element in heading.find_all_next("a")
+            if isinstance(element, Tag)
+        ]
 
-    for tag in soup.find_all(("h2", "h3", "h4", "section", "div")):
-        if not isinstance(tag, Tag):
-            continue
-        if "最新" not in _normalize_space(tag.get_text(" ", strip=True)):
-            continue
-        links.extend(link for link in tag.find_all("a") if isinstance(link, Tag))
-        for sibling in tag.find_next_siblings(limit=3):
-            if isinstance(sibling, Tag):
-                links.extend(link for link in sibling.find_all("a") if isinstance(link, Tag))
+    for selector in (
+        ".all-chapters a",
+        ".allChapter a",
+        ".chapter-list a",
+        ".dirlist a",
+        "#all-chapters a",
+        "#chapter-list a",
+        "#dirlist a",
+    ):
+        links = [tag for tag in soup.select(selector) if isinstance(tag, Tag)]
         if links:
             return links
 
     return [tag for tag in soup.find_all("a") if isinstance(tag, Tag)]
+
+
+def _is_chapter_url(url: str, source_url: str, source_novel_id: str) -> bool:
+    parsed = urlsplit(url)
+    source = urlsplit(source_url)
+    if parsed.scheme != source.scheme or parsed.netloc != source.netloc:
+        return False
+    chapter_path = re.compile(rf"^/{re.escape(source_novel_id)}/[^/]+\.html$")
+    return chapter_path.fullmatch(parsed.path) is not None
 
 
 def _parse_chapter_number(title: str) -> int | None:

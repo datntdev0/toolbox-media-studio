@@ -32,9 +32,9 @@ def list_crawlers() -> CrawlerListResponse:
     return CrawlerListResponse(items=list_crawler_summaries())
 
 
-@router.get("/{crawler_id}/metadata", response_model=CrawlerMetadataResponse)
+@router.get("/{id}/metadata", response_model=CrawlerMetadataResponse)
 def get_crawler_metadata(
-    crawler_id: str,
+    id: str,
     source_url: Annotated[str, Query(alias="url")],
     current_user: CurrentUser,
     settings: SettingsDep,
@@ -46,7 +46,7 @@ def get_crawler_metadata(
     del current_user
     try:
         return fetch_crawler_metadata(
-            crawler_id=crawler_id,
+            crawler_id=id,
             source_url=source_url,
             settings=settings,
             cache_provider=cache_provider,

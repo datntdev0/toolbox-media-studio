@@ -227,9 +227,10 @@ class Connector(Protocol):
 Before full background chapter crawling, the API supports a synchronous metadata endpoint:
 
 - `GET /api/crawlers`
-- `GET /api/crawlers/{crawler_id}/metadata?url=<source_url>`
+- `GET /api/crawlers/{id}/metadata?url=<source_url>`
 
-The first supported crawler is `novel543`. URL validation lives in
+The first supported crawler is `novel543`. Its source URL must be the full chapter directory,
+ending in `/dir`; metadata responses contain the complete ordered `chapters` list. URL validation lives in
 `srcs/api/app/providers/crawler_provider.py`; fetching uses FlareSolverr through
 `srcs/shared/flaresolverr_http_client.py`; parsing lives in `srcs/shared/novel543_parser.py`;
 HTML and parsed metadata are cached through `srcs/api/app/providers/cache_provider.py` and the

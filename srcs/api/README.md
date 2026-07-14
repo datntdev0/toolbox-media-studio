@@ -16,7 +16,7 @@ Implemented:
 - `GET /health` readiness.
 - `/api/users` admin user-management routes.
 - `/api/novels` user-scoped novel-management routes.
-- `/api/crawlers` registry and `/api/crawlers/{crawler_id}/metadata` for `novel543`.
+- `/api/crawlers` registry and `/api/crawlers/{id}/metadata` for `novel543`.
 - Cosmos-backed repositories for users, novels, and generic cache records.
 - FlareSolverr-backed metadata fetching through `srcs/shared/flaresolverr_http_client.py`.
 - Novel543 metadata parsing through `srcs/shared/novel543_parser.py`.
@@ -181,8 +181,9 @@ mypy ../shared
 - `POST /auth/login` with `FAST_SECURITY_DEFAULT_ADMIN_EMAIL` /
   `FAST_SECURITY_DEFAULT_ADMIN_PASSWORD` returns a JWT; any other credentials return `401`.
 - `GET /auth/me` with that JWT returns the admin user; a missing/invalid token returns `401`.
-- `GET /api/crawlers/novel543/metadata?url=https://www.novel543.com/0603625457/` returns parsed
-  metadata when FlareSolverr and local infrastructure are running.
+- `GET /api/crawlers/novel543/metadata?url=https://www.novel543.com/0603625457/dir` returns parsed
+  metadata with the full ordered chapter list when FlareSolverr and local infrastructure are
+  running.
 
 ## Next Steps
 

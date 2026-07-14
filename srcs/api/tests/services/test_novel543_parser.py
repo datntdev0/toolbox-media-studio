@@ -3,7 +3,7 @@
 import pytest
 from shared.novel543_parser import Novel543ParseError, parse_novel543_metadata
 
-SOURCE_URL = "https://www.novel543.com/0603625457/"
+SOURCE_URL = "https://www.novel543.com/0603625457/dir"
 
 NOVEL543_HTML = """
 <!doctype html>
@@ -34,6 +34,15 @@ NOVEL543_HTML = """
           <li><a href="/0603625457/535.html">第535章 故人重逢</a></li>
         </ul>
       </section>
+      <section class="all-chapters">
+        <h2>全部章节</h2>
+        <ul>
+          <li><a href="/0603625457/1.html">第1章 故事開始</a></li>
+          <li><a href="/0603625457/2.html">第2章 踏上旅程</a></li>
+          <li><a href="/0603625457/535.html">第535章 故人重逢</a></li>
+          <li><a href="/0603625457/536.html">第536章 常回來看看（大結局）</a></li>
+        </ul>
+      </section>
     </main>
   </body>
 </html>
@@ -51,12 +60,14 @@ def test_novel543_parser_extracts_expected_metadata() -> None:
     assert metadata.protagonists == ["林牧", "姬梧桐"]
     assert metadata.description == "瞎眼少年林牧下山行醫，意外救下聖女，兩人踏上尋找真相的旅程。"
     assert metadata.cover_image_url == "https://www.novel543.com/files/article/image/0603625457.jpg"
-    assert [chapter.title for chapter in metadata.latest_chapters] == [
-        "第536章 常回來看看（大結局）",
+    assert [chapter.title for chapter in metadata.chapters] == [
+        "第1章 故事開始",
+        "第2章 踏上旅程",
         "第535章 故人重逢",
+        "第536章 常回來看看（大結局）",
     ]
-    assert metadata.latest_chapters[0].url == "https://www.novel543.com/0603625457/536.html"
-    assert metadata.latest_chapters[0].chapter_number == 536
+    assert metadata.chapters[0].url == "https://www.novel543.com/0603625457/1.html"
+    assert metadata.chapters[0].chapter_number == 1
 
 
 def test_novel543_parser_raises_when_title_is_missing() -> None:

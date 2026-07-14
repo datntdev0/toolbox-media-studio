@@ -36,7 +36,7 @@ NOVEL543_CRAWLER = CrawlerDefinition(
     hosts=("www.novel543.com",),
     metadata_supported=True,
     scheme="https",
-    path_pattern=re.compile(r"^/(?P<source_novel_id>[0-9]+)/?$"),
+    path_pattern=re.compile(r"^/(?P<source_novel_id>[0-9]+)/dir$"),
 )
 
 _CRAWLERS = {NOVEL543_CRAWLER.id: NOVEL543_CRAWLER}
@@ -91,10 +91,12 @@ def validate_crawler_source(crawler_id: str, source_url: str) -> CrawlerSource:
 
     match = crawler.path_pattern.fullmatch(parsed.path)
     if match is None:
-        raise InvalidCrawlerUrlError(f"{crawler.name} URLs must point to a numeric novel path")
+        raise InvalidCrawlerUrlError(
+            f"{crawler.name} URLs must point to a numeric novel directory path ending in /dir"
+        )
 
     source_novel_id = match.group("source_novel_id")
-    canonical_url = f"{crawler.scheme}://{host}/{source_novel_id}/"
+    canonical_url = f"{crawler.scheme}://{host}/{source_novel_id}/dir"
     return CrawlerSource(
         crawler_id=crawler.id,
         source_url=canonical_url,

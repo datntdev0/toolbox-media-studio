@@ -22,6 +22,13 @@ SAMPLE_HTML = """
       <li><a href="/0603625457/536.html">第536章 常回來看看（大結局）</a></li>
       <li><a href="/0603625457/535.html">第535章 心意</a></li>
     </ul>
+    <h3>瞎眼神醫，開局遇到聖女報恩...全部章节</h3>
+    <ul>
+      <li><a href="/0603625457/1.html">第1章 故事開始</a></li>
+      <li><a href="/0603625457/2.html">第2章 踏上旅程</a></li>
+      <li><a href="/0603625457/535.html">第535章 心意</a></li>
+      <li><a href="/0603625457/536.html">第536章 常回來看看（大結局）</a></li>
+    </ul>
   </body>
 </html>
 """
@@ -40,7 +47,7 @@ def _headers(client: TestClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {_login(client)}"}
 
 
-def _metadata_url(source_url: str = "https://www.novel543.com/0603625457/") -> str:
+def _metadata_url(source_url: str = "https://www.novel543.com/0603625457/dir") -> str:
     return f"/api/crawlers/novel543/metadata?url={source_url}"
 
 
@@ -60,6 +67,17 @@ def test_list_crawlers_returns_novel543(client: TestClient) -> None:
     }
 
 
+def test_metadata_openapi_uses_id_path_parameter(client: TestClient) -> None:
+    paths = client.get("/openapi.json").json()["paths"]
+    operation = paths["/api/crawlers/{id}/metadata"]["get"]
+
+    assert not any(path == "/api/crawlers/{crawler_id}/metadata" for path in paths)
+    assert any(
+        parameter["name"] == "id" and parameter["in"] == "path"
+        for parameter in operation["parameters"]
+    )
+
+
 def test_metadata_requires_auth(client: TestClient) -> None:
     response = client.get(_metadata_url())
 
@@ -68,7 +86,7 @@ def test_metadata_requires_auth(client: TestClient) -> None:
 
 def test_metadata_rejects_unknown_crawler(client: TestClient) -> None:
     response = client.get(
-        "/api/crawlers/unknown/metadata?url=https://www.novel543.com/0603625457/",
+        "/api/crawlers/unknown/metadata?url=https://www.novel543.com/0603625457/dir",
         headers=_headers(client),
     )
 
@@ -82,6 +100,7 @@ def test_metadata_rejects_invalid_novel543_urls(client: TestClient) -> None:
         "http://www.novel543.com/0603625457/",
         "https://example.com/0603625457/",
         "https://www.novel543.com/books/0603625457/",
+        "https://www.novel543.com/0603625457/",
     ]:
         response = client.get(_metadata_url(source_url), headers=headers)
         assert response.status_code == 422
@@ -98,7 +117,7 @@ def test_metadata_fetches_html_through_flaresolverr_on_cache_miss(
     assert response.status_code == 200
     body = response.json()
     assert body["crawlerId"] == "novel543"
-    assert body["sourceUrl"] == "https://www.novel543.com/0603625457/"
+    assert body["sourceUrl"] == "https://www.novel543.com/0603625457/dir"
     assert body["sourceNovelId"] == "0603625457"
     assert body["title"] == "瞎眼神醫，開局遇到聖女報恩"
     assert body["author"] == "十一條金魚"
@@ -107,9 +126,9 @@ def test_metadata_fetches_html_through_flaresolverr_on_cache_miss(
     assert body["protagonists"] == ["林牧", "姬梧桐"]
     assert body["description"] == "報恩，她是認真的！"
     assert body["coverImageUrl"] == "https://www.novel543.com/cover.jpg"
-    assert body["latestChapters"][0]["chapterNumber"] == 536
+    assert [chapter["chapterNumber"] for chapter in body["chapters"]] == [1, 2, 535, 536]
     assert body["cached"] is False
-    assert flaresolverr_client.calls == [("https://www.novel543.com/0603625457/", 60000)]
+    assert flaresolverr_client.calls == [("https://www.novel543.com/0603625457/dir", 60000)]
 
 
 def test_metadata_uses_html_cache_without_fetching(
@@ -119,7 +138,7 @@ def test_metadata_uses_html_cache_without_fetching(
 ) -> None:
     cache_provider.set(
         "crawler:novel543:html",
-        "https://www.novel543.com/0603625457/",
+        "https://www.novel543.com/0603625457/dir",
         SAMPLE_HTML,
     )
 
@@ -137,7 +156,7 @@ def test_metadata_uses_parsed_metadata_cache_without_fetching_or_reparsing(
 ) -> None:
     cached: dict[str, Any] = {
         "crawler_id": "novel543",
-        "source_url": "https://www.novel543.com/0603625457/",
+        "source_url": "https://www.novel543.com/0603625457/dir",
         "source_novel_id": "0603625457",
         "title": "Cached Title",
         "author": None,
@@ -146,13 +165,13 @@ def test_metadata_uses_parsed_metadata_cache_without_fetching_or_reparsing(
         "protagonists": [],
         "description": None,
         "cover_image_url": None,
-        "latest_chapters": [],
+        "chapters": [],
         "cached": False,
         "fetched_at": "2026-07-11T00:00:00+00:00",
     }
     cache_provider.set(
         "crawler:novel543:metadata",
-        "https://www.novel543.com/0603625457/",
+        "https://www.novel543.com/0603625457/dir",
         cached,
     )
 

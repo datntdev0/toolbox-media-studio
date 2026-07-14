@@ -7,7 +7,7 @@ from app.repositories.cache_repository import CacheRecord, InMemoryCacheReposito
 
 def test_cache_repository_keys_records_by_cache_type() -> None:
     repository = InMemoryCacheRepository()
-    canonical_url = "https://www.novel543.com/0603625457/"
+    canonical_url = "https://www.novel543.com/0603625457/dir"
     html_record = CacheRecord(
         cache_type="crawler:novel543:html",
         cache_key=canonical_url,
