@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
 
 from app.core.azure import should_verify_connection, storage_api_version
-from app.core.config import Settings
+from app.core.logger import Logger
 from app.core.logging import get_logger
 from app.core.runtime import ApplicationOverrides, ApplicationRuntime
 
@@ -22,29 +21,29 @@ except ImportError as exc:  # pragma: no cover - exercised when deps are missing
         "Azure SDK dependencies are missing. Install the api package dependencies first."
     ) from exc
 
-logger = get_logger("startup")
 
 
-def build_lifespan(settings: Settings, overrides: ApplicationOverrides) -> Callable[[FastAPI], Any]:
-    """Create the FastAPI lifespan function for startup orchestration."""
 
-    @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        validate_external_connections(settings)
-        runtime = ApplicationRuntime(settings, overrides)
-        runtime.ensure_queues()
-        runtime.attach(app)
+# def build_lifespan(settings: Settings, overrides: ApplicationOverrides) -> Callable[[FastAPI], Any]:
+#     """Create the FastAPI lifespan function for startup orchestration."""
 
-        from app.services.user_service import seed_admin_user
+#     @asynccontextmanager
+#     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+#         validate_external_connections(settings)
+#         runtime = ApplicationRuntime(settings, overrides)
+#         runtime.ensure_queues()
+#         runtime.attach(app)
 
-        seed_admin_user(settings, runtime.user_repository)
-        runtime.start()
-        try:
-            yield
-        finally:
-            runtime.stop()
+#         from app.services.user_service import seed_admin_user
 
-    return lifespan
+#         seed_admin_user(settings, runtime.user_repository)
+#         runtime.start()
+#         try:
+#             yield
+#         finally:
+#             runtime.stop()
+
+#     return lifespan
 
 
 def validate_external_connections(settings: Settings) -> None:

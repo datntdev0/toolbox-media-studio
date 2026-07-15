@@ -42,17 +42,20 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_file_path: str = "logs/api.log"
 
-    # Azure local/dev infrastructure.
+    # Azure connection strings.
     az_cosmosdb_connection_string: str = Field(
         validation_alias="FAST_AZ_CONNECTION_STRING_COSMOSDB"
     )
-    az_cosmosdb_database_name: str = "mediastudio"
     az_storage_blob_connection_string: str = Field(
         validation_alias="FAST_AZ_CONNECTION_STRING_STORAGE_BLOB"
     )
     az_storage_queue_connection_string: str = Field(
         validation_alias="FAST_AZ_CONNECTION_STRING_STORAGE_QUEUE"
     )
+
+    # Azure configuration
+    az_cosmosdb_database_name: str = "mediastudio"
+    az_storage_queue_api_version: str | None = "2024-11-04"
 
     # Crawler infrastructure.
     flaresolverr_base_url: str = "http://localhost:8191/v1"

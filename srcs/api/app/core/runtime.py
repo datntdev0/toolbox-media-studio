@@ -15,6 +15,9 @@ from app.repositories.novel_repository import NovelRepository
 from app.repositories.user_repository import UserRepository
 from app.services.crawler_service import FlareSolverrClientLike
 
+from app.core.events.polling_queue_listener import PollingQueueListener
+from app.events.sample_handler import SampleQueueListener
+
 
 class RuntimeConsumer(Protocol):
     """Minimal lifecycle contract for runtime consumers."""
@@ -57,6 +60,7 @@ class ApplicationRuntime:
             overrides.queue_provider_factory or build_azure_queue_provider_factory(settings)
         )
         self.crawler_consumer: RuntimeConsumer | None = overrides.crawler_consumer
+        self.listeners_sample = SampleQueueListener("sample", 2)
 
     def ensure_queues(self) -> None:
         from app.consumers.crawler_queue_consumer import CrawlerQueueConsumer
@@ -77,16 +81,7 @@ class ApplicationRuntime:
         )
 
     def start(self) -> None:
-        if not self._overrides.start_consumers:
-            return
-        if self.crawler_consumer is None:
-            from app.consumers.crawler_queue_consumer import CrawlerQueueConsumer
-
-            self.crawler_consumer = CrawlerQueueConsumer(
-                job_repository=self.job_repository,
-                queue_provider_factory=self.queue_provider_factory,
-            )
-        self.crawler_consumer.start()
+        self.listeners_sample.start()
 
     def stop(self) -> None:
         if self.crawler_consumer is not None:

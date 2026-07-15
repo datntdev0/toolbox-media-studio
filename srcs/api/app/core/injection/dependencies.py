@@ -15,6 +15,9 @@ from app.repositories.novel_repository import NovelRepository
 from app.repositories.user_repository import UserRepository
 from app.services.crawler_service import FlareSolverrClientLike
 
+
+
+
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 _bearer_scheme = HTTPBearer(auto_error=False)
@@ -135,3 +138,4 @@ def require_admin_user(current_user: Annotated[User, Depends(get_current_user)])
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 AdminUser = Annotated[User, Depends(require_admin_user)]
+
