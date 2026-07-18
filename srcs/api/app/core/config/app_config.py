@@ -17,6 +17,10 @@ class Security:
     default_admin_email: str
     default_admin_password: str
 
+@dataclass
+class CacheSettings:
+    ttl_default: int
+
 @singleton
 class AppConfig:
 
@@ -39,4 +43,8 @@ class AppConfig:
             jwt_expire_minutes=int(os.environ.get("FAST_JWT_EXPIRE_MINUTES", "60")),
             default_admin_email=os.environ.get("FAST_SECURITY_DEFAULT_ADMIN_EMAIL"),
             default_admin_password=os.environ.get("FAST_SECURITY_DEFAULT_ADMIN_PASSWORD"),
+        )
+
+        self.cache: CacheSettings = CacheSettings(
+            ttl_default=int(os.environ.get("FAST_CACHE_TTL_SECONDS_DEFAULT", "3600"))
         )

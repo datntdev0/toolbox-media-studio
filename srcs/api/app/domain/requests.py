@@ -1,11 +1,11 @@
 """Inbound request bodies."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
-from isodate import UTC
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.domain.novels import NovelStatus
+from app.domain.novels import Novel, NovelStatus
 from app.domain.users import User, UserRole, UserStatus
 
 
@@ -67,6 +67,7 @@ class NovelUpdateRequest(BaseModel):
     tags: list[str] | None = None
     notes: str | None = None
     status: NovelStatus | None = None
+    etag: str | None = None
 
 
 class CrawlerJobCreateRequest(BaseModel):
@@ -76,17 +77,43 @@ class CrawlerJobCreateRequest(BaseModel):
 
     url: str
 
+
 def to_user_entity(body: UserCreateRequest) -> User:
     """Convert a UserCreateRequest to a User entity."""
+
     now = datetime.now(UTC)
     normalized_email = body.email.lower()
     return User(
         id=str(uuid4()),
         email=normalized_email,
         normalized_email=normalized_email,
+        password_hash="",
         display_name=body.display_name,
         role=body.role,
         status=body.status,
+        created_by="",
         created_at=now,
+        updated_by="",
+        updated_at=now,
+    )
+
+
+def to_novel_entity(body: NovelCreateRequest, created_by: str) -> Novel:
+    """Convert a NovelCreateRequest to a Novel entity."""
+
+    now = datetime.now(UTC)
+    return Novel(
+        id=str(uuid4()),
+        title=body.title,
+        description=body.description,
+        cover_image_url=body.cover_image_url,
+        language=body.language,
+        author=body.author,
+        tags=list(body.tags or []),
+        notes=body.notes,
+        status=NovelStatus.DRAFT,
+        created_by=created_by,
+        created_at=now,
+        updated_by=created_by,
         updated_at=now,
     )

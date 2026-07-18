@@ -1,11 +1,10 @@
 from fastapi import APIRouter, HTTPException, status
-from app.core.exceptions import NotImplementException
 
 from app.core.injection.service_provider import RepositoryUserDep
+from app.core.security.authentication import InvalidCredentialsError, authenticate
 from app.core.security.authorization import SessionUser
-from app.core.security.authentication import authenticate, InvalidCredentialsError
 from app.domain.requests import LoginRequest
-from app.domain.responses import TokenResponse, UserResponse
+from app.domain.responses import TokenResponse, UserResponse, to_user_response
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -24,16 +23,6 @@ def login(body: LoginRequest, repositoryUser: RepositoryUserDep) -> TokenRespons
 
 
 @router.get("/me", response_model=UserResponse)
-def me() -> UserResponse:
+def me(current_user: SessionUser) -> UserResponse:
     """Return the current user resolved from the Bearer JWT."""
-    raise NotImplementException("This endpoint is not yet implemented")
-    return UserResponse(
-        id=current_user.id,
-        email=current_user.email,
-        display_name=current_user.display_name,
-        role=current_user.role,
-        status=current_user.status,
-        created_at=current_user.created_at,
-        updated_at=current_user.updated_at,
-        etag=current_user.etag,
-    )
+    return to_user_response(current_user)

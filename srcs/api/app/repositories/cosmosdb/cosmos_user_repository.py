@@ -166,14 +166,14 @@ class CosmosUserRepository:
         )
 
 
-def build_cosmos_user_repository(settings: AppConfig) -> CosmosUserRepository:
+def build_cosmos_user_repository(config: AppConfig) -> CosmosUserRepository:
     """Construct the default Cosmos-backed repository."""
 
     client = CosmosClient.from_connection_string(
-        settings.connectionStrings.azCosmosDb,
+        config.connectionStrings.azCosmosDb,
         connection_verify=True,
     )
-    return CosmosUserRepository(client=client, dbName=settings.azCosmosDbDatabaseName)
+    return CosmosUserRepository(client=client, dbName=config.azCosmosDbDatabaseName)
 
 
 def _parse_optional_datetime(value: Any) -> datetime | None:

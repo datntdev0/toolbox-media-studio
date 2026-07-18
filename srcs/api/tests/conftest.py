@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 
+from app.core.config.app_config import AppConfig
 from app.providers.cache_provider import RepositoryCacheProvider
-from app.providers.queue_provider import QueueProvider, ReceivedQueueMessage, SentQueueMessage
 from app.repositories.cache_repository import InMemoryCacheRepository
 from app.repositories.job_repository import InMemoryJobRepository
 from app.repositories.novel_repository import InMemoryNovelRepository
@@ -22,6 +22,22 @@ class FakeFlareSolverrResult:
     """Minimal fake FlareSolverr result for tests."""
 
     html: str
+
+
+@dataclass(frozen=True, slots=True)
+class SentQueueMessage:
+    """Minimal sent queue message for tests."""
+
+    id: str
+
+
+@dataclass(frozen=True, slots=True)
+class ReceivedQueueMessage:
+    """Minimal received queue message for tests."""
+
+    id: str
+    pop_receipt: str
+    body: Mapping[str, Any]
 
 
 class FakeFlareSolverrClient:
@@ -78,7 +94,7 @@ class FakeQueueProviderFactory:
     def __init__(self) -> None:
         self.providers: dict[str, FakeQueueProvider] = {}
 
-    def get(self, queue_name: str) -> QueueProvider:
+    def get(self, queue_name: str) -> FakeQueueProvider:
         provider = self.providers.get(queue_name)
         if provider is None:
             provider = FakeQueueProvider(queue_name)
@@ -95,6 +111,8 @@ def _env(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     monkeypatch.setenv("FAST_SECURITY_DEFAULT_ADMIN_EMAIL", TEST_ADMIN_EMAIL)
     monkeypatch.setenv("FAST_SECURITY_DEFAULT_ADMIN_PASSWORD", TEST_ADMIN_PASSWORD)
+    monkeypatch.setenv("FAST_JWT_SIGNING_KEY", "test-signing-key-please-ignore")
+    monkeypatch.setenv("FAST_JWT_EXPIRE_MINUTES", "120")
     monkeypatch.setenv("FAST_SECURITY_JWT_SIGNING_KEY", "test-signing-key-please-ignore")
     monkeypatch.setenv("FAST_SECURITY_JWT_EXPIRE_MINUTES", "120")
     monkeypatch.setenv("FAST_LOG_LEVEL", "INFO")
@@ -123,11 +141,6 @@ def _env(monkeypatch: pytest.MonkeyPatch) -> None:
         "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/"
         "KBHBeksoGMGw==;QueueEndpoint=http://localhost:10001/devstoreaccount1;",
     )
-    monkeypatch.setattr(
-        "app.core.startup.validate_external_connections",
-        lambda settings: None,
-    )
-
 
 @pytest.fixture
 def user_repository() -> InMemoryUserRepository:
@@ -162,8 +175,8 @@ def cache_provider() -> RepositoryCacheProvider:
     """Shared in-memory cache provider for a test app instance."""
 
     return RepositoryCacheProvider(
+        config=AppConfig(),
         repository=InMemoryCacheRepository(),
-        ttl_seconds=2_592_000,
     )
 
 
@@ -176,6 +189,7 @@ def flaresolverr_client() -> FakeFlareSolverrClient:
 
 @pytest.fixture
 def client(
+    monkeypatch: pytest.MonkeyPatch,
     _env: None,
     user_repository: InMemoryUserRepository,
     novel_repository: InMemoryNovelRepository,
@@ -187,20 +201,36 @@ def client(
     """A TestClient with a fresh app and cleared settings cache."""
     from fastapi.testclient import TestClient
 
-    from app.core.config import get_settings
-    from app.main import create_app
+    monkeypatch.setattr(
+        "app.repositories.cosmosdb.cosmos_user_repository.build_cosmos_user_repository",
+        lambda config: user_repository,
+    )
+    monkeypatch.setattr(
+        "app.repositories.cosmosdb.cosmos_novel_repository.build_cosmos_novel_repository",
+        lambda config: novel_repository,
+    )
+    monkeypatch.setattr(
+        "app.repositories.cosmosdb.cosmos_cache_repository.build_cosmos_cache_repository",
+        lambda config: cache_provider._repository,
+    )
 
-    get_settings.cache_clear()
-    with TestClient(
-        create_app(
-            user_repository=user_repository,
-            novel_repository=novel_repository,
-            cache_provider=cache_provider,
-            flaresolverr_client=flaresolverr_client,
-            job_repository=job_repository,
-            queue_provider_factory=queue_provider_factory,
-            start_consumers=False,
-        )
-    ) as test_client:
+    import app.core.injection.service_provider as service_provider
+    import app.main as main_module
+    import app.routers.health as health_router
+
+    service_provider.repository_user = user_repository
+    service_provider.repository_novel = novel_repository
+    service_provider.repository_cache = cache_provider._repository
+    service_provider.provider_cache = cache_provider
+
+    main_module.repository_user = user_repository
+    main_module.repository_novel = novel_repository
+    main_module.repository_cache = cache_provider._repository
+    main_module.provider_cache = cache_provider
+
+    monkeypatch.setattr(health_router, "_check_cosmos", lambda logger, settings: True)
+    monkeypatch.setattr(health_router, "_check_blob_storage", lambda logger, settings: True)
+    monkeypatch.setattr(health_router, "_check_queue_storage", lambda logger, settings: True)
+
+    with TestClient(main_module.app) as test_client:
         yield test_client
-    get_settings.cache_clear()

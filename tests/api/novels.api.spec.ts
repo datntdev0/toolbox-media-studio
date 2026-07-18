@@ -62,14 +62,12 @@ test.describe('/api/novels CRUD', () => {
     expect(fetched.status).toBe('draft');
 
     const updatedResponse = await request.patch(`/api/novels/${created.id}`, {
-      headers: {
-        ...headers,
-        'If-Match': created.etag,
-      },
+      headers,
       data: {
         title: 'Updated Playwright Novel',
         notes: 'Updated by Playwright API spec',
         status: 'active',
+        etag: created.etag,
       },
     });
     expect(updatedResponse.status()).toBe(200);
@@ -108,10 +106,7 @@ test.describe('/api/novels CRUD', () => {
     expect(list.continuationToken).toBeNull();
 
     const deletedResponse = await request.delete(`/api/novels/${created.id}`, {
-      headers: {
-        ...headers,
-        'If-Match': updated.etag,
-      },
+      headers,
     });
     expect(deletedResponse.status()).toBe(204);
 

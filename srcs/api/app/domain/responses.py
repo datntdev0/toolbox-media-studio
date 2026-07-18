@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.jobs import JobKind, JobStatus
-from app.domain.novels import NovelStatus
+from app.domain.novels import Novel, NovelStatus
 from app.domain.users import User, UserRole, UserStatus
 
 
@@ -83,8 +83,10 @@ class CrawlerJobResponse(BaseModel):
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
 
+
 def to_user_response(current_user: User) -> UserResponse:
     """Convert a User domain model to a UserResponse model."""
+
     return UserResponse(
         id=current_user.id,
         email=current_user.email,
@@ -94,4 +96,23 @@ def to_user_response(current_user: User) -> UserResponse:
         created_at=current_user.created_at,
         updated_at=current_user.updated_at,
         etag=current_user.etag,
+    )
+
+
+def to_novel_response(novel: Novel) -> NovelResponse:
+    """Convert a Novel domain model to a NovelResponse model."""
+
+    return NovelResponse(
+        id=novel.id,
+        title=novel.title,
+        description=novel.description,
+        cover_image_url=novel.cover_image_url,
+        language=novel.language,
+        author=novel.author,
+        tags=novel.tags,
+        notes=novel.notes,
+        status=novel.status,
+        created_at=novel.created_at,
+        updated_at=novel.updated_at,
+        etag=novel.etag,
     )

@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from typing import Annotated
+
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.core.injection.service_provider import RepositoryUserDep
@@ -24,7 +25,7 @@ def create_user_route(
     
     try:
         user_entity = to_user_entity(body)
-        user_entity.hash_password(body.password)
+        user_entity.password_hash = hash_password(body.password)
         user_entity.created_by = session_user.id
         user_entity.updated_by = session_user.id
         user_return = repository_user.create(user_entity)
@@ -66,6 +67,11 @@ def get_user_route(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         ) from exc
+    if user_return is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
     return to_user_response(user_return)
 
 
@@ -84,6 +90,11 @@ def update_user_route(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         ) from exc
+    if existing_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
     
     if "password" in body.model_fields_set and body.password is not None:
         existing_user.password_hash = hash_password(body.password)
@@ -125,6 +136,11 @@ def delete_user_route(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         ) from exc
+    if existing_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
    
     if session_user.id == existing_user.id:
         raise HTTPException(
@@ -133,7 +149,11 @@ def delete_user_route(
         )
     
     try:
-        repository_user.delete(existing_user.id, session_user.id)
+        repository_user.delete(
+            id=existing_user.id,
+            etag=None,
+            deleted_by=session_user.id,
+        )
     except UserConflictError as exc:
         raise HTTPException(
             status_code=status.HTTP_412_PRECONDITION_FAILED,

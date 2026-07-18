@@ -19,6 +19,7 @@ class CacheRecord:
     cache_key: str
     value: CacheValue
     created_at: datetime
+    expired_at: datetime
 
 
 class CacheRepository(Protocol):

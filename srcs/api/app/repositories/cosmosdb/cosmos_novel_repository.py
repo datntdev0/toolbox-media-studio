@@ -8,54 +8,56 @@ from typing import Any, cast
 from azure.core import MatchConditions
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 
-from app.core.config import Settings
-from app.core.startup import _should_verify_connection
+from app.core.config.app_config import AppConfig
 from app.domain.novels import Novel, NovelPage, NovelStatus
 from app.repositories.novel_repository import NovelConflictError, NovelNotFoundError
 
-NOVELS_CONTAINER_NAME = "novels"
+NOVELS_CONTAINER_NAME = "domain.novels"
 
 
 class CosmosNovelRepository:
     """Novel repository backed by Azure Cosmos DB."""
 
-    def __init__(self, client: CosmosClient, settings: Settings) -> None:
-        self._database = client.create_database_if_not_exists(id=settings.az_cosmosdb_database_name)
+    def __init__(self, client: CosmosClient, dbName: str) -> None:
+        self._database = client.create_database_if_not_exists(id=dbName)
         self._container = self._database.create_container_if_not_exists(
             id=NOVELS_CONTAINER_NAME,
-            partition_key=PartitionKey(path="/createdBy"),
+            partition_key=PartitionKey(path="/id"),
         )
 
     def create(self, novel: Novel) -> Novel:
         item = cast(dict[str, Any], self._container.create_item(body=self._serialize(novel)))
         return self._deserialize(item)
 
-    def get_by_id(self, id: str, created_by: str) -> Novel | None:
-        try:
-            item = cast(
-                dict[str, Any],
-                self._container.read_item(item=id, partition_key=created_by),
+    def get_by_id(self, id: str) -> Novel | None:
+        query = """
+        SELECT TOP 1 * FROM c
+        WHERE c.id = @id
+        """
+        items = list(
+            self._container.query_items(
+                query=query,
+                parameters=[{"name": "@id", "value": id}],
+                enable_cross_partition_query=True,
             )
-        except exceptions.CosmosResourceNotFoundError:
+        )
+        if not items:
             return None
-        novel = self._deserialize(item)
+        novel = self._deserialize(cast(dict[str, Any], items[0]))
         if novel.status == NovelStatus.DELETED:
             return None
         return novel
 
-    def list(self, created_by: str, limit: int, continuation_token: str | None) -> NovelPage:
+    def list(self, limit: int, continuation_token: str | None) -> NovelPage:
         query = """
         SELECT * FROM c
-        WHERE c.createdBy = @created_by AND c.status != @deleted_status
+        WHERE c.status != @deleted_status
         ORDER BY c.createdAt
         """
         iterator = self._container.query_items(
             query=query,
-            parameters=[
-                {"name": "@created_by", "value": created_by},
-                {"name": "@deleted_status", "value": NovelStatus.DELETED.value},
-            ],
-            partition_key=created_by,
+            parameters=[{"name": "@deleted_status", "value": NovelStatus.DELETED.value}],
+            enable_cross_partition_query=True,
             max_item_count=limit,
         )
         page_iterator = iterator.by_page(continuation_token=continuation_token)
@@ -64,7 +66,7 @@ class CosmosNovelRepository:
         return NovelPage(items=items, continuation_token=None)
 
     def update(self, novel: Novel, etag: str | None) -> Novel:
-        existing = self.get_by_id(novel.id, novel.created_by)
+        existing = self.get_by_id(novel.id)
         if existing is None:
             raise NovelNotFoundError
 
@@ -86,8 +88,8 @@ class CosmosNovelRepository:
 
         return self._deserialize(item)
 
-    def delete(self, id: str, created_by: str, etag: str | None, deleted_by: str) -> None:
-        novel = self.get_by_id(id, created_by)
+    def delete(self, id: str, etag: str | None, deleted_by: str) -> None:
+        novel = self.get_by_id(id)
         if novel is None:
             raise NovelNotFoundError
 
@@ -141,14 +143,14 @@ class CosmosNovelRepository:
         )
 
 
-def build_cosmos_novel_repository(settings: Settings) -> CosmosNovelRepository:
+def build_cosmos_novel_repository(config: AppConfig) -> CosmosNovelRepository:
     """Construct the default Cosmos-backed repository."""
 
     client = CosmosClient.from_connection_string(
-        settings.az_cosmosdb_connection_string,
-        connection_verify=_should_verify_connection(settings),
+        config.connectionStrings.azCosmosDb,
+        connection_verify=True,
     )
-    return CosmosNovelRepository(client=client, settings=settings)
+    return CosmosNovelRepository(client=client, dbName=config.azCosmosDbDatabaseName)
 
 
 def _parse_optional_datetime(value: Any) -> datetime | None:

@@ -6,6 +6,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
+from app.core.config.app_config import AppConfig
 from app.repositories.cache_repository import CacheRecord, CacheRepository, CacheValue
 
 CacheClock = Callable[[], datetime]
@@ -24,15 +25,10 @@ class CacheProvider(Protocol):
 class RepositoryCacheProvider:
     """Cache provider backed by a cache repository."""
 
-    def __init__(
-        self,
-        repository: CacheRepository,
-        ttl_seconds: int,
-        clock: CacheClock | None = None,
-    ) -> None:
+    def __init__(self, config: AppConfig, repository: CacheRepository) -> None:
         self._repository = repository
-        self._ttl = timedelta(seconds=ttl_seconds)
-        self._clock = clock or _utc_now
+        self._ttl = timedelta(seconds=config.cache.ttl_default)
+        self._clock = _utc_now
 
     def get(self, cache_type: str, cache_key: str) -> CacheValue | None:
         record = self._repository.get(cache_type, cache_key)
@@ -43,13 +39,15 @@ class RepositoryCacheProvider:
             return None
         return record.value
 
-    def set(self, cache_type: str, cache_key: str, value: CacheValue) -> None:
+    def set(self, cache_type: str, cache_key: str, value: CacheValue, ttl: int = None) -> None:
+        if ttl is None: ttl = int(self._ttl.total_seconds())
         self._repository.upsert(
             CacheRecord(
                 cache_type=cache_type,
                 cache_key=cache_key,
                 value=value,
                 created_at=self._clock(),
+                expired_at=self._clock() + timedelta(seconds=ttl)
             )
         )
 

@@ -62,8 +62,8 @@ def test_admin_can_create_list_update_and_delete_user(client: TestClient) -> Non
 
     updated = client.patch(
         f"/api/users/{user_id}",
-        headers={**headers, "If-Match": etag},
-        json={"displayName": "Updated Member", "status": "inactive"},
+        headers=headers,
+        json={"displayName": "Updated Member", "status": "inactive", "etag": etag},
     )
     assert updated.status_code == 200
     updated_body = updated.json()
@@ -72,7 +72,7 @@ def test_admin_can_create_list_update_and_delete_user(client: TestClient) -> Non
 
     deleted = client.delete(
         f"/api/users/{user_id}",
-        headers={**headers, "If-Match": updated_body["etag"]},
+        headers=headers,
     )
     assert deleted.status_code == 204
 

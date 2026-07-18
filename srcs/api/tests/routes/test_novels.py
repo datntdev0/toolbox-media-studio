@@ -55,8 +55,8 @@ def test_user_can_create_list_update_and_delete_own_novel(client: TestClient) ->
 
     updated = client.patch(
         f"/api/novels/{novel_id}",
-        headers={**headers, "If-Match": etag},
-        json={"title": "Updated Title", "status": "active"},
+        headers=headers,
+        json={"title": "Updated Title", "status": "active", "etag": etag},
     )
     assert updated.status_code == 200
     updated_body = updated.json()
@@ -65,7 +65,7 @@ def test_user_can_create_list_update_and_delete_own_novel(client: TestClient) ->
 
     deleted = client.delete(
         f"/api/novels/{novel_id}",
-        headers={**headers, "If-Match": updated_body["etag"]},
+        headers=headers,
     )
     assert deleted.status_code == 204
 
@@ -119,14 +119,14 @@ def test_novel_update_with_stale_etag_returns_412(client: TestClient) -> None:
 
     first_update = client.patch(
         f"/api/novels/{novel_id}",
-        headers={**headers, "If-Match": etag},
-        json={"notes": "updated once"},
+        headers=headers,
+        json={"notes": "updated once", "etag": etag},
     )
     assert first_update.status_code == 200
 
     stale_update = client.patch(
         f"/api/novels/{novel_id}",
-        headers={**headers, "If-Match": etag},
-        json={"notes": "updated twice"},
+        headers=headers,
+        json={"notes": "updated twice", "etag": etag},
     )
     assert stale_update.status_code == 412

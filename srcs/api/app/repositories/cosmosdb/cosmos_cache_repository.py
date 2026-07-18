@@ -7,21 +7,21 @@ from typing import Any, cast
 
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 
-from app.core.config import Settings
+from app.core.config.app_config import AppConfig
 from app.repositories.cache_repository import (
     CacheRecord,
     CacheRepository,
     cache_record_id,
 )
 
-CACHE_CONTAINER_NAME = "cache"
+CACHE_CONTAINER_NAME = "sys.caches"
 
 
 class CosmosCacheRepository:
     """Cache repository backed by Cosmos DB."""
 
-    def __init__(self, client: CosmosClient, settings: Settings) -> None:
-        self._database = client.create_database_if_not_exists(id=settings.az_cosmosdb_database_name)
+    def __init__(self, client: CosmosClient, dbName: str) -> None:
+        self._database = client.create_database_if_not_exists(id=dbName)
         self._container = self._database.create_container_if_not_exists(
             id=CACHE_CONTAINER_NAME,
             partition_key=PartitionKey(path="/cacheType"),
@@ -68,11 +68,11 @@ class CosmosCacheRepository:
         )
 
 
-def build_cosmos_cache_repository(settings: Settings) -> CacheRepository:
+def build_cosmos_cache_repository(config: AppConfig) -> CacheRepository:
     """Construct the default Cosmos-backed cache repository."""
 
     client = CosmosClient.from_connection_string(
-        settings.az_cosmosdb_connection_string,
-        connection_verify=settings.environment.lower() != "localhost",
+        config.connectionStrings.azCosmosDb,
+        connection_verify=True,
     )
-    return CosmosCacheRepository(client=client, settings=settings)
+    return CosmosCacheRepository(client=client, dbName=config.azCosmosDbDatabaseName)

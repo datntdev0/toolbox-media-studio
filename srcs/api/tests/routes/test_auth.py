@@ -8,7 +8,11 @@ from tests.conftest import TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD
 def test_health(client: TestClient) -> None:
     resp = client.get("/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    assert resp.json() == {
+        "azCosmosDb": "ok",
+        "azStorageBlob": "ok",
+        "azStorageQueue": "ok",
+    }
 
 
 def test_login_success_returns_token(client: TestClient) -> None:

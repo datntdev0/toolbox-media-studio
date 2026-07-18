@@ -55,13 +55,11 @@ test.describe('/api/users CRUD', () => {
     expect(fetched.status).toBe('active');
 
     const updatedResponse = await request.patch(`/api/users/${created.id}`, {
-      headers: {
-        ...headers,
-        'If-Match': created.etag,
-      },
+      headers,
       data: {
         displayName: 'Updated Playwright Member',
         status: 'inactive',
+        etag: created.etag,
       },
     });
     expect(updatedResponse.status()).toBe(200);
@@ -100,10 +98,7 @@ test.describe('/api/users CRUD', () => {
     expect(list.continuationToken).toBeNull();
 
     const deletedResponse = await request.delete(`/api/users/${created.id}`, {
-      headers: {
-        ...headers,
-        'If-Match': updated.etag,
-      },
+      headers,
     });
     expect(deletedResponse.status()).toBe(204);
 

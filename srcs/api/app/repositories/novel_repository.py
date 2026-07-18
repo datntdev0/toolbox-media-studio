@@ -14,13 +14,13 @@ class NovelRepository(Protocol):
 
     def create(self, novel: Novel) -> Novel: ...
 
-    def get_by_id(self, id: str, created_by: str) -> Novel | None: ...
+    def get_by_id(self, id: str) -> Novel | None: ...
 
-    def list(self, created_by: str, limit: int, continuation_token: str | None) -> NovelPage: ...
+    def list(self, limit: int, continuation_token: str | None) -> NovelPage: ...
 
     def update(self, novel: Novel, etag: str | None) -> Novel: ...
 
-    def delete(self, id: str, created_by: str, etag: str | None, deleted_by: str) -> None: ...
+    def delete(self, id: str, etag: str | None, deleted_by: str) -> None: ...
 
 
 class NovelNotFoundError(Exception):
@@ -43,20 +43,18 @@ class InMemoryNovelRepository:
         self._novels[stored.id] = stored
         return deepcopy(stored)
 
-    def get_by_id(self, id: str, created_by: str) -> Novel | None:
+    def get_by_id(self, id: str) -> Novel | None:
         novel = self._novels.get(id)
-        if novel is None:
-            return None
-        if novel.created_by != created_by or novel.status == NovelStatus.DELETED:
+        if novel is None or novel.status == NovelStatus.DELETED:
             return None
         return deepcopy(novel)
 
-    def list(self, created_by: str, limit: int, continuation_token: str | None) -> NovelPage:
+    def list(self, limit: int, continuation_token: str | None) -> NovelPage:
         del continuation_token
         novels = [
             deepcopy(novel)
             for novel in self._novels.values()
-            if novel.created_by == created_by and novel.status != NovelStatus.DELETED
+            if novel.status != NovelStatus.DELETED
         ]
         novels.sort(key=lambda item: item.created_at)
         return NovelPage(items=novels[:limit], continuation_token=None)
@@ -75,11 +73,9 @@ class InMemoryNovelRepository:
         self._novels[stored.id] = stored
         return deepcopy(stored)
 
-    def delete(self, id: str, created_by: str, etag: str | None, deleted_by: str) -> None:
+    def delete(self, id: str, etag: str | None, deleted_by: str) -> None:
         current = self._novels.get(id)
         if current is None or current.status == NovelStatus.DELETED:
-            raise NovelNotFoundError
-        if current.created_by != created_by:
             raise NovelNotFoundError
         if etag is not None and current.etag != etag:
             raise NovelConflictError
