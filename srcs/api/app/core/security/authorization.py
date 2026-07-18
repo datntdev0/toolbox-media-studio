@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError
 from typing import Annotated
 
-from app.core.injection.service_provider import RepositoryUserDep
+from app.core.injection import RepositoryUserDep
 from app.domain.users import User, UserRole
 from app.core.security.jwt_helper import decode_access_token
 from app.domain.users import UserStatus

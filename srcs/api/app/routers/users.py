@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
-from app.core.injection.service_provider import RepositoryUserDep
+from app.core.injection import RepositoryUserDep
 from app.core.security.authentication import hash_password
 from app.core.security.authorization import ReqAdminUser
 from app.domain.requests import UserCreateRequest, UserUpdateRequest, to_user_entity

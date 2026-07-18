@@ -2,14 +2,12 @@
 
 from datetime import UTC, datetime, timedelta
 
-from app.providers.cache_provider import RepositoryCacheProvider
-from app.repositories.cache_repository import InMemoryCacheRepository
+from app.providers.cache_provider import InMemoryCacheProvider
 
 
 def test_cache_provider_expires_items_from_created_at_and_configured_ttl() -> None:
     current_time = datetime(2026, 7, 11, tzinfo=UTC)
-    cache = RepositoryCacheProvider(
-        repository=InMemoryCacheRepository(),
+    cache = InMemoryCacheProvider(
         ttl_seconds=60,
         clock=lambda: current_time,
     )

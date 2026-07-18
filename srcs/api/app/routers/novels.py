@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
-from app.core.injection.service_provider import RepositoryNovelDep
+from app.core.injection import RepositoryNovelDep
 from app.core.security.authorization import SessionUser
 from app.domain.requests import NovelCreateRequest, NovelUpdateRequest, to_novel_entity
 from app.domain.responses import NovelListResponse, NovelResponse, to_novel_response

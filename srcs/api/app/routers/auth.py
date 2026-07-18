@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 
-from app.core.injection.service_provider import RepositoryUserDep
+from app.core.injection import RepositoryUserDep
 from app.core.security.authentication import InvalidCredentialsError, authenticate
 from app.core.security.authorization import SessionUser
 from app.domain.requests import LoginRequest

@@ -7,8 +7,7 @@ from typing import Any
 import pytest
 
 from app.core.config.app_config import AppConfig
-from app.providers.cache_provider import RepositoryCacheProvider
-from app.repositories.cache_repository import InMemoryCacheRepository
+from app.providers.cache_provider import InMemoryCacheProvider
 from app.repositories.job_repository import InMemoryJobRepository
 from app.repositories.novel_repository import InMemoryNovelRepository
 from app.repositories.user_repository import InMemoryUserRepository
@@ -171,13 +170,10 @@ def queue_provider_factory() -> FakeQueueProviderFactory:
 
 
 @pytest.fixture
-def cache_provider() -> RepositoryCacheProvider:
+def cache_provider() -> InMemoryCacheProvider:
     """Shared in-memory cache provider for a test app instance."""
 
-    return RepositoryCacheProvider(
-        config=AppConfig(),
-        repository=InMemoryCacheRepository(),
-    )
+    return InMemoryCacheProvider(ttl_seconds=AppConfig().cache.ttl_default)
 
 
 @pytest.fixture
@@ -195,7 +191,7 @@ def client(
     novel_repository: InMemoryNovelRepository,
     job_repository: InMemoryJobRepository,
     queue_provider_factory: FakeQueueProviderFactory,
-    cache_provider: RepositoryCacheProvider,
+    cache_provider: InMemoryCacheProvider,
     flaresolverr_client: FakeFlareSolverrClient,
 ):
     """A TestClient with a fresh app and cleared settings cache."""
@@ -210,23 +206,23 @@ def client(
         lambda config: novel_repository,
     )
     monkeypatch.setattr(
-        "app.repositories.cosmosdb.cosmos_cache_repository.build_cosmos_cache_repository",
-        lambda config: cache_provider._repository,
+        "app.providers.cache_provider.build_cosmos_cache_provider",
+        lambda config: cache_provider,
     )
 
-    import app.core.injection.service_provider as service_provider
+    import app.core.injection as service_provider
     import app.main as main_module
     import app.routers.health as health_router
 
     service_provider.repository_user = user_repository
     service_provider.repository_novel = novel_repository
-    service_provider.repository_cache = cache_provider._repository
     service_provider.provider_cache = cache_provider
+    service_provider.provider_proxy = flaresolverr_client
 
     main_module.repository_user = user_repository
     main_module.repository_novel = novel_repository
-    main_module.repository_cache = cache_provider._repository
     main_module.provider_cache = cache_provider
+    main_module.provider_proxy = flaresolverr_client
 
     monkeypatch.setattr(health_router, "_check_cosmos", lambda logger, settings: True)
     monkeypatch.setattr(health_router, "_check_blob_storage", lambda logger, settings: True)

@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.parsers.novel543_parser import Novel543ParseError, parse_novel543_metadata
+from app.providers.crawler_parser_novel543 import Novel543ParseError, parse_novel543_metadata
 
 SOURCE_URL = "https://www.novel543.com/0603625457/dir"
 

@@ -25,7 +25,7 @@ class CrawlerSummaryResponse(BaseModel):
 
     id: str
     name: str
-    hosts: list[str]
+    hosts: tuple[str, ...]
     metadata_supported: bool = Field(alias="metadataSupported")
 
 

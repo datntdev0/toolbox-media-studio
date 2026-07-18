@@ -18,9 +18,9 @@ Implemented:
 - `/api/novels` user-scoped novel-management routes.
 - `/api/crawlers` registry, `/api/crawlers/{id}/metadata`, and
   `POST /api/crawlers/{id}/jobs` for `novel543`.
-- Cosmos-backed repositories for users, novels, jobs, and generic cache records.
+- Cosmos-backed repositories for users, novels, and jobs, plus a Cosmos-backed cache provider.
 - Azure Storage Queue provider plus API-hosted APScheduler consumers for `crawler-jobs`.
-- FlareSolverr-backed metadata fetching through `app/providers/flaresolverr_provider.py`.
+- FlareSolverr-backed metadata fetching through `app/providers/proxy_service_provider.py`.
 - Novel543 metadata parsing through `app/parsers/novel543_parser.py`.
 
 Still out of scope: real chapter body crawling, translation, audio, image, and video pipelines.
@@ -105,14 +105,13 @@ srcs/api/
       requests.py            # Inbound request models
       responses.py           # Common outbound response models
     providers/
-      cache_provider.py      # Generic cache behavior + TTL enforcement
+      cache_provider.py      # Generic cache behavior, TTL enforcement, and cache storage
       crawler_provider.py    # Supported crawler registry and URL validation
-      flaresolverr_provider.py # FlareSolverr HTTP client
+      proxy_service_provider.py # Proxy provider + concrete FlareSolver service
       queue_provider.py      # Azure Storage Queue provider/factory
     parsers/
       novel543_parser.py     # Novel543 metadata parsing
     repositories/
-      cache_repository.py    # Generic cache persistence contract + in-memory repo
       job_repository.py      # Async job persistence contract + in-memory repo
       cosmosdb/              # Cosmos DB implementations
     routers/

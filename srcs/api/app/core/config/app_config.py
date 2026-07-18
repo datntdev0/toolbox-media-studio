@@ -21,6 +21,11 @@ class Security:
 class CacheSettings:
     ttl_default: int
 
+@dataclass
+class FlareSolverrSettings:
+    base_url: str
+    default_max_timeout_ms: int
+
 @singleton
 class AppConfig:
 
@@ -38,9 +43,9 @@ class AppConfig:
             azStorageQueue=os.environ.get("FAST_AZ_CONNECTION_STRING_STORAGE_QUEUE", ""))
 
         self.security: Security = Security(
-            jwt_algorithm=os.environ.get("FAST_JWT_ALGORITHM", "HS256"),
-            jwt_signing_key=os.environ.get("FAST_JWT_SIGNING_KEY", "datntdev.mediastudio"),
-            jwt_expire_minutes=int(os.environ.get("FAST_JWT_EXPIRE_MINUTES", "60")),
+            jwt_algorithm=os.environ.get("FAST_SECURITY_JWT_ALGORITHM", "HS256"),
+            jwt_signing_key=os.environ.get("FAST_SECURITY_JWT_SIGNING_KEY", "datntdev.mediastudio"),
+            jwt_expire_minutes=int(os.environ.get("FAST_SECURITY_JWT_EXPIRE_MINUTES", "60")),
             default_admin_email=os.environ.get("FAST_SECURITY_DEFAULT_ADMIN_EMAIL"),
             default_admin_password=os.environ.get("FAST_SECURITY_DEFAULT_ADMIN_PASSWORD"),
         )
@@ -48,3 +53,9 @@ class AppConfig:
         self.cache: CacheSettings = CacheSettings(
             ttl_default=int(os.environ.get("FAST_CACHE_TTL_SECONDS_DEFAULT", "3600"))
         )
+
+        self.flaresolverr: FlareSolverrSettings = FlareSolverrSettings(
+            base_url=os.environ.get("FAST_FLARESOLVERR_BASE_URL", "http://localhost:8191/v1"),
+            default_max_timeout_ms=int(os.environ.get("FAST_FLARESOLVERR_MAX_TIMEOUT_MS", "60000"))
+        )
+                                    

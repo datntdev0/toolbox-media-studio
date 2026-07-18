@@ -1,4 +1,4 @@
-"""Small synchronous FlareSolverr client for approved crawler fetches."""
+"""Proxy-service clients for approved crawler fetches."""
 
 from __future__ import annotations
 
@@ -21,6 +21,12 @@ class FlareSolverrClient(Protocol):
     def get(self, url: str, max_timeout_ms: int | None = None) -> FlareSolverrResult: ...
 
 
+class ProxyProvider(Protocol):
+    """Proxy-service provider contract."""
+
+    def get(self, url: str, max_timeout_ms: int | None = None) -> FlareSolverrResult: ...
+
+
 class FlareSolverrError(RuntimeError):
     """Base error for FlareSolverr fetch failures."""
 
@@ -37,22 +43,14 @@ class FlareSolverrBadResponseError(FlareSolverrError):
         self.status_code = status_code
 
 
-class FlareSolverrHttpClient:
-    """HTTP client for FlareSolverr's `request.get` command."""
+class FlareSolverHttpClient:
+    """Concrete HTTP service for FlareSolverr's `request.get` command."""
 
-    def __init__(
-        self,
-        base_url: str,
-        default_max_timeout_ms: int = 60_000,
-        http_client: httpx.Client | None = None,
-    ) -> None:
-        if default_max_timeout_ms <= 0:
-            raise ValueError("default_max_timeout_ms must be positive")
-
-        self._base_url = self._normalize_base_url(base_url)
-        self._default_max_timeout_ms = default_max_timeout_ms
-        self._client = http_client or httpx.Client()
-        self._owns_client = http_client is None
+    def __init__(self, config: Any) -> None:
+        self._base_url = self._normalize_base_url(_base_url(config))
+        self._default_max_timeout_ms = _default_max_timeout_ms(config)
+        self._client = httpx.Client()
+        self._owns_client = True
 
     def get(self, url: str, max_timeout_ms: int | None = None) -> FlareSolverrResult:
         timeout_ms = self._default_max_timeout_ms if max_timeout_ms is None else max_timeout_ms
@@ -89,7 +87,7 @@ class FlareSolverrHttpClient:
         if self._owns_client:
             self._client.close()
 
-    def __enter__(self) -> FlareSolverrHttpClient:
+    def __enter__(self) -> FlareSolverHttpClient:
         return self
 
     def __exit__(
@@ -152,8 +150,40 @@ class FlareSolverrHttpClient:
         )
 
 
+class FlareSolverProxyProvider:
+    """Proxy provider backed by the concrete FlareSolver HTTP service."""
+
+    def __init__(self, service: FlareSolverrClient) -> None:
+        self._service = service
+
+    def get(self, url: str, max_timeout_ms: int | None = None) -> FlareSolverrResult:
+        return self._service.get(url, max_timeout_ms=max_timeout_ms)
+
+
+def build_proxy_provider(config: Any) -> ProxyProvider:
+    """Construct the default proxy provider."""
+
+    return FlareSolverProxyProvider(service=FlareSolverHttpClient(config))
+
+
 def _string_headers(value: object) -> dict[str, str]:
     if not isinstance(value, dict):
         return {}
 
     return {str(key): str(header_value) for key, header_value in value.items()}
+
+
+def _base_url(config: Any) -> str:
+    flaresolverr = getattr(config, "flaresolverr", None)
+    base_url = getattr(flaresolverr, "base_url", None)
+    if base_url is None:
+        base_url = getattr(config, "flaresolverr_base_url", "http://localhost:8191/v1")
+    return str(base_url)
+
+
+def _default_max_timeout_ms(config: Any) -> int:
+    flaresolverr = getattr(config, "flaresolverr", None)
+    timeout_ms = getattr(flaresolverr, "default_max_timeout_ms", None)
+    if timeout_ms is None:
+        timeout_ms = getattr(config, "flaresolverr_max_timeout_ms", 60000)
+    return int(timeout_ms)
