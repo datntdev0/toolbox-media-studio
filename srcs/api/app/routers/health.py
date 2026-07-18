@@ -5,15 +5,15 @@ from azure.storage.blob import BlobServiceClient
 from azure.storage.queue import QueueServiceClient
 from fastapi import APIRouter
 
-from app.core.config.app_settings import AppSettings
-from app.core.logger import Logger
+from app.core.config.app_config import AppConfig
+from app.core.logging import LogManager
 
 router = APIRouter(tags=["health"])
 
 @router.get("/health")
 def health() -> dict[str, str]:
-    logger = Logger().getLogger("router.health")
-    settings = AppSettings()
+    logger = LogManager().getLogger("router.health")
+    settings = AppConfig()
 
     cosmos_ok = _check_cosmos(logger, settings)
     blob_ok = _check_blob_storage(logger, settings)
@@ -26,7 +26,7 @@ def health() -> dict[str, str]:
     }
 
 
-def _check_cosmos(logger: logging.Logger, settings: AppSettings) -> bool:
+def _check_cosmos(logger: logging.Logger, settings: AppConfig) -> bool:
     logger.info("Checking connectivity to Cosmos DB...")
     try:
         client = CosmosClient.from_connection_string(
@@ -39,7 +39,7 @@ def _check_cosmos(logger: logging.Logger, settings: AppSettings) -> bool:
         logger.exception("Cosmos DB connectivity check failed", exc_info=exc)
         return False
     
-def _check_blob_storage(logger: logging.Logger, settings: AppSettings) -> bool:
+def _check_blob_storage(logger: logging.Logger, settings: AppConfig) -> bool:
     logger.info("Checking connectivity to Blob Storage...")
     try:
         client = BlobServiceClient.from_connection_string(
@@ -53,7 +53,7 @@ def _check_blob_storage(logger: logging.Logger, settings: AppSettings) -> bool:
         return False
 
 
-def _check_queue_storage(logger: logging.Logger, settings: AppSettings) -> bool:
+def _check_queue_storage(logger: logging.Logger, settings: AppConfig) -> bool:
     logger.info("Checking connectivity to Queue Storage...")
     try:
         client = QueueServiceClient.from_connection_string(
@@ -66,5 +66,5 @@ def _check_queue_storage(logger: logging.Logger, settings: AppSettings) -> bool:
         logger.exception("Queue Storage connectivity check failed", exc_info=exc)
         return False
 
-def _storage_api_version(settings: AppSettings) -> str | None:
+def _storage_api_version(settings: AppConfig) -> str | None:
     return "2024-11-04" if settings.environment.lower() == "localhost" else None

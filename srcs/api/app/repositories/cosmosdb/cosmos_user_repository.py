@@ -1,5 +1,3 @@
-"""Azure Cosmos DB implementation of the user repository."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -8,8 +6,7 @@ from typing import Any, cast
 from azure.core import MatchConditions
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 
-from app.core.config import Settings
-from app.core.startup import _should_verify_connection
+from app.core.config.app_config import AppConfig
 from app.domain.users import User, UserPage, UserRole, UserStatus
 from app.repositories.user_repository import (
     UserAlreadyExistsError,
@@ -17,14 +14,14 @@ from app.repositories.user_repository import (
     UserNotFoundError,
 )
 
-USERS_CONTAINER_NAME = "users"
+USERS_CONTAINER_NAME = "sys.users"
 
 
 class CosmosUserRepository:
     """User repository backed by Azure Cosmos DB."""
 
-    def __init__(self, client: CosmosClient, settings: Settings) -> None:
-        self._database = client.create_database_if_not_exists(id=settings.az_cosmosdb_database_name)
+    def __init__(self, client: CosmosClient, dbName: str) -> None:
+        self._database = client.create_database_if_not_exists(id=dbName)
         self._container = self._database.create_container_if_not_exists(
             id=USERS_CONTAINER_NAME,
             partition_key=PartitionKey(path="/id"),
@@ -47,7 +44,7 @@ class CosmosUserRepository:
                 self._container.read_item(item=id, partition_key=id),
             )
         except exceptions.CosmosResourceNotFoundError:
-            return None
+            raise UserNotFoundError
         user = self._deserialize(item)
         if user.status == UserStatus.DELETED:
             return None
@@ -131,11 +128,6 @@ class CosmosUserRepository:
         user.updated_by = deleted_by
         self.update(user, etag)
 
-    def seed_admin(self, user: User) -> User | None:
-        if self.get_by_email(user.email) is not None:
-            return None
-        return self.create(user)
-
     @staticmethod
     def _serialize(user: User) -> dict[str, Any]:
         return {
@@ -174,14 +166,14 @@ class CosmosUserRepository:
         )
 
 
-def build_cosmos_user_repository(settings: Settings) -> CosmosUserRepository:
+def build_cosmos_user_repository(settings: AppConfig) -> CosmosUserRepository:
     """Construct the default Cosmos-backed repository."""
 
     client = CosmosClient.from_connection_string(
-        settings.az_cosmosdb_connection_string,
-        connection_verify=_should_verify_connection(settings),
+        settings.connectionStrings.azCosmosDb,
+        connection_verify=True,
     )
-    return CosmosUserRepository(client=client, settings=settings)
+    return CosmosUserRepository(client=client, dbName=settings.azCosmosDbDatabaseName)
 
 
 def _parse_optional_datetime(value: Any) -> datetime | None:

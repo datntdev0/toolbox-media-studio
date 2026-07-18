@@ -1,9 +1,12 @@
 """Inbound request bodies."""
 
+from datetime import datetime
+from uuid import uuid4
+from isodate import UTC
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.domain.novels import NovelStatus
-from app.domain.users import UserRole, UserStatus
+from app.domain.users import User, UserRole, UserStatus
 
 
 class LoginRequest(BaseModel):
@@ -34,6 +37,7 @@ class UserUpdateRequest(BaseModel):
     display_name: str | None = Field(default=None, alias="displayName")
     role: UserRole | None = None
     status: UserStatus | None = None
+    etag: str | None = None
 
 
 class NovelCreateRequest(BaseModel):
@@ -71,3 +75,18 @@ class CrawlerJobCreateRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     url: str
+
+def to_user_entity(body: UserCreateRequest) -> User:
+    """Convert a UserCreateRequest to a User entity."""
+    now = datetime.now(UTC)
+    normalized_email = body.email.lower()
+    return User(
+        id=str(uuid4()),
+        email=normalized_email,
+        normalized_email=normalized_email,
+        display_name=body.display_name,
+        role=body.role,
+        status=body.status,
+        created_at=now,
+        updated_at=now,
+    )

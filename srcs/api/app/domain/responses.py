@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.jobs import JobKind, JobStatus
 from app.domain.novels import NovelStatus
-from app.domain.users import UserRole, UserStatus
+from app.domain.users import User, UserRole, UserStatus
 
 
 class TokenResponse(BaseModel):
@@ -82,3 +82,16 @@ class CrawlerJobResponse(BaseModel):
     reused: bool
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
+
+def to_user_response(current_user: User) -> UserResponse:
+    """Convert a User domain model to a UserResponse model."""
+    return UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        display_name=current_user.display_name,
+        role=current_user.role,
+        status=current_user.status,
+        created_at=current_user.created_at,
+        updated_at=current_user.updated_at,
+        etag=current_user.etag,
+    )

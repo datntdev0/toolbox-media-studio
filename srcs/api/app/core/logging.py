@@ -1,18 +1,18 @@
 import logging
 
-from app.core.config.app_settings import AppSettings
+from app.core.config.app_config import AppConfig
 from shared.decorators import singleton
 
 LOGGER_NAME = "toolbox_media_studio_api"
 
 @singleton
-class Logger:
+class LogManager:
     
     def __init__(self):
         self.__mainLogger = logging.getLogger(LOGGER_NAME)
 
     def configure(self) -> None:
-        settings = AppSettings()
+        settings = AppConfig()
 
         self.__mainLogger.setLevel(self.coerce_level(settings.logLevel))
 
