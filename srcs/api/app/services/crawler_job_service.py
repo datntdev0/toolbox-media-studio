@@ -7,12 +7,14 @@ import json
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from app.core.events.polling_queue_publisher import PollingQueuePublisher
 from app.domain.jobs import Job, JobKind, JobStatus
 from app.domain.requests import CrawlerJobCreateRequest
 from app.domain.responses import CrawlerJobResponse
 from app.providers.crawler_provider import validate_source
-from app.providers.queue_provider import QueueProvider
 from app.repositories.job_repository import JobRepository
+
+CRAWLER_QUEUE_NAME = "crawler-jobs"
 
 
 class CrawlerJobPublishError(Exception):
@@ -25,7 +27,7 @@ def create_crawler_job(
     request: CrawlerJobCreateRequest,
     created_by: str,
     repository: JobRepository,
-    queue_provider: QueueProvider,
+    queue_publisher: PollingQueuePublisher,
 ) -> CrawlerJobResponse:
     """Create or reuse an active crawler job and enqueue new work."""
 
@@ -53,7 +55,7 @@ def create_crawler_job(
     result = repository.create_or_get_active(candidate)
     if result.created:
         try:
-            queue_provider.send(_to_queue_message(result.job))
+            queue_publisher.publish(CRAWLER_QUEUE_NAME, _to_queue_message(result.job))
         except Exception as exc:
             repository.mark_failed(result.job.id, result.job.created_by, 0, "Queue publish failed")
             raise CrawlerJobPublishError("Queue publish failed") from exc

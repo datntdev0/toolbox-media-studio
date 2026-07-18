@@ -1,18 +1,13 @@
 import json
-
 from collections.abc import Mapping
-from dataclasses import dataclass
 from typing import Any, Protocol
 
 from azure.core.exceptions import ResourceExistsError
 from azure.storage.queue import QueueClient
 
-from app.core.config import get_settings
+from app.core.config.app_config import AppConfig
+from app.core.events.message_handler import QueueMessage
 
-@dataclass()
-class QueueMessage:
-    id: str
-    content: Mapping[str, Any] | None = None
 
 class PollingQueueClient(Protocol):
     @property
@@ -24,11 +19,15 @@ class PollingQueueClient(Protocol):
 
     def push(self, content: Mapping[str, Any]) -> QueueMessage: ...
 
+    def delete(self, message: QueueMessage) -> None: ...
+
+
 class AzureStorageQueueClient(PollingQueueClient):
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, config: AppConfig | None = None) -> None:
+        settings = config or AppConfig()
         self._queue_client = QueueClient.from_connection_string(
-            conn_str=get_settings().az_storage_queue_connection_string,
-            api_version=get_settings().az_storage_queue_api_version,
+            conn_str=settings.connectionStrings.azStorageQueue,
+            api_version=_storage_api_version(settings),
             queue_name=name,
         )
 
@@ -43,13 +42,25 @@ class AzureStorageQueueClient(PollingQueueClient):
             pass
 
     def pop(self) -> QueueMessage | None:
-        messages = list(self._queue_client.receive_messages(messages_per_page=1))
+        messages = list(self._queue_client.receive_messages(messages_per_page=1,visibility_timeout=1))
         message = messages[0] if messages else None
-        self._queue_client.delete_message(message) if message else None
-        content = json.loads(message.content) if message else None
-        return QueueMessage(id=message.id, content=content) if content else None
+        if message is None:
+            return None
+
+        self._queue_client.delete_message(message.id, message.pop_receipt)
+        content = json.loads(message.content)
+        return QueueMessage(
+            id=message.id,
+            pop_receipt=message.pop_receipt,
+            dequeue_count=message.dequeue_count,
+            content=content,
+        )
 
     def push(self, content: Mapping[str, Any]) -> QueueMessage:
-        jsonContent = json.dumps(content)
-        message = self._queue_client.send_message(jsonContent)
+        json_content = json.dumps(content)
+        message = self._queue_client.send_message(json_content)
         return QueueMessage(id=message.id)
+
+
+def _storage_api_version(settings: AppConfig) -> str | None:
+    return "2024-11-04" if settings.environment.lower() == "localhost" else None

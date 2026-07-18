@@ -76,6 +76,7 @@ class CrawlerJobCreateRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     url: str
+    chapters: list[int] | None = None
 
 
 def to_user_entity(body: UserCreateRequest) -> User:

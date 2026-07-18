@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
 
-from app.consumers.crawler_queue_consumer import CrawlerJobProcessor, CrawlerQueueConsumer
+from app.consumers.crawler_queue_consumer import CrawlerJobProcessor, CrawlerQueueMessageHandler
+from app.core.events.message_handler import QueueMessage
 from app.domain.jobs import Job, JobKind, JobStatus
-from app.providers.queue_provider import QueueProvider, ReceivedQueueMessage, SentQueueMessage
 from app.repositories.job_repository import InMemoryJobRepository
 
 
@@ -22,97 +21,33 @@ class FailingProcessor(CrawlerJobProcessor):
         raise RuntimeError("boom")
 
 
-class RecordingQueue:
-    """Queue fake that records retry/delete/send calls."""
-
-    def __init__(self, queue_name: str) -> None:
-        self._queue_name = queue_name
-        self.sent: list[Mapping[str, object]] = []
-        self.deleted: list[str] = []
-        self.raise_on_send: Exception | None = None
-
-    @property
-    def queue_name(self) -> str:
-        return self._queue_name
-
-    def ensure_exists(self) -> None:
-        return None
-
-    def send(self, message: Mapping[str, object]) -> SentQueueMessage:
-        if self.raise_on_send is not None:
-            raise self.raise_on_send
-        self.sent.append(dict(message))
-        return SentQueueMessage(id=str(len(self.sent)))
-
-    def receive_one(self, visibility_timeout: int) -> ReceivedQueueMessage | None:
-        del visibility_timeout
-        return None
-
-    def retry(self, message: ReceivedQueueMessage, visibility_timeout: int) -> None:
-        del message, visibility_timeout
-
-    def delete(self, message: ReceivedQueueMessage) -> None:
-        self.deleted.append(message.id)
-
-
-class RecordingQueueFactory:
-    """Factory fake for concrete consumer construction."""
-
-    def __init__(self, source: RecordingQueue, dlq: RecordingQueue) -> None:
-        self.source = source
-        self.dlq = dlq
-
-    def get(self, queue_name: str) -> QueueProvider:
-        if queue_name == "crawler-jobs":
-            return self.source
-        if queue_name == "crawler-jobs-dead-letter":
-            return self.dlq
-        raise KeyError(queue_name)
-
-
-def test_sixth_failure_dead_letters_marks_failed_then_deletes() -> None:
+def test_processing_failure_marks_retrying_before_reraising() -> None:
     repository = InMemoryJobRepository()
     job = repository.create_or_get_active(_job()).job
-    source = RecordingQueue("crawler-jobs")
-    dlq = RecordingQueue("crawler-jobs-dead-letter")
-    consumer = _consumer(source, dlq, repository)
+    handler = CrawlerQueueMessageHandler(repository, FailingProcessor())
 
-    consumer._process_message(_message(job, dequeue_count=6), "consumer-0")
+    with pytest.raises(RuntimeError, match="boom"):
+        handler.handle(_message(job, dequeue_count=2))
+
+    stored = repository.get(job.id, job.created_by)
+    assert stored is not None
+    assert stored.status == JobStatus.RETRYING
+    assert stored.attempts == 2
+    assert stored.last_error == "boom"
+
+
+def test_mark_failed_transitions_job_to_failed() -> None:
+    repository = InMemoryJobRepository()
+    job = repository.create_or_get_active(_job()).job
+    handler = CrawlerQueueMessageHandler(repository, FailingProcessor())
+
+    handler.mark_failed(_message(job, dequeue_count=6), "boom")
 
     stored = repository.get(job.id, job.created_by)
     assert stored is not None
     assert stored.status == JobStatus.FAILED
-    assert len(dlq.sent) == 1
-    assert source.deleted == ["message-1"]
-
-
-def test_dead_letter_send_failure_keeps_source_message_and_active_job() -> None:
-    repository = InMemoryJobRepository()
-    job = repository.create_or_get_active(_job()).job
-    source = RecordingQueue("crawler-jobs")
-    dlq = RecordingQueue("crawler-jobs-dead-letter")
-    dlq.raise_on_send = RuntimeError("dlq down")
-    consumer = _consumer(source, dlq, repository)
-
-    with pytest.raises(RuntimeError, match="dlq down"):
-        consumer._process_message(_message(job, dequeue_count=6), "consumer-0")
-
-    stored = repository.get(job.id, job.created_by)
-    assert stored is not None
-    assert stored.status == JobStatus.PROCESSING
-    assert source.deleted == []
-
-
-def _consumer(
-    source: QueueProvider,
-    dlq: QueueProvider,
-    repository: InMemoryJobRepository,
-) -> CrawlerQueueConsumer:
-    return CrawlerQueueConsumer(
-        job_repository=repository,
-        queue_provider_factory=RecordingQueueFactory(source, dlq),
-        processor=FailingProcessor(),
-    )
+    assert stored.attempts == 6
+    assert stored.last_error == "boom"
 
 
 def _job() -> Job:
@@ -133,8 +68,8 @@ def _job() -> Job:
     )
 
 
-def _message(job: Job, dequeue_count: int) -> ReceivedQueueMessage:
-    return ReceivedQueueMessage(
+def _message(job: Job, dequeue_count: int) -> QueueMessage:
+    return QueueMessage(
         id="message-1",
         pop_receipt="receipt",
         dequeue_count=dequeue_count,

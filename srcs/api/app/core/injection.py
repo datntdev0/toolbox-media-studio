@@ -3,7 +3,12 @@ from typing import Annotated
 from fastapi.params import Depends
 
 from app.core.config.app_config import AppConfig
+from app.core.events.polling_queue_publisher import (
+    AzureStorageQueuePublisher,
+    PollingQueuePublisher,
+)
 from app.core.logging import LogManager
+from app.events.sample_handler import SampleQueueListener
 from app.providers.cache_provider import CacheProvider, build_cosmos_cache_provider
 from app.providers.proxy_service_provider import ProxyProvider, build_proxy_provider
 from app.repositories.cosmosdb.cosmos_novel_repository import build_cosmos_novel_repository
@@ -22,6 +27,10 @@ repository_novel = build_cosmos_novel_repository(config)
 provider_proxy = build_proxy_provider(config)
 provider_cache = build_cosmos_cache_provider(config)
 
+# Queue publishers and subscribers can be registered
+queue_publisher = AzureStorageQueuePublisher(config)
+queue_subscriber_sample = SampleQueueListener(log_manager.getLogger("queue.sample"), 1)
+
 # Dependency injection for FastAPI routes
 
 LogManagerDep = Annotated[LogManager, Depends(lambda: log_manager)]
@@ -31,3 +40,4 @@ RepositoryNovelDep = Annotated[NovelRepository, Depends(lambda: repository_novel
 
 ProviderCacheDep = Annotated[CacheProvider, Depends(lambda: provider_cache)]
 ProviderProxyDep = Annotated[ProxyProvider, Depends(lambda: provider_proxy)]
+PollingQueuePublisherDep = Annotated[PollingQueuePublisher, Depends(lambda: queue_publisher)]

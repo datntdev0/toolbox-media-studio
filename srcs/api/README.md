@@ -99,7 +99,6 @@ srcs/api/
       dependencies.py        # FastAPI dependency providers
     consumers/
       crawler_queue_consumer.py # crawler-jobs consumer
-      queue_consumer.py      # reusable scheduled queue consumer
     domain/
       crawlers.py            # Crawler response/domain models
       requests.py            # Inbound request models
@@ -109,6 +108,8 @@ srcs/api/
       crawler_provider.py    # Supported crawler registry and URL validation
       proxy_service_provider.py # Proxy provider + concrete FlareSolver service
       queue_provider.py      # Azure Storage Queue provider/factory
+      queue_publisher.py     # Queue publishing abstraction
+      queue_subscriber.py    # Queue subscription abstraction
     parsers/
       novel543_parser.py     # Novel543 metadata parsing
     repositories/

@@ -101,6 +101,16 @@ class FakeQueueProviderFactory:
         return provider
 
 
+class FakeQueuePublisher:
+    """In-memory queue publisher for route tests."""
+
+    def __init__(self) -> None:
+        self.messages: list[tuple[str, Mapping[str, Any]]] = []
+
+    def publish(self, queue_name: str, message: Mapping[str, Any]) -> None:
+        self.messages.append((queue_name, dict(message)))
+
+
 @pytest.fixture(autouse=True)
 def _env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Set required env vars before settings are constructed.
@@ -170,6 +180,13 @@ def queue_provider_factory() -> FakeQueueProviderFactory:
 
 
 @pytest.fixture
+def queue_publisher() -> FakeQueuePublisher:
+    """Shared fake queue publisher for a test app instance."""
+
+    return FakeQueuePublisher()
+
+
+@pytest.fixture
 def cache_provider() -> InMemoryCacheProvider:
     """Shared in-memory cache provider for a test app instance."""
 
@@ -191,6 +208,7 @@ def client(
     novel_repository: InMemoryNovelRepository,
     job_repository: InMemoryJobRepository,
     queue_provider_factory: FakeQueueProviderFactory,
+    queue_publisher: FakeQueuePublisher,
     cache_provider: InMemoryCacheProvider,
     flaresolverr_client: FakeFlareSolverrClient,
 ):
@@ -218,6 +236,7 @@ def client(
     service_provider.repository_novel = novel_repository
     service_provider.provider_cache = cache_provider
     service_provider.provider_proxy = flaresolverr_client
+    service_provider.queue_publisher = queue_publisher
 
     main_module.repository_user = user_repository
     main_module.repository_novel = novel_repository

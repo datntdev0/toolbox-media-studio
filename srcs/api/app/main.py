@@ -11,10 +11,12 @@ from app.core.injection import (
     provider_proxy,
     repository_novel,
     repository_user,
+    queue_subscriber_sample,
 )
 from app.routers import auth, crawlers, health, novels, users
 
 app_config = AppConfig()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,15 +27,22 @@ async def lifespan(app: FastAPI):
     app.state.config = config  # Store the app config instance in app state
     app.state.repository_user = repository_user  # Store the user repository instance in app state
     app.state.repository_novel = repository_novel
-    app.state.cache_provider = provider_cache  # Store the cache provider instance in app state
     app.state.provider_cache = provider_cache  # Backward-compatible cache provider state name
-    app.state.proxy_provider = provider_proxy  # Store the proxy provider instance in app state
-    app.state.flaresolverr_client = provider_proxy  # Backward-compatible proxy state name
+    app.state.provider_proxy = provider_proxy  # Store the proxy provider instance in app state
+    app.state.queue_subscriber_sample = queue_subscriber_sample
 
     from app.core.security.authentication import seed_admin_user
     seed_admin_user(logger, app_config, repository_user)
 
-    yield
+    queue_subscriber_sample.start()
+
+    try:
+        yield
+    finally:
+        try:
+            queue_subscriber_sample.stop()
+        except Exception:
+            logger.exception("Sample queue subscriber failed to stop")
 
 app = FastAPI(lifespan=lifespan)
 

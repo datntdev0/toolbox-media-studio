@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
-
-from app.core.config import Settings
 
 
 def test_cosmos_connection_verification_is_disabled_for_localhost(
@@ -34,7 +33,7 @@ def test_cosmos_connection_verification_is_disabled_for_localhost(
     from app.core.startup import _check_cosmos
 
     _check_cosmos(
-        Settings(
+        SimpleNamespace(
             admin_email="admin@example.com",
             admin_password="SecurePassword123!",
             jwt_signing_key="test-signing-key",
@@ -60,7 +59,7 @@ def test_configure_logging_creates_file_handler(tmp_path: Path) -> None:
 
     log_file = tmp_path / "api.log"
     configured_logger = configure_logging(
-        Settings(
+        SimpleNamespace(
             admin_email="admin@example.com",
             admin_password="SecurePassword123!",
             jwt_signing_key="test-signing-key",

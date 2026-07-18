@@ -8,7 +8,7 @@ from typing import Any, cast
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 
 from app.core.azure import should_verify_connection
-from app.core.config import Settings
+from app.core.config.app_config import AppConfig
 from app.domain.jobs import Job, JobCreateResult, JobKind, JobStatus
 from app.repositories.job_repository import JobNotFoundError
 
@@ -18,8 +18,8 @@ JOBS_CONTAINER_NAME = "jobs"
 class CosmosJobRepository:
     """Job repository backed by Azure Cosmos DB."""
 
-    def __init__(self, client: CosmosClient, settings: Settings) -> None:
-        self._database = client.create_database_if_not_exists(id=settings.az_cosmosdb_database_name)
+    def __init__(self, client: CosmosClient, settings: AppConfig) -> None:
+        self._database = client.create_database_if_not_exists(id=settings.azCosmosDbDatabaseName)
         self._container = self._database.create_container_if_not_exists(
             id=JOBS_CONTAINER_NAME,
             partition_key=PartitionKey(path="/createdBy"),
@@ -154,11 +154,11 @@ class CosmosJobRepository:
         )
 
 
-def build_cosmos_job_repository(settings: Settings) -> CosmosJobRepository:
+def build_cosmos_job_repository(settings: AppConfig) -> CosmosJobRepository:
     """Construct the default Cosmos-backed job repository."""
 
     client = CosmosClient.from_connection_string(
-        settings.az_cosmosdb_connection_string,
+        settings.connectionStrings.azCosmosDb,
         connection_verify=should_verify_connection(settings),
     )
     return CosmosJobRepository(client=client, settings=settings)

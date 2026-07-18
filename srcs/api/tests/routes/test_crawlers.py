@@ -11,6 +11,7 @@ from tests.conftest import (
     TEST_ADMIN_EMAIL,
     TEST_ADMIN_PASSWORD,
     FakeFlareSolverrClient,
+    FakeQueuePublisher,
 )
 
 SAMPLE_HTML = """
@@ -252,3 +253,29 @@ def test_metadata_maps_flaresolverr_bad_response_to_502(
     response = client.get(_metadata_url(), headers=_headers(client))
 
     assert response.status_code == 502
+
+
+def test_create_crawler_job_publishes_to_sample_queue(
+    client: TestClient,
+    queue_publisher: FakeQueuePublisher,
+) -> None:
+    response = client.post(
+        "/api/crawlers/novel543/jobs",
+        headers=_headers(client),
+        json={"url": "https://www.novel543.com/0603625457/dir", "chapters": [1, 2]},
+    )
+
+    assert response.status_code == 201
+    assert len(queue_publisher.messages) == 1
+    queue_name, message = queue_publisher.messages[0]
+    assert queue_name == "sample"
+    assert message == {
+        "schemaVersion": 1,
+        "kind": "sample",
+        "crawlerId": "novel543",
+        "url": "https://www.novel543.com/0603625457/dir",
+        "chapters": [1, 2],
+        "createdBy": message["createdBy"],
+    }
+    assert isinstance(message["createdBy"], str)
+    assert message["createdBy"]
