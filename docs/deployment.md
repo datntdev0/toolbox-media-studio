@@ -65,9 +65,9 @@ flowchart LR
 - **App settings (non-secret):** Cosmos endpoint, storage account names, and the allowed CORS
   origin (the `web` app URL).
 - **FastAPI settings:** all FastAPI app settings use the `FAST_` prefix, grouped by domain where
-  useful: `FAST_SECURITY_*`, `FAST_AZ_*`, `FAST_FLARESOLVERR_*`, and cache TTL settings.
+  useful: `FAST_SECURITY_*`, `FAST_AZ_*`, and `FAST_FLARESOLVERR_*`.
 - **Crawler settings:** `FAST_FLARESOLVERR_BASE_URL`, `FAST_FLARESOLVERR_MAX_TIMEOUT_MS`, and
-  `FAST_CACHE_TTL_SECONDS_CRAWLER`. Queue names, retry timing, consumer count, visibility timeout,
+  crawler cache TTLs. Queue names, retry timing, consumer count, visibility timeout, cache TTLs,
   and simulated processing duration are application constants. Local development points
   `FAST_FLARESOLVERR_BASE_URL` at `http://localhost:8191/v1`.
 - **CORS:** FastAPI allows the Nuxt origin only; credentials mode as needed for the JWT.

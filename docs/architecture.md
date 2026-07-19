@@ -162,8 +162,8 @@ patch + ETag. Blob layout: `raw-chapters/{novelId}/{index}.txt`,
 The generic `cache` container is intentionally not crawler-specific. The first crawler metadata
 slice uses cache types such as `crawler:novel543:html` and `crawler:novel543:metadata`, with the
 canonical source URL as `cacheKey`. Cache freshness is enforced in the API cache provider by
-checking `createdAt + FAST_CACHE_TTL_SECONDS_CRAWLER`; Cosmos item TTL is not required for this
-slice.
+checking `createdAt + CACHE_TTL_CRAWLER` from `app_config.py`; the crawler TTL is 7 days.
+Cosmos item TTL is not required for this slice.
 
 ## Connector abstraction (pluggable crawling)
 

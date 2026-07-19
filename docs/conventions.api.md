@@ -96,7 +96,6 @@ Prefer consistent HTTP status mapping across feature routers:
 FastAPI tests live under `srcs/api/tests` and are grouped by responsibility:
 
 - `tests/routes/` for HTTP route/API behavior.
-- `tests/services/` for use-case and shared parsing behavior.
 - `tests/providers/` for runtime adapters such as cache and crawler providers.
 - `tests/repositories/` for persistence contract and repository behavior.
 - Root-level tests are reserved for cross-cutting startup/config/logging tests and shared

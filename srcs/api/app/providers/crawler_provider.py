@@ -15,7 +15,7 @@ from app.domain.crawlers import (
     CrawlerSource,
     CrawlerSummaryResponse,
 )
-from app.providers.cache_provider import CacheProvider
+from app.providers.cache_provider import CACHE_TYPE_PREFIX_CRAWLER, CacheProvider
 from app.providers.crawler_parser_novel543 import (
     Novel543ParseError,
     ParsedChapterContent,
@@ -227,19 +227,21 @@ def fetch_metadata(
     source_url: str,
     cache_provider: CacheProvider,
     proxy_provider: ProxyProvider,
+    use_cache: bool = True,
 ) -> CrawlerMetadataResponse:
     """Fetch, parse, cache, and return crawler metadata."""
 
     source = validate_novel_url(crawler_id, source_url)
-    cached_metadata = get_cached_metadata(cache_provider, source)
-    if cached_metadata is not None:
-        return cached_metadata
+    if use_cache:
+        cached_metadata = get_cached_metadata(cache_provider, source)
+        if cached_metadata is not None:
+            return cached_metadata
 
     html_cache_type = _cache_type(source.crawler_id, _CACHE_KIND_HTML)
     metadata_cache_type = _cache_type(source.crawler_id, _CACHE_KIND_METADATA)
     cache_key = source.canonical_url
 
-    html = get_cached_html(cache_provider, source)
+    html = get_cached_html(cache_provider, source) if use_cache else None
     html_from_cache = html is not None
     if html is None:
         html = _fetch_html(source.canonical_url, proxy_provider)
@@ -262,19 +264,21 @@ def fetch_chapter_content(
     chapter_url: str,
     cache_provider: CacheProvider,
     proxy_provider: ProxyProvider,
+    use_cache: bool = True,
 ) -> CrawlerChapterContentResponse:
     """Fetch, parse, cache, and return crawler chapter content."""
 
     source = validate_chapter_url(crawler_id, chapter_url)
-    cached_content = get_cached_chapter_content(cache_provider, source)
-    if cached_content is not None:
-        return cached_content
+    if use_cache:
+        cached_content = get_cached_chapter_content(cache_provider, source)
+        if cached_content is not None:
+            return cached_content
 
     html_cache_type = _cache_type(source.crawler_id, _CACHE_KIND_HTML)
     content_cache_type = _cache_type(source.crawler_id, _CACHE_KIND_CONTENT)
     cache_key = source.canonical_url
 
-    html = get_cached_html(cache_provider, source)
+    html = get_cached_html(cache_provider, source) if use_cache else None
     html_from_cache = html is not None
     if html is None:
         html = _fetch_html(source.canonical_url, proxy_provider)
@@ -284,7 +288,7 @@ def fetch_chapter_content(
     content = list(parsed.content)
     for part_url in _remaining_chapter_part_urls(source, parsed):
         part_source = validate_chapter_url(source.crawler_id, part_url)
-        part_html = get_cached_html(cache_provider, part_source)
+        part_html = get_cached_html(cache_provider, part_source) if use_cache else None
         if part_html is None:
             part_html = _fetch_html(part_source.canonical_url, proxy_provider)
             cache_provider.set(html_cache_type, part_source.canonical_url, part_html)
@@ -443,4 +447,4 @@ def _novel_url(crawler: CrawlerDefinition, host: str, source_novel_id: str) -> s
 
 
 def _cache_type(crawler_id: str, kind: str) -> str:
-    return f"crawler:{crawler_id}:{kind}"
+    return f"{CACHE_TYPE_PREFIX_CRAWLER}:{crawler_id}:{kind}"

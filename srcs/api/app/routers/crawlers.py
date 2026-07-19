@@ -36,6 +36,7 @@ def get_crawler_metadata_route(
     provider_proxy: ProviderProxyDep,
     id: str,
     source_url: Annotated[str, Query(alias="url")],
+    use_cache: Annotated[bool, Query(alias="cache")] = True,
 ) -> CrawlerMetadataResponse:
     """Fetch novel metadata from a supported crawler source."""
 
@@ -46,6 +47,7 @@ def get_crawler_metadata_route(
             source_url=source_url,
             cache_provider=provider_cache,
             proxy_provider=provider_proxy,
+            use_cache=use_cache,
         )
     except UnknownCrawlerError as exc:
         raise HTTPException(
@@ -75,6 +77,7 @@ def get_crawler_chapter_route(
     provider_proxy: ProviderProxyDep,
     id: str,
     source_url: Annotated[str, Query(alias="url")],
+    use_cache: Annotated[bool, Query(alias="cache")] = True,
 ) -> CrawlerChapterContentResponse:
     """Fetch chapter content from a supported crawler source."""
 
@@ -85,6 +88,7 @@ def get_crawler_chapter_route(
             chapter_url=source_url,
             cache_provider=provider_cache,
             proxy_provider=provider_proxy,
+            use_cache=use_cache,
         )
     except UnknownCrawlerError as exc:
         raise HTTPException(

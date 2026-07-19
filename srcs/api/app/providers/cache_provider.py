@@ -11,9 +11,12 @@ from typing import Any, Protocol, cast
 
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 
+from app.core.config.app_config import AppConfig
+
 CacheValue = str | dict[str, Any]
 CacheClock = Callable[[], datetime]
 CACHE_CONTAINER_NAME = "sys.caches"
+CACHE_TYPE_PREFIX_CRAWLER = "crawler"
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,10 +51,11 @@ class _RecordCacheProvider:
 
     def __init__(
         self,
-        ttl_seconds: int,
         clock: CacheClock | None = None,
     ) -> None:
-        self._ttl = timedelta(seconds=ttl_seconds)
+        cache_settings = AppConfig().cache
+        self._ttl = timedelta(seconds=cache_settings.ttl_default)
+        self._crawler_ttl = timedelta(seconds=cache_settings.ttl_crawler)
         self._clock = clock or _utc_now
 
     def get(self, cache_type: str, cache_key: str) -> CacheValue | None:
@@ -70,7 +74,9 @@ class _RecordCacheProvider:
         value: CacheValue,
         ttl: int | None = None,
     ) -> None:
-        ttl_seconds = int(self._ttl.total_seconds()) if ttl is None else ttl
+        ttl_seconds = (
+            int(self._ttl_for_cache_type(cache_type).total_seconds()) if ttl is None else ttl
+        )
         now = self._clock()
         self._upsert_record(
             CacheRecord(
@@ -94,16 +100,20 @@ class _RecordCacheProvider:
     def _delete_record(self, cache_type: str, cache_key: str) -> None:
         raise NotImplementedError
 
+    def _ttl_for_cache_type(self, cache_type: str) -> timedelta:
+        if cache_type.startswith(CACHE_TYPE_PREFIX_CRAWLER):
+            return self._crawler_ttl
+        return self._ttl
+
 
 class InMemoryCacheProvider(_RecordCacheProvider):
     """In-memory cache provider for tests."""
 
     def __init__(
         self,
-        ttl_seconds: int = 3600,
         clock: CacheClock | None = None,
     ) -> None:
-        super().__init__(ttl_seconds=ttl_seconds, clock=clock)
+        super().__init__(clock=clock)
         self._records: dict[tuple[str, str], CacheRecord] = {}
 
     def _get_record(self, cache_type: str, cache_key: str) -> CacheRecord | None:
@@ -126,10 +136,9 @@ class CosmosCacheProvider(_RecordCacheProvider):
         self,
         client: CosmosClient,
         database_name: str,
-        ttl_seconds: int,
         clock: CacheClock | None = None,
     ) -> None:
-        super().__init__(ttl_seconds=ttl_seconds, clock=clock)
+        super().__init__(clock=clock)
         self._database = client.create_database_if_not_exists(id=database_name)
         self._container = self._database.create_container_if_not_exists(
             id=CACHE_CONTAINER_NAME,
@@ -174,7 +183,7 @@ class CosmosCacheProvider(_RecordCacheProvider):
         expired_at = (
             datetime.fromisoformat(cast(str, expired_at_value))
             if isinstance(expired_at_value, str)
-            else created_at + self._ttl
+            else created_at + self._ttl_for_cache_type(cast(str, item["cacheType"]))
         )
         return CacheRecord(
             cache_type=cast(str, item["cacheType"]),
@@ -195,7 +204,6 @@ def build_cosmos_cache_provider(config: Any) -> CacheProvider:
     return CosmosCacheProvider(
         client=client,
         database_name=_cosmos_database_name(config),
-        ttl_seconds=_cache_ttl_seconds(config),
     )
 
 
@@ -214,14 +222,6 @@ def _is_expired(expired_at: datetime, now: datetime) -> bool:
 
 def _utc_now() -> datetime:
     return datetime.now(UTC)
-
-
-def _cache_ttl_seconds(config: Any) -> int:
-    cache_settings = getattr(config, "cache", None)
-    ttl = getattr(cache_settings, "ttl_default", None)
-    if ttl is None:
-        ttl = getattr(config, "crawler_cache_ttl_seconds", None)
-    return int(ttl if ttl is not None else 3600)
 
 
 def _cosmos_connection_string(config: Any) -> str:

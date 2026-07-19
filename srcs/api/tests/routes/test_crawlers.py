@@ -242,6 +242,45 @@ def test_metadata_uses_parsed_metadata_cache_without_fetching_or_reparsing(
     assert flaresolverr_client.calls == []
 
 
+def test_metadata_cache_false_refetches_and_updates_cached_metadata(
+    client: TestClient,
+    cache_provider: InMemoryCacheProvider,
+    flaresolverr_client: FakeFlareSolverrClient,
+) -> None:
+    cache_key = "https://www.novel543.com/0603625457/dir"
+    cache_provider.set(
+        "crawler:novel543:metadata",
+        cache_key,
+        {
+            "crawler_id": "novel543",
+            "source_url": cache_key,
+            "source_novel_id": "0603625457",
+            "title": "Stale Title",
+            "author": None,
+            "category": None,
+            "updated_date": None,
+            "protagonists": [],
+            "description": None,
+            "cover_image_url": None,
+            "chapters": [],
+            "cached": False,
+            "fetched_at": "2026-07-11T00:00:00+00:00",
+        },
+    )
+    flaresolverr_client.html = SAMPLE_HTML
+
+    response = client.get(f"{_metadata_url()}&cache=false", headers=_headers(client))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["title"] == "瞎眼神醫，開局遇到聖女報恩"
+    assert body["cached"] is False
+    assert flaresolverr_client.calls == [(cache_key, None)]
+    cached_metadata = cache_provider.get("crawler:novel543:metadata", cache_key)
+    assert isinstance(cached_metadata, dict)
+    assert cached_metadata["title"] == "瞎眼神醫，開局遇到聖女報恩"
+
+
 def test_metadata_maps_flaresolverr_timeout_to_504(
     client: TestClient,
     flaresolverr_client: FakeFlareSolverrClient,
@@ -298,6 +337,50 @@ def test_chapter_fetches_content_through_flaresolverr(
     assert flaresolverr_client.calls == [
         ("https://www.novel543.com/0603625457/8096_1.html", None)
     ]
+
+
+def test_chapter_cache_false_refetches_and_updates_cached_content(
+    client: TestClient,
+    cache_provider: InMemoryCacheProvider,
+    flaresolverr_client: FakeFlareSolverrClient,
+) -> None:
+    cache_key = "https://www.novel543.com/0603625457/8096_1.html"
+    cache_provider.set(
+        "crawler:novel543:content",
+        cache_key,
+        {
+            "crawler_id": "novel543",
+            "novel_url": "https://www.novel543.com/0603625457/dir",
+            "chapter_url": cache_key,
+            "chapter_title": "Cached Chapter",
+            "chapter_number": 1,
+            "content": ["stale"],
+            "cached": False,
+            "fetched_at": "2026-07-11T00:00:00+00:00",
+        },
+    )
+    flaresolverr_client.html = """
+    <html>
+      <body>
+        <h1>第1章 林神醫</h1>
+        <div id="chaptercontent">
+          fresh line<br>
+          溫馨提示: 請記得加入書架哦
+        </div>
+      </body>
+    </html>
+    """
+
+    response = client.get(f"{_chapter_url()}&cache=false", headers=_headers(client))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["content"] == ["fresh line"]
+    assert body["cached"] is False
+    assert flaresolverr_client.calls == [(cache_key, None)]
+    cached_content = cache_provider.get("crawler:novel543:content", cache_key)
+    assert isinstance(cached_content, dict)
+    assert cached_content["content"] == ["fresh line"]
 
 
 def test_crawler_jobs_route_is_removed(client: TestClient) -> None:

@@ -6,7 +6,6 @@ from typing import Any
 
 import pytest
 
-from app.core.config.app_config import AppConfig
 from app.providers.cache_provider import InMemoryCacheProvider
 from app.repositories.job_repository import InMemoryJobRepository
 from app.repositories.novel_repository import InMemoryNovelRepository
@@ -129,7 +128,6 @@ def _env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FAST_ENVIRONMENT", "localhost")
     monkeypatch.setenv("FAST_FLARESOLVERR_BASE_URL", "http://localhost:8191/v1")
     monkeypatch.setenv("FAST_FLARESOLVERR_MAX_TIMEOUT_MS", "60000")
-    monkeypatch.setenv("FAST_CACHE_TTL_SECONDS_CRAWLER", "2592000")
     monkeypatch.setenv(
         "FAST_AZ_CONNECTION_STRING_COSMOSDB",
         (
@@ -190,7 +188,7 @@ def queue_publisher() -> FakeQueuePublisher:
 def cache_provider() -> InMemoryCacheProvider:
     """Shared in-memory cache provider for a test app instance."""
 
-    return InMemoryCacheProvider(ttl_seconds=AppConfig().cache.ttl_default)
+    return InMemoryCacheProvider()
 
 
 @pytest.fixture
