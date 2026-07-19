@@ -37,13 +37,13 @@ const fields = [{
 
 const providers = [{
   label: 'Google',
-  icon: 'i-simple-icons-google',
+  icon: 'simple-icons:google',
   onClick: () => {
     toast.add({ title: 'Google', description: 'Sign in with Google' })
   }
 }, {
   label: 'GitHub',
-  icon: 'i-simple-icons-github',
+  icon: 'simple-icons:github',
   onClick: () => {
     toast.add({ title: 'GitHub', description: 'Sign in with GitHub' })
   }
@@ -104,7 +104,7 @@ async function onSubmit(payload: FormSubmitEvent<Schema>) {
     :providers="providers"
     :loading="isSubmitting"
     title="Welcome back"
-    icon="i-lucide-lock"
+    icon="lucide:lock"
     @submit="onSubmit"
   >
     <template #description>

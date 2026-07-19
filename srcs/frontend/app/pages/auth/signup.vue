@@ -35,13 +35,13 @@ const fields = [{
 
 const providers = [{
   label: 'Google',
-  icon: 'i-simple-icons-google',
+  icon: 'simple-icons:google',
   onClick: () => {
     toast.add({ title: 'Google', description: 'Sign up with Google' })
   }
 }, {
   label: 'GitHub',
-  icon: 'i-simple-icons-github',
+  icon: 'simple-icons:github',
   onClick: () => {
     toast.add({ title: 'GitHub', description: 'Sign up with GitHub' })
   }

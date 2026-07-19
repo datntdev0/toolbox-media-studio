@@ -49,7 +49,7 @@ const items = [{
 
         <UDropdownMenu :items="items" :content="{ align: 'end' }">
           <UButton
-            icon="i-lucide-ellipsis-vertical"
+            icon="lucide:ellipsis-vertical"
             color="neutral"
             variant="ghost"
           />

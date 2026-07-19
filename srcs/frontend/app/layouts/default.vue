@@ -6,71 +6,113 @@ const toast = useToast()
 
 const open = ref(false)
 
-const links = [[{
-  label: 'Home',
-  icon: 'i-lucide-house',
-  to: '/',
-  onSelect: () => {
-    open.value = false
-  }
-}, {
-  label: 'Inbox',
-  icon: 'i-lucide-inbox',
-  to: '/inbox',
-  badge: '4',
-  onSelect: () => {
-    open.value = false
-  }
-}, {
-  label: 'Customers',
-  icon: 'i-lucide-users',
-  to: '/customers',
-  onSelect: () => {
-    open.value = false
-  }
-}, {
-  label: 'Settings',
-  to: '/settings',
-  icon: 'i-lucide-settings',
-  defaultOpen: true,
-  type: 'trigger',
-  children: [{
-    label: 'General',
-    to: '/settings',
-    exact: true,
-    onSelect: () => {
-      open.value = false
+const links = [
+  [
+    {
+      label: 'Dashboard',
+      icon: 'lucide:layout-dashboard',
+      to: '/',
+      onSelect: () => {
+        open.value = false
+      }
+    },
+    {
+      label: 'Workspaces',
+      icon: 'lucide:gallery-horizontal-end',
+      to: '/#',
+      onSelect: () => {
+        open.value = false
+      }
+    },
+    {
+      label: 'Translations',
+      icon: 'lucide:languages',
+      to: '/#',
+      onSelect: () => {
+        open.value = false
+      }
+    },
+    {
+      label: 'Library',
+      icon: 'lucide:library-big',
+      to: '/#',
+      onSelect: () => {
+        open.value = false
+      }
+    },
+    {
+      label: 'Administration',
+      icon: 'lucide:shield-cog-corner',
+      type: 'trigger',
+      children: [
+        {
+          label: 'Users',
+          icon: 'lucide:users',
+          to: '/customers',
+          onSelect: () => {
+            open.value = false
+          }
+        }
+      ]
+    },
+    {
+      label: 'Settings',
+      to: '/settings',
+      icon: 'lucide:settings',
+      defaultOpen: true,
+      type: 'trigger',
+      children: [
+        {
+          label: 'General',
+          to: '/settings',
+          exact: true,
+          onSelect: () => {
+            open.value = false
+          }
+        }, {
+          label: 'Members',
+          to: '/settings/members',
+          onSelect: () => {
+            open.value = false
+          }
+        }, {
+          label: 'Notifications',
+          to: '/settings/notifications',
+          onSelect: () => {
+            open.value = false
+          }
+        }, {
+          label: 'Security',
+          to: '/settings/security',
+          onSelect: () => {
+            open.value = false
+          }
+        },
+        {
+          label: 'AI Services',
+          icon: 'lucide:brain',
+          to: '/#',
+          onSelect: () => {
+            open.value = false
+          }
+        }
+      ]
+    }],
+  [
+    {
+      label: 'Feedback',
+      icon: 'lucide:message-circle',
+      to: 'https://github.com/nuxt-ui-templates/dashboard',
+      target: '_blank'
+    },
+    {
+      label: 'Help & Support',
+      icon: 'lucide:info',
+      to: 'https://github.com/nuxt-ui-templates/dashboard',
+      target: '_blank'
     }
-  }, {
-    label: 'Members',
-    to: '/settings/members',
-    onSelect: () => {
-      open.value = false
-    }
-  }, {
-    label: 'Notifications',
-    to: '/settings/notifications',
-    onSelect: () => {
-      open.value = false
-    }
-  }, {
-    label: 'Security',
-    to: '/settings/security',
-    onSelect: () => {
-      open.value = false
-    }
-  }]
-}], [{
-  label: 'Feedback',
-  icon: 'i-lucide-message-circle',
-  to: 'https://github.com/nuxt-ui-templates/dashboard',
-  target: '_blank'
-}, {
-  label: 'Help & Support',
-  icon: 'i-lucide-info',
-  to: 'https://github.com/nuxt-ui-templates/dashboard',
-  target: '_blank'
-}]] satisfies NavigationMenuItem[][]
+  ]
+] satisfies NavigationMenuItem[][]
 
 const groups = computed(() => [{
   id: 'links',
@@ -82,7 +124,7 @@ const groups = computed(() => [{
   items: [{
     id: 'source',
     label: 'View page source',
-    icon: 'i-simple-icons-github',
+    icon: 'simple-icons:github',
     to: `https://github.com/nuxt-ui-templates/dashboard/blob/main/app/pages${route.path === '/' ? '/index' : route.path}.vue`,
     target: '_blank'
   }]

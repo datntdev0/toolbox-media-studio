@@ -11,11 +11,11 @@ const { isNotificationsSlideoverOpen } = useDashboard()
 
 const items = [[{
   label: 'New mail',
-  icon: 'i-lucide-send',
+  icon: 'lucide:send',
   to: '/inbox'
 }, {
   label: 'New customer',
-  icon: 'i-lucide-user-plus',
+  icon: 'lucide:user-plus',
   to: '/customers'
 }]] satisfies DropdownMenuItem[][]
 
@@ -43,13 +43,13 @@ const period = ref<Period>('daily')
               @click="isNotificationsSlideoverOpen = true"
             >
               <UChip color="error" inset>
-                <UIcon name="i-lucide-bell" class="size-5 shrink-0" />
+                <UIcon name="lucide:bell" class="size-5 shrink-0" />
               </UChip>
             </UButton>
           </UTooltip>
 
           <UDropdownMenu :items="items">
-            <UButton icon="i-lucide-plus" size="md" class="rounded-full" />
+            <UButton icon="lucide:plus" size="md" class="rounded-full" />
           </UDropdownMenu>
         </template>
       </UDashboardNavbar>

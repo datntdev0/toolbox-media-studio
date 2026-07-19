@@ -31,17 +31,17 @@ const items = computed<DropdownMenuItem[][]>(() => {
     avatar: user.value.avatar
   }], [{
     label: 'Profile',
-    icon: 'i-lucide-user'
+    icon: 'lucide:user'
   }, {
     label: 'Billing',
-    icon: 'i-lucide-credit-card'
+    icon: 'lucide:credit-card'
   }, {
     label: 'Settings',
-    icon: 'i-lucide-settings',
+    icon: 'lucide:settings',
     to: '/settings'
   }], [{
     label: 'Theme',
-    icon: 'i-lucide-palette',
+    icon: 'lucide:palette',
     children: [{
       label: 'Primary',
       slot: 'chip',
@@ -85,10 +85,10 @@ const items = computed<DropdownMenuItem[][]>(() => {
     }]
   }, {
     label: 'Appearance',
-    icon: 'i-lucide-sun-moon',
+    icon: 'lucide:sun-moon',
     children: [{
       label: 'Light',
-      icon: 'i-lucide-sun',
+      icon: 'lucide:sun',
       type: 'checkbox',
       checked: colorMode.value === 'light',
       onSelect(e: Event) {
@@ -98,7 +98,7 @@ const items = computed<DropdownMenuItem[][]>(() => {
       }
     }, {
       label: 'Dark',
-      icon: 'i-lucide-moon',
+      icon: 'lucide:moon',
       type: 'checkbox',
       checked: colorMode.value === 'dark',
       onUpdateChecked(checked: boolean) {
@@ -112,7 +112,7 @@ const items = computed<DropdownMenuItem[][]>(() => {
     }]
   }], [{
     label: 'Templates',
-    icon: 'i-lucide-layout-template',
+    icon: 'lucide:layout-template',
     children: [{
       label: 'Starter',
       to: 'https://starter-template.nuxt.dev/'
@@ -143,17 +143,17 @@ const items = computed<DropdownMenuItem[][]>(() => {
     }]
   }], [{
     label: 'Documentation',
-    icon: 'i-lucide-book-open',
+    icon: 'lucide:book-open',
     to: 'https://ui.nuxt.com/docs/getting-started/installation/nuxt',
     target: '_blank'
   }, {
     label: 'GitHub repository',
-    icon: 'i-simple-icons-github',
+    icon: 'simple-icons:github',
     to: 'https://github.com/nuxt-ui-templates/dashboard',
     target: '_blank'
   }, {
     label: 'Log out',
-    icon: 'i-lucide-log-out',
+    icon: 'lucide:log-out',
     onSelect: async () => {
       auth.logout()
       await navigateTo('/auth/signin')
@@ -172,7 +172,7 @@ const items = computed<DropdownMenuItem[][]>(() => {
       v-bind="{
         ...user,
         label: collapsed ? undefined : user?.name,
-        trailingIcon: collapsed ? undefined : 'i-lucide-chevrons-up-down'
+        trailingIcon: collapsed ? undefined : 'lucide:chevrons-up-down'
       }"
       color="neutral"
       variant="ghost"
