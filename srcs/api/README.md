@@ -1,8 +1,8 @@
 # Novel Media Studio — API (FastAPI)
 
 The domain API for Novel Media Studio. It currently includes JWT authentication, user and novel
-management, and the first crawler metadata/job slice for `novel543` using FlareSolverr, Cosmos,
-and Azure Storage Queues.
+management, and crawler metadata/chapter content fetching for `novel543` using FlareSolverr,
+Cosmos, and Azure Storage Queues.
 
 See the design docs for the full picture:
 [`architecture.md`](../../docs/architecture.md) · [`requirements.md`](../../docs/requirements.md) ·
@@ -17,7 +17,7 @@ Implemented:
 - `/api/users` admin user-management routes.
 - `/api/novels` user-scoped novel-management routes.
 - `/api/crawlers` registry, `/api/crawlers/{id}/metadata`, and
-  `POST /api/crawlers/{id}/jobs` for `novel543`.
+  `/api/crawlers/{id}/chapter` for `novel543`.
 - Cosmos-backed repositories for users, novels, and jobs, plus a Cosmos-backed cache provider.
 - Azure Storage Queue provider plus API-hosted APScheduler consumers for `crawler-jobs`.
 - FlareSolverr-backed metadata fetching through `app/providers/proxy_service_provider.py`.
@@ -194,8 +194,8 @@ mypy app
 - `GET /api/crawlers/novel543/metadata?url=https://www.novel543.com/0603625457/dir` returns parsed
   metadata with the full ordered chapter list when FlareSolverr and local infrastructure are
   running.
-- `POST /api/crawlers/novel543/jobs` with `{ "url": "https://www.novel543.com/0603625457/dir" }`
-  returns `202`, creates or reuses an active job, and enqueues new work to `crawler-jobs`.
+- `GET /api/crawlers/novel543/chapter?url=https://www.novel543.com/0603625457/8096_1.html`
+  returns parsed chapter content lines.
 
 ## Next Steps
 

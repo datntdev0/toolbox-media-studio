@@ -63,3 +63,18 @@ class CrawlerMetadataResponse(BaseModel):
     chapters: list[CrawlerChapterResponse]
     cached: bool
     fetched_at: datetime = Field(alias="fetchedAt")
+
+
+class CrawlerChapterContentResponse(BaseModel):
+    """Chapter content returned by the crawler endpoint."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    crawler_id: str = Field(alias="crawlerId")
+    novel_url: str = Field(alias="novelUrl")
+    chapter_url: str = Field(alias="chapterUrl")
+    chapter_title: str = Field(alias="chapterTitle")
+    chapter_number: int | None = Field(default=None, alias="chapterNumber")
+    content: list[str]
+    cached: bool
+    fetched_at: datetime = Field(alias="fetchedAt")

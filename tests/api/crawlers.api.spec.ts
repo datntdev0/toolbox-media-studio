@@ -62,4 +62,50 @@ test.describe('/api/crawlers', () => {
       detail: 'Novel543 URLs must use an allowed host',
     });
   });
+
+  test('requires authentication before fetching chapter content', async ({ request }) => {
+    const response = await request.get(
+      '/api/crawlers/novel543/chapter?url=https://www.novel543.com/0603625457/8096_1.html',
+    );
+
+    expect(response.status()).toBe(401);
+  });
+
+  test('returns 404 for an unknown crawler id before fetching chapter content', async ({
+    request,
+  }) => {
+    const token = await loginAsAdmin(request);
+
+    const response = await request.get(
+      '/api/crawlers/unknown/chapter?url=https://www.novel543.com/0603625457/8096_1.html',
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status()).toBe(404);
+    expect(await response.json()).toEqual({
+      detail: 'Crawler not found',
+    });
+  });
+
+  test('validates Novel543 chapter URLs before fetching chapter content', async ({ request }) => {
+    const token = await loginAsAdmin(request);
+
+    const response = await request.get(
+      '/api/crawlers/novel543/chapter?url=https://example.com/0603625457/8096_1.html',
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status()).toBe(422);
+    expect(await response.json()).toEqual({
+      detail: 'Novel543 URLs must use an allowed host',
+    });
+  });
 });

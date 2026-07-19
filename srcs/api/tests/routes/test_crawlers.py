@@ -11,7 +11,6 @@ from tests.conftest import (
     TEST_ADMIN_EMAIL,
     TEST_ADMIN_PASSWORD,
     FakeFlareSolverrClient,
-    FakeQueuePublisher,
 )
 
 SAMPLE_HTML = """
@@ -56,6 +55,10 @@ def _metadata_url(source_url: str = "https://www.novel543.com/0603625457/dir") -
     return f"/api/crawlers/novel543/metadata?url={source_url}"
 
 
+def _chapter_url(source_url: str = "https://www.novel543.com/0603625457/8096_1.html") -> str:
+    return f"/api/crawlers/novel543/chapter?url={source_url}"
+
+
 def test_list_crawlers_returns_novel543(client: TestClient) -> None:
     response = client.get("/api/crawlers")
 
@@ -81,6 +84,12 @@ def test_metadata_openapi_uses_id_path_parameter(client: TestClient) -> None:
         parameter["name"] == "id" and parameter["in"] == "path"
         for parameter in operation["parameters"]
     )
+
+
+def test_openapi_does_not_expose_crawler_jobs_route(client: TestClient) -> None:
+    paths = client.get("/openapi.json").json()["paths"]
+
+    assert "/api/crawlers/{id}/jobs" not in paths
 
 
 def test_metadata_requires_auth(client: TestClient) -> None:
@@ -255,27 +264,47 @@ def test_metadata_maps_flaresolverr_bad_response_to_502(
     assert response.status_code == 502
 
 
-def test_create_crawler_job_publishes_to_sample_queue(
+def test_chapter_fetches_content_through_flaresolverr(
     client: TestClient,
-    queue_publisher: FakeQueuePublisher,
+    flaresolverr_client: FakeFlareSolverrClient,
 ) -> None:
+    flaresolverr_client.html = """
+    <html>
+      <body>
+        <h1>第1章 林神醫</h1>
+        <div id="chaptercontent">
+          大虞王朝，燕山城。<br>
+          暴雪初降，城中百姓多受風寒。<br>
+          溫馨提示: 請記得加入書架哦
+        </div>
+      </body>
+    </html>
+    """
+
+    response = client.get(_chapter_url(), headers=_headers(client))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["crawlerId"] == "novel543"
+    assert body["novelUrl"] == "https://www.novel543.com/0603625457/dir"
+    assert body["chapterUrl"] == "https://www.novel543.com/0603625457/8096_1.html"
+    assert body["chapterTitle"] == "第1章 林神醫"
+    assert body["chapterNumber"] == 1
+    assert body["content"] == [
+        "大虞王朝，燕山城。",
+        "暴雪初降，城中百姓多受風寒。",
+    ]
+    assert body["cached"] is False
+    assert flaresolverr_client.calls == [
+        ("https://www.novel543.com/0603625457/8096_1.html", None)
+    ]
+
+
+def test_crawler_jobs_route_is_removed(client: TestClient) -> None:
     response = client.post(
         "/api/crawlers/novel543/jobs",
         headers=_headers(client),
         json={"url": "https://www.novel543.com/0603625457/dir", "chapters": [1, 2]},
     )
 
-    assert response.status_code == 201
-    assert len(queue_publisher.messages) == 1
-    queue_name, message = queue_publisher.messages[0]
-    assert queue_name == "sample"
-    assert message == {
-        "schemaVersion": 1,
-        "kind": "sample",
-        "crawlerId": "novel543",
-        "url": "https://www.novel543.com/0603625457/dir",
-        "chapters": [1, 2],
-        "createdBy": message["createdBy"],
-    }
-    assert isinstance(message["createdBy"], str)
-    assert message["createdBy"]
+    assert response.status_code == 404

@@ -2,7 +2,11 @@
 
 import pytest
 
-from app.providers.crawler_parser_novel543 import Novel543ParseError, parse_novel543_metadata
+from app.providers.crawler_parser_novel543 import (
+    Novel543ParseError,
+    parse_novel543_chapter,
+    parse_novel543_metadata,
+)
 
 SOURCE_URL = "https://www.novel543.com/0603625457/dir"
 
@@ -74,3 +78,38 @@ def test_novel543_parser_extracts_expected_metadata() -> None:
 def test_novel543_parser_raises_when_title_is_missing() -> None:
     with pytest.raises(Novel543ParseError):
         parse_novel543_metadata("<html><body></body></html>", SOURCE_URL)
+
+
+def test_novel543_chapter_parser_extracts_content_lines_and_part_metadata() -> None:
+    html = """
+    <html>
+      <body>
+        <main>
+          <h1>第1章 林神醫 (1/2)</h1>
+          <div id="chaptercontent">
+            ————————（腦子寄存處）<br>
+            大虞王朝，燕山城。<br>
+            暴雪初降，城中百姓多受風寒。<br>
+            溫馨提示: 如果覺得本書不錯, 請記得加入書架哦
+          </div>
+          <nav>上一章 | 目錄 | 下一章</nav>
+        </main>
+      </body>
+    </html>
+    """
+
+    chapter = parse_novel543_chapter(
+        html,
+        "https://www.novel543.com/0603625457/8096_1.html",
+    )
+
+    assert chapter.source_novel_id == "0603625457"
+    assert chapter.title == "第1章 林神醫"
+    assert chapter.chapter_number == 1
+    assert chapter.part_number == 1
+    assert chapter.part_count == 2
+    assert chapter.content == [
+        "————————（腦子寄存處）",
+        "大虞王朝，燕山城。",
+        "暴雪初降，城中百姓多受風寒。",
+    ]

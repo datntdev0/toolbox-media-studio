@@ -70,15 +70,6 @@ class NovelUpdateRequest(BaseModel):
     etag: str | None = None
 
 
-class CrawlerJobCreateRequest(BaseModel):
-    """Payload for creating a crawler job."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    url: str
-    chapters: list[int] | None = None
-
-
 def to_user_entity(body: UserCreateRequest) -> User:
     """Convert a UserCreateRequest to a User entity."""
 

@@ -23,6 +23,19 @@ class ParsedChapter:
 
 
 @dataclass(frozen=True, slots=True)
+class ParsedChapterContent:
+    """Chapter content parsed from a Novel543 chapter page."""
+
+    source_novel_id: str
+    url: str
+    title: str
+    chapter_number: int | None
+    content: list[str]
+    part_number: int | None = None
+    part_count: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ParsedNovelMetadata:
     """Novel metadata parsed from Novel543."""
 
@@ -43,6 +56,9 @@ _DATE_PATTERN = re.compile(
 )
 _CHAPTER_NUMBER_PATTERN = re.compile(r"第\s*(?P<number>[0-9]+)\s*[章回話话]")
 _ENGLISH_CHAPTER_PATTERN = re.compile(r"\b(?:chapter|ch)\.?\s*(?P<number>[0-9]+)\b", re.IGNORECASE)
+_CHAPTER_PART_PATTERN = re.compile(
+    r"[\(（]\s*(?P<part>[0-9]+)\s*/\s*(?P<count>[0-9]+)\s*[\)）]\s*$"
+)
 
 _AUTHOR_LABELS = ("作者", "作家")
 _CATEGORY_LABELS = ("類別", "类别", "分類", "分类", "類型", "类型")
@@ -89,12 +105,54 @@ def parse_novel543_metadata(
     )
 
 
+def parse_novel543_chapter(
+    html: str,
+    source_url: str | None = None,
+    source_novel_id: str | None = None,
+    canonical_url: str | None = None,
+) -> ParsedChapterContent:
+    """Parse a Novel543 chapter page into title and normalized content lines."""
+
+    page_url = canonical_url or source_url
+    if page_url is None:
+        raise Novel543ParseError("Source URL is required")
+
+    soup = BeautifulSoup(html, "html.parser")
+    novel_id = source_novel_id or _source_novel_id_from_chapter_url(page_url)
+    raw_title = _extract_title(soup)
+    if raw_title is None:
+        raise Novel543ParseError("Chapter title was not found")
+
+    title = _clean_chapter_title(raw_title)
+    content = _extract_chapter_content(soup, title)
+    if not content:
+        raise Novel543ParseError("Chapter content was not found")
+
+    part_number, part_count = _parse_chapter_part(raw_title)
+    return ParsedChapterContent(
+        source_novel_id=novel_id,
+        url=page_url,
+        title=title,
+        chapter_number=_parse_chapter_number(title),
+        content=content,
+        part_number=part_number,
+        part_count=part_count,
+    )
+
+
 def _source_novel_id_from_url(source_url: str) -> str:
     path = urlsplit(source_url).path
     match = _NOVEL_ID_PATTERN.fullmatch(path)
     if match is None:
         raise Novel543ParseError("Novel id was not found in the source URL")
     return match.group("source_novel_id")
+
+
+def _source_novel_id_from_chapter_url(source_url: str) -> str:
+    path_parts = [part for part in urlsplit(source_url).path.split("/") if part]
+    if len(path_parts) != 2 or not path_parts[0].isdigit() or not path_parts[1].endswith(".html"):
+        raise Novel543ParseError("Novel id was not found in the chapter URL")
+    return path_parts[0]
 
 
 def _extract_title(soup: BeautifulSoup) -> str | None:
@@ -109,6 +167,130 @@ def _extract_title(soup: BeautifulSoup) -> str | None:
     if soup.title and soup.title.string:
         return _clean_title(soup.title.string)
     return None
+
+
+def _clean_chapter_title(value: str) -> str:
+    return _CHAPTER_PART_PATTERN.sub("", _clean_title(value)).strip()
+
+
+def _parse_chapter_part(value: str) -> tuple[int | None, int | None]:
+    match = _CHAPTER_PART_PATTERN.search(_normalize_space(value))
+    if match is None:
+        return None, None
+    return int(match.group("part")), int(match.group("count"))
+
+
+def _extract_chapter_content(soup: BeautifulSoup, title: str) -> list[str]:
+    for selector in (
+        "#chaptercontent",
+        "#chapter-content",
+        "#content",
+        ".chapter-content",
+        ".chapterContent",
+        ".reader-content",
+        ".read-content",
+        ".article-content",
+        "article",
+    ):
+        tag = soup.select_one(selector)
+        if isinstance(tag, Tag):
+            lines = _content_lines_from_tag(tag, title)
+            if lines:
+                return lines
+
+    body = soup.body
+    if not isinstance(body, Tag):
+        return []
+    return _content_lines_from_page(body, title)
+
+
+def _content_lines_from_tag(tag: Tag, title: str) -> list[str]:
+    cleaned = BeautifulSoup(str(tag), "html.parser")
+    root = cleaned.find()
+    if not isinstance(root, Tag):
+        return []
+    _remove_non_content_tags(root)
+    return _trim_chapter_content_lines(_text_lines(root), title)
+
+
+def _content_lines_from_page(body: Tag, title: str) -> list[str]:
+    cleaned = BeautifulSoup(str(body), "html.parser")
+    root = cleaned.body or cleaned.find()
+    if not isinstance(root, Tag):
+        return []
+    _remove_non_content_tags(root)
+    lines = _text_lines(root)
+
+    start_index = 0
+    for index, line in enumerate(lines):
+        if _is_title_line(line, title):
+            start_index = index + 1
+            break
+    return _trim_chapter_content_lines(lines[start_index:], title)
+
+
+def _remove_non_content_tags(tag: Tag) -> None:
+    for selector in (
+        "script",
+        "style",
+        "noscript",
+        "iframe",
+        "img",
+        "svg",
+        "header",
+        "footer",
+        "nav",
+        "form",
+        ".ads",
+        ".ad",
+        ".advert",
+        ".banner",
+        ".chapter-nav",
+        ".page-nav",
+        ".toolbar",
+    ):
+        for element in tag.select(selector):
+            element.decompose()
+
+
+def _text_lines(tag: Tag) -> list[str]:
+    for br in tag.find_all("br"):
+        br.replace_with("\n")
+    return [_normalize_space(line) for line in tag.get_text("\n", strip=False).splitlines()]
+
+
+def _trim_chapter_content_lines(lines: list[str], title: str) -> list[str]:
+    content: list[str] = []
+    for line in lines:
+        if not line or _is_title_line(line, title):
+            continue
+        if _is_chapter_content_stop_line(line):
+            break
+        content.append(line)
+    return content
+
+
+def _is_title_line(line: str, title: str) -> bool:
+    return _clean_chapter_title(line) == title
+
+
+def _is_chapter_content_stop_line(line: str) -> bool:
+    return line.startswith(
+        (
+            "溫馨提示",
+            "温馨提示",
+            "上一章",
+            "下一章",
+            "目錄",
+            "目录",
+            "設置",
+            "设置",
+            "閱讀進度",
+            "阅读进度",
+            "聯絡我們",
+            "联系我们",
+        )
+    )
 
 
 def _first_text(soup: BeautifulSoup, selectors: tuple[str, ...]) -> str | None:

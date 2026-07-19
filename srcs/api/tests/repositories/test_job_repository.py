@@ -8,26 +8,6 @@ from uuid import uuid4
 
 from app.domain.jobs import Job, JobKind, JobStatus
 from app.repositories.job_repository import InMemoryJobRepository
-from app.services.crawler_job_service import build_idempotency_key
-
-
-def test_idempotency_key_is_deterministic_for_canonical_payload() -> None:
-    first = build_idempotency_key(
-        relative_path="/api/crawlers/novel543/jobs",
-        payload={"url": "https://www.novel543.com/0603625457/dir"},
-    )
-    second = build_idempotency_key(
-        relative_path="/api/crawlers/novel543/jobs",
-        payload={"url": "https://www.novel543.com/0603625457/dir"},
-    )
-    changed = build_idempotency_key(
-        relative_path="/api/crawlers/novel543/jobs",
-        payload={"url": "https://www.novel543.com/111/dir"},
-    )
-
-    assert first == second
-    assert first.startswith("sha256:")
-    assert first != changed
 
 
 def test_create_or_get_active_reuses_until_terminal() -> None:
