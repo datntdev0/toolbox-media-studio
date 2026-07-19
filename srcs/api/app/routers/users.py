@@ -16,7 +16,7 @@ from app.repositories.user_repository import (
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
-@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED, operation_id="create_user")
 def create_user_route(
     session_user: ReqAdminUser,
     repository_user: RepositoryUserDep,
@@ -37,7 +37,7 @@ def create_user_route(
     return to_user_response(user_return)
 
 
-@router.get("", response_model=UserListResponse)
+@router.get("", response_model=UserListResponse, operation_id="list_users")
 def list_users_route(
     session_user: ReqAdminUser,
     repository_user: RepositoryUserDep,
@@ -52,7 +52,7 @@ def list_users_route(
         continuation_token=page.continuation_token,
     )
 
-@router.get("/{id}", response_model=UserResponse)
+@router.get("/{id}", response_model=UserResponse, operation_id="get_user")
 def get_user_route(
     session_user: ReqAdminUser,
     repository_user: RepositoryUserDep,
@@ -75,7 +75,7 @@ def get_user_route(
     return to_user_response(user_return)
 
 
-@router.patch("/{id}", response_model=UserResponse)
+@router.patch("/{id}", response_model=UserResponse, operation_id="update_user")
 def update_user_route(
     session_user: ReqAdminUser,
     repository_user: RepositoryUserDep,
@@ -122,7 +122,7 @@ def update_user_route(
     return to_user_response(user_return)
 
 
-@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT, operation_id="delete_user")
 def delete_user_route(
     session_user: ReqAdminUser,
     repository_user: RepositoryUserDep,

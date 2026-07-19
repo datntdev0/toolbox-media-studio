@@ -10,7 +10,7 @@ from app.core.logging import LogManager
 
 router = APIRouter(tags=["health"])
 
-@router.get("/health")
+@router.get("/health", operation_id="health")
 def health() -> dict[str, str]:
     logger = LogManager().getLogger("router.health")
     settings = AppConfig()

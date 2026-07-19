@@ -22,14 +22,14 @@ from app.providers.crawler_provider import (
 router = APIRouter(prefix="/api/crawlers", tags=["crawlers"])
 
 
-@router.get("", response_model=CrawlerListResponse)
+@router.get("", response_model=CrawlerListResponse, operation_id="list_crawlers")
 def list_crawlers_route() -> CrawlerListResponse:
     """List supported crawlers."""
 
     return CrawlerListResponse(items=list_crawlers())
 
 
-@router.get("/{id}/metadata", response_model=CrawlerMetadataResponse)
+@router.get("/{id}/metadata", response_model=CrawlerMetadataResponse, operation_id="get_crawler_metadata")
 def get_crawler_metadata_route(
     session_user: SessionUser,
     provider_cache: ProviderCacheDep,
@@ -70,7 +70,7 @@ def get_crawler_metadata_route(
             detail="Crawler source could not be fetched",
         ) from exc
 
-@router.get("/{id}/chapter", response_model=CrawlerChapterContentResponse)
+@router.get("/{id}/chapter", response_model=CrawlerChapterContentResponse, operation_id="get_crawler_chapter")
 def get_crawler_chapter_route(
     session_user: SessionUser,
     provider_cache: ProviderCacheDep,

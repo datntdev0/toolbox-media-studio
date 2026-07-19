@@ -9,7 +9,7 @@ from app.domain.responses import TokenResponse, UserResponse, to_user_response
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, operation_id="login")
 def login(body: LoginRequest, repositoryUser: RepositoryUserDep) -> TokenResponse:
     """Verify credentials and issue a JWT."""
     try:
@@ -22,7 +22,7 @@ def login(body: LoginRequest, repositoryUser: RepositoryUserDep) -> TokenRespons
     return TokenResponse(access_token=token)
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=UserResponse, operation_id="me")
 def me(current_user: SessionUser) -> UserResponse:
     """Return the current user resolved from the Bearer JWT."""
     return to_user_response(current_user)

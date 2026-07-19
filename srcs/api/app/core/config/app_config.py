@@ -17,6 +17,7 @@ class Security:
     jwt_expire_minutes: int
     default_admin_email: str
     default_admin_password: str
+    cors_allowed_origins: list[str] = None
 
 @dataclass
 class CacheSettings:
@@ -51,6 +52,7 @@ class AppConfig:
             azStorageQueue=os.environ.get("FAST_AZ_CONNECTION_STRING_STORAGE_QUEUE", ""),
         )
 
+        cors_origins = os.environ.get("FAST_SECURITY_CORS_ALLOWED_ORIGIN")
         self.security: Security = Security(
             jwt_algorithm=os.environ.get("FAST_SECURITY_JWT_ALGORITHM", "HS256"),
             jwt_signing_key=os.environ.get(
@@ -60,6 +62,7 @@ class AppConfig:
             jwt_expire_minutes=int(os.environ.get("FAST_SECURITY_JWT_EXPIRE_MINUTES", "60")),
             default_admin_email=os.environ.get("FAST_SECURITY_DEFAULT_ADMIN_EMAIL"),
             default_admin_password=os.environ.get("FAST_SECURITY_DEFAULT_ADMIN_PASSWORD"),
+            cors_allowed_origins=cors_origins.split(",") if cors_origins else [],
         )
 
         self.cache: CacheSettings = CacheSettings(

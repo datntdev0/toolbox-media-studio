@@ -14,7 +14,7 @@ from app.repositories.novel_repository import NovelConflictError
 router = APIRouter(prefix="/api/novels", tags=["novels"])
 
 
-@router.post("", response_model=NovelResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=NovelResponse, status_code=status.HTTP_201_CREATED, operation_id="create_novel")
 def create_novel_route(
     session_user: SessionUser,
     repository_novel: RepositoryNovelDep,
@@ -25,7 +25,7 @@ def create_novel_route(
     return to_novel_response(novel_return)
 
 
-@router.get("", response_model=NovelListResponse)
+@router.get("", response_model=NovelListResponse, operation_id="list_novels")
 def list_novels_route(
     session_user: SessionUser,
     repository_novel: RepositoryNovelDep,
@@ -43,7 +43,7 @@ def list_novels_route(
     )
 
 
-@router.get("/{id}", response_model=NovelResponse)
+@router.get("/{id}", response_model=NovelResponse, operation_id="get_novel")
 def get_novel_route(
     session_user: SessionUser,
     repository_novel: RepositoryNovelDep,
@@ -58,7 +58,7 @@ def get_novel_route(
     return to_novel_response(novel_return)
 
 
-@router.patch("/{id}", response_model=NovelResponse)
+@router.patch("/{id}", response_model=NovelResponse, operation_id="update_novel")
 def update_novel_route(
     session_user: SessionUser,
     repository_novel: RepositoryNovelDep,
@@ -101,7 +101,7 @@ def update_novel_route(
     return to_novel_response(novel_return)
 
 
-@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT, operation_id="delete_novel")
 def delete_novel_route(
     session_user: SessionUser,
     repository_novel: RepositoryNovelDep,
