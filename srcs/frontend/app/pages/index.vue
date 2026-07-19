@@ -3,6 +3,10 @@ import { sub } from 'date-fns'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { Period, Range } from '~/types'
 
+definePageMeta({
+  middleware: 'auth'
+})
+
 const { isNotificationsSlideoverOpen } = useDashboard()
 
 const items = [[{

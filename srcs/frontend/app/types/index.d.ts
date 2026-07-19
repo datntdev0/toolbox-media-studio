@@ -1,4 +1,22 @@
 import type { AvatarProps } from '@nuxt/ui'
+import type { UserRole } from '~~/shared/api-services/srv-core.client'
+
+// NSwag's Fetch template defaults to `window` when no HTTP implementation is
+// supplied. The application always supplies one, but this declaration keeps
+// the generated module type-checkable in Nuxt's server TypeScript context.
+declare global {
+  const window: Record<string, unknown>
+}
+
+declare module '#app' {
+  interface PageMeta {
+    auth?: {
+      roles?: UserRole[]
+    }
+  }
+}
+
+export {}
 
 export type UserStatus = 'subscribed' | 'unsubscribed' | 'bounced'
 export type SaleStatus = 'paid' | 'failed' | 'refunded'

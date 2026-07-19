@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import { LoginRequest } from '~~/shared/api-services/srv-core.client'
 
 definePageMeta({
   layout: 'auth'
@@ -12,6 +13,9 @@ useSeoMeta({
 })
 
 const toast = useToast()
+const auth = useAuth()
+const route = useRoute()
+const isSubmitting = ref(false)
 
 const fields = [{
   name: 'email',
@@ -53,8 +57,43 @@ const schema = z.object({
 
 type Schema = z.output<typeof schema>
 
-function onSubmit(payload: FormSubmitEvent<Schema>) {
-  console.log('Submitted', payload)
+async function onSubmit(payload: FormSubmitEvent<Schema>) {
+  if (isSubmitting.value) return
+
+  isSubmitting.value = true
+  try {
+    await auth.login(new LoginRequest({
+      email: payload.data.email,
+      password: payload.data.password
+    }))
+
+    toast.add({
+      title: 'Signed in',
+      description: 'Welcome back.',
+      color: 'success'
+    })
+
+    const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
+      ? route.query.redirect
+      : '/'
+    await navigateTo(redirect)
+  } catch (error: unknown) {
+    const caught = error as {
+      response?: { data?: { detail?: string } }
+      message?: string
+    }
+    const description = caught.response?.data?.detail
+      ?? caught.message
+      ?? 'The email or password is incorrect.'
+
+    toast.add({
+      title: 'Unable to sign in',
+      description,
+      color: 'error'
+    })
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 
@@ -63,6 +102,7 @@ function onSubmit(payload: FormSubmitEvent<Schema>) {
     :fields="fields"
     :schema="schema"
     :providers="providers"
+    :loading="isSubmitting"
     title="Welcome back"
     icon="i-lucide-lock"
     @submit="onSubmit"

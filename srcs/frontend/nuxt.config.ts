@@ -6,11 +6,20 @@ export default defineNuxtConfig({
     '@vueuse/nuxt'
   ],
 
+  // This application uses browser token storage and is intentionally CSR-only.
+  ssr: false,
+
   devtools: {
     enabled: true
   },
 
   css: ['~/assets/css/main.css'],
+
+  runtimeConfig: {
+    public: {
+      servUrl: ''
+    }
+  },
 
   routeRules: {
     '/api/**': {
