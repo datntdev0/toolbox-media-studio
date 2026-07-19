@@ -1,9 +1,0 @@
-<script setup>
-useHead({
-  title: 'Dashboard'
-})
-</script>
-
-<template>
-  <h3>Dashboard</h3>
-</template>
