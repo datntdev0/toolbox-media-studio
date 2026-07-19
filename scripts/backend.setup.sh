@@ -4,7 +4,7 @@ set -euo pipefail
 # shellcheck source=/dev/null
 source ".venv/Scripts/activate"
 
-cd "./srcs/api"
+cd "./srcs/backend"
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 

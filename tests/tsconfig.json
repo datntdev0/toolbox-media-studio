@@ -6,5 +6,5 @@
     "strict": true,
     "noEmit": true
   },
-  "include": ["playwright.config.ts", "api/**/*.ts"]
+  "include": ["playwright.config.ts", "backend/**/*.ts"]
 }

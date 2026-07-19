@@ -63,9 +63,9 @@ scripts/backend.start.sh
 The API will be available at `http://localhost:8000` with automatic docs at `http://localhost:8000/docs`.
 
 The scripts are thin Bash helpers around the standard commands. `backend.setup.sh` activates the
-root `.venv`, installs the FastAPI package with dev dependencies, and creates `srcs/api/.env` from
-`srcs/api/.env.example` when missing. `backend.start.sh` activates the virtual environment and
-starts Uvicorn from `srcs/api`. You can still run the commands manually if you prefer.
+root `.venv`, installs the FastAPI package with dev dependencies, and creates `srcs/backend/.env` from
+`srcs/backend/.env.example` when missing. `backend.start.sh` activates the virtual environment and
+starts Uvicorn from `srcs/backend`. You can still run the commands manually if you prefer.
 
 ### 4. Setup Frontend (Nuxt)
 
@@ -88,7 +88,7 @@ The web app will be available at `http://localhost:3000`.
 **Backend Tests (pytest):**
 
 ```bash
-cd srcs/api
+cd srcs/backend
 pytest
 ```
 

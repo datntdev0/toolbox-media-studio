@@ -4,5 +4,5 @@ set -euo pipefail
 # shellcheck source=/dev/null
 source ".venv/Scripts/activate"
 
-cd "./srcs/api"
+cd "./srcs/backend"
 uvicorn app.main:app --reload --port 8000 --env-file .env

@@ -10,9 +10,9 @@
       "request": "launch",
       "module": "uvicorn",
       "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8000", "--reload"],
-      "cwd": "${workspaceFolder}/srcs/api",
+      "cwd": "${workspaceFolder}/srcs/backend",
       "python": "${workspaceFolder}/.venv/Scripts/python.exe",
-      "envFile": "${workspaceFolder}/srcs/api/.env",
+      "envFile": "${workspaceFolder}/srcs/backend/.env",
       "console": "integratedTerminal",
       "justMyCode": false,
       "subProcess": true

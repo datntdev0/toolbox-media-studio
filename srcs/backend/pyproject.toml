@@ -38,12 +38,11 @@ packages = [
     "app.consumers",
     "app.core",
     "app.domain",
-    "app.parsers",
+    "app.events",
     "app.providers",
     "app.repositories",
     "app.repositories.cosmosdb",
     "app.routers",
-    "app.services",
 ]
 
 [tool.ruff]
