@@ -19,7 +19,7 @@ const links = [
     {
       label: 'Workspaces',
       icon: 'lucide:gallery-horizontal-end',
-      to: '/#',
+      to: '/workspaces',
       onSelect: () => {
         open.value = false
       }
@@ -27,7 +27,7 @@ const links = [
     {
       label: 'Translations',
       icon: 'lucide:languages',
-      to: '/#',
+      to: '/translations',
       onSelect: () => {
         open.value = false
       }
@@ -35,7 +35,7 @@ const links = [
     {
       label: 'Library',
       icon: 'lucide:library-big',
-      to: '/#',
+      to: '/library',
       onSelect: () => {
         open.value = false
       }
@@ -63,27 +63,15 @@ const links = [
       type: 'trigger',
       children: [
         {
-          label: 'General',
-          to: '/settings',
-          exact: true,
-          onSelect: () => {
-            open.value = false
-          }
-        }, {
           label: 'Members',
           to: '/settings/members',
           onSelect: () => {
             open.value = false
           }
-        }, {
+        },
+        {
           label: 'Notifications',
           to: '/settings/notifications',
-          onSelect: () => {
-            open.value = false
-          }
-        }, {
-          label: 'Security',
-          to: '/settings/security',
           onSelect: () => {
             open.value = false
           }
@@ -91,7 +79,7 @@ const links = [
         {
           label: 'AI Services',
           icon: 'lucide:brain',
-          to: '/#',
+          to: '/ai-services',
           onSelect: () => {
             open.value = false
           }
