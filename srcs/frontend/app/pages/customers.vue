@@ -18,6 +18,7 @@ const UDropdownMenu = resolveComponent('UDropdownMenu')
 const UCheckbox = resolveComponent('UCheckbox')
 
 const toast = useToast()
+const confirm = useConfirmDialog()
 const table = useTemplateRef('table')
 
 const columnFilters = ref([{
@@ -74,6 +75,24 @@ function getRowItems(row: Row<User>) {
       }
     }
   ]
+}
+
+async function deleteSelectedCustomers() {
+  const count = table.value?.tableApi?.getFilteredSelectedRowModel().rows.length || 0
+  if (!count) return
+
+  const confirmed = await confirm({
+    title: `Delete ${count} customer${count > 1 ? 's' : ''}`,
+    description: 'Are you sure? This action cannot be undone.',
+    confirmLabel: 'Delete',
+    confirmColor: 'error'
+  })
+  if (!confirmed) return
+
+  toast.add({
+    title: 'Customers deleted',
+    description: `${count} customer${count > 1 ? 's have' : ' has'} been deleted.`
+  })
 }
 
 const columns: TableColumn<User>[] = [
@@ -236,21 +255,20 @@ const pagination = ref({
         />
 
         <div class="flex flex-wrap items-center gap-1.5">
-          <CustomersDeleteModal :count="table?.tableApi?.getFilteredSelectedRowModel().rows.length">
-            <UButton
-              v-if="table?.tableApi?.getFilteredSelectedRowModel().rows.length"
-              label="Delete"
-              color="error"
-              variant="subtle"
-              icon="lucide:trash"
-            >
-              <template #trailing>
-                <UKbd>
-                  {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length }}
-                </UKbd>
-              </template>
-            </UButton>
-          </CustomersDeleteModal>
+          <UButton
+            v-if="table?.tableApi?.getFilteredSelectedRowModel().rows.length"
+            label="Delete"
+            color="error"
+            variant="subtle"
+            icon="lucide:trash"
+            @click="deleteSelectedCustomers"
+          >
+            <template #trailing>
+              <UKbd>
+                {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length }}
+              </UKbd>
+            </template>
+          </UButton>
 
           <USelect
             v-model="statusFilter"
