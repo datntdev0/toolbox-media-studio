@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from app.domain.novels import Novel, NovelStatus
 from app.domain.users import User, UserRole, UserStatus
@@ -45,7 +45,7 @@ class NovelCreateRequest(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    title: str
+    title: str = Field(min_length=1)
     description: str | None = None
     cover_image_url: str | None = Field(default=None, alias="coverImageUrl")
     language: str | None = None
@@ -55,11 +55,11 @@ class NovelCreateRequest(BaseModel):
 
 
 class NovelUpdateRequest(BaseModel):
-    """Payload for partially updating a novel."""
+    """Payload for updating a novel while allowing nullable fields to be cleared."""
 
     model_config = ConfigDict(populate_by_name=True)
 
-    title: str | None = None
+    title: str | None = Field(default=None, min_length=1)
     description: str | None = None
     cover_image_url: str | None = Field(default=None, alias="coverImageUrl")
     language: str | None = None
@@ -68,6 +68,20 @@ class NovelUpdateRequest(BaseModel):
     notes: str | None = None
     status: NovelStatus | None = None
     etag: str | None = None
+
+    @model_validator(mode="after")
+    def validate_required_fields(self) -> "NovelUpdateRequest":
+        """Reject null required fields when they are explicitly supplied."""
+
+        invalid_fields = [
+            field
+            for field in ("title", "status")
+            if field in self.model_fields_set and getattr(self, field) is None
+        ]
+        if invalid_fields:
+            fields = ", ".join(invalid_fields)
+            raise ValueError(f"Required field(s) cannot be null: {fields}")
+        return self
 
 
 def to_user_entity(body: UserCreateRequest) -> User:

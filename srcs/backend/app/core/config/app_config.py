@@ -74,3 +74,6 @@ class AppConfig:
             base_url=os.environ.get("FAST_FLARESOLVERR_BASE_URL", "http://localhost:8191/v1"),
             default_max_timeout_ms=int(os.environ.get("FAST_FLARESOLVERR_MAX_TIMEOUT_MS", "60000")),
         )
+        self.public_blob_container: str = os.environ.get(
+            "FAST_AZ_STORAGE_BLOB_PUBLIC_CONTAINER", "public"
+        )

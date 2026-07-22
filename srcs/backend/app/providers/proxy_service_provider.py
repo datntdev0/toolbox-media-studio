@@ -16,7 +16,6 @@ class FlareSolverrResult:
     headers: dict[str, str]
     user_agent: str | None
 
-
 class FlareSolverrClient(Protocol):
     def get(self, url: str, max_timeout_ms: int | None = None) -> FlareSolverrResult: ...
 
@@ -25,7 +24,6 @@ class ProxyProvider(Protocol):
     """Proxy-service provider contract."""
 
     def get(self, url: str, max_timeout_ms: int | None = None) -> FlareSolverrResult: ...
-
 
 class FlareSolverrError(RuntimeError):
     """Base error for FlareSolverr fetch failures."""
@@ -158,7 +156,6 @@ class FlareSolverProxyProvider:
 
     def get(self, url: str, max_timeout_ms: int | None = None) -> FlareSolverrResult:
         return self._service.get(url, max_timeout_ms=max_timeout_ms)
-
 
 def build_proxy_provider(config: Any) -> ProxyProvider:
     """Construct the default proxy provider."""

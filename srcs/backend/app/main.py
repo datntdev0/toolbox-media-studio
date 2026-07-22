@@ -10,9 +10,10 @@ from app.core.injection import (
     log_manager,
     provider_cache,
     provider_proxy,
+    provider_public_blob,
+    queue_subscriber_sample,
     repository_novel,
     repository_user,
-    queue_subscriber_sample,
 )
 from app.routers import auth, crawlers, health, novels, users
 
@@ -30,6 +31,7 @@ async def lifespan(app: FastAPI):
     app.state.repository_novel = repository_novel
     app.state.provider_cache = provider_cache  # Backward-compatible cache provider state name
     app.state.provider_proxy = provider_proxy  # Store the proxy provider instance in app state
+    app.state.provider_public_blob = provider_public_blob
     app.state.queue_subscriber_sample = queue_subscriber_sample
 
     from app.core.security.authentication import seed_admin_user

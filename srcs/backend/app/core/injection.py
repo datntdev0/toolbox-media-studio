@@ -9,6 +9,7 @@ from app.core.events.polling_queue_publisher import (
 )
 from app.core.logging import LogManager
 from app.events.sample_handler import SampleQueueListener
+from app.providers.blob_storage_provider import PublicBlobProvider, build_public_blob_provider
 from app.providers.cache_provider import CacheProvider, build_cosmos_cache_provider
 from app.providers.proxy_service_provider import ProxyProvider, build_proxy_provider
 from app.repositories.cosmosdb.cosmos_novel_repository import build_cosmos_novel_repository
@@ -25,6 +26,7 @@ repository_novel = build_cosmos_novel_repository(config)
 
 # Provider instances can be registered
 provider_proxy = build_proxy_provider(config)
+provider_public_blob = build_public_blob_provider(config)
 provider_cache = build_cosmos_cache_provider(config)
 
 # Queue publishers and subscribers can be registered
@@ -40,4 +42,5 @@ RepositoryNovelDep = Annotated[NovelRepository, Depends(lambda: repository_novel
 
 ProviderCacheDep = Annotated[CacheProvider, Depends(lambda: provider_cache)]
 ProviderProxyDep = Annotated[ProxyProvider, Depends(lambda: provider_proxy)]
+ProviderPublicBlobDep = Annotated[PublicBlobProvider, Depends(lambda: provider_public_blob)]
 PollingQueuePublisherDep = Annotated[PollingQueuePublisher, Depends(lambda: queue_publisher)]

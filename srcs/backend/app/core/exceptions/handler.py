@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 from traceback import extract_tb
+from typing import cast
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from app.core import logging
 from app.core.config.app_config import AppConfig
 from app.core.exceptions import NotImplementException
 
@@ -17,6 +19,9 @@ async def global_exception_handlers(request: Request, exc: Exception) -> JSONRes
     status_code = {
         NotImplementException: 501,
     }.get(type(exc), 500)
+
+    logger = cast(logging.Logger, request.state.logger)
+    logger.exception("Unhandled exception: %s", exc)
 
     return JSONResponse(
         status_code=status_code,

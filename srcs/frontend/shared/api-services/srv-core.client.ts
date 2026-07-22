@@ -364,6 +364,14 @@ export class UsersClient {
     }
 }
 
+function appendNovelFormData(form: FormData, body: Record<string, any>): void {
+    for (const [key, value] of Object.entries(body)) {
+        if (key === "coverImageUrl" || value === undefined) continue;
+        const formValue = Array.isArray(value) ? value.join(",") : value === null ? "__null__" : String(value);
+        form.append(key, formValue);
+    }
+}
+
 export class NovelsClient {
     private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
     private baseUrl: string;
@@ -378,17 +386,18 @@ export class NovelsClient {
      * Create Novel Route
      * @return Successful Response
      */
-    create_novel(body: NovelCreateRequest): Promise<NovelResponse> {
+    create_novel(body: NovelCreateRequest, coverImage?: Blob | null): Promise<NovelResponse> {
         let url_ = this.baseUrl + "/api/novels";
         url_ = url_.replace(/[?&]$/, "");
 
-        const content_ = JSON.stringify(body);
+        const content_ = new FormData();
+        appendNovelFormData(content_, body);
+        if (coverImage) content_.append("coverImage", coverImage);
 
         let options_: RequestInit = {
             body: content_,
             method: "POST",
             headers: {
-                "Content-Type": "application/json",
                 "Accept": "application/json"
             }
         };
@@ -530,20 +539,22 @@ export class NovelsClient {
      * Update Novel Route
      * @return Successful Response
      */
-    update_novel(id: string, body: NovelUpdateRequest): Promise<NovelResponse> {
+    update_novel(id: string, body: NovelUpdateRequest, coverImage?: Blob | null, clearCoverImage = false): Promise<NovelResponse> {
         let url_ = this.baseUrl + "/api/novels/{id}";
         if (id === undefined || id === null)
             throw new globalThis.Error("The parameter 'id' must be defined.");
         url_ = url_.replace("{id}", encodeURIComponent("" + id));
         url_ = url_.replace(/[?&]$/, "");
 
-        const content_ = JSON.stringify(body);
+        const content_ = new FormData();
+        appendNovelFormData(content_, body);
+        if (coverImage) content_.append("coverImage", coverImage);
+        if (clearCoverImage) content_.append("clear_cover_image", "true");
 
         let options_: RequestInit = {
             body: content_,
-            method: "PATCH",
+            method: "PUT",
             headers: {
-                "Content-Type": "application/json",
                 "Accept": "application/json"
             }
         };

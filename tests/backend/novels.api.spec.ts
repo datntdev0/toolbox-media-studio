@@ -11,13 +11,12 @@ test.describe('/api/novels CRUD', () => {
 
     const createdResponse = await request.post('/api/novels', {
       headers,
-      data: {
+      multipart: {
         title: 'Playwright Novel',
         description: 'Novel created from API spec test',
-        coverImageUrl: 'https://example.com/novel-cover.jpg',
         language: 'en',
         author: 'Playwright Author',
-        tags: ['playwright', 'api'],
+        tags: 'playwright,api',
         notes: 'Created by Playwright API spec',
       },
     });
@@ -37,7 +36,7 @@ test.describe('/api/novels CRUD', () => {
     expect(created.id).toBeTruthy();
     expect(created.title).toBe('Playwright Novel');
     expect(created.description).toBe('Novel created from API spec test');
-    expect(created.coverImageUrl).toBe('https://example.com/novel-cover.jpg');
+    expect(created.coverImageUrl).toBeNull();
     expect(created.language).toBe('en');
     expect(created.author).toBe('Playwright Author');
     expect(created.tags).toEqual(['playwright', 'api']);
@@ -61,9 +60,9 @@ test.describe('/api/novels CRUD', () => {
     expect(fetched.author).toBe('Playwright Author');
     expect(fetched.status).toBe('draft');
 
-    const updatedResponse = await request.patch(`/api/novels/${created.id}`, {
+    const updatedResponse = await request.put(`/api/novels/${created.id}`, {
       headers,
-      data: {
+      multipart: {
         title: 'Updated Playwright Novel',
         notes: 'Updated by Playwright API spec',
         status: 'active',

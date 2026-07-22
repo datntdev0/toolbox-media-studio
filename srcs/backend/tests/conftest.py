@@ -21,6 +21,14 @@ class FakeFlareSolverrResult:
 
     html: str
 
+    @property
+    def content(self) -> bytes:
+        return self.html.encode("utf-8")
+
+    @property
+    def headers(self) -> dict[str, str]:
+        return {"content-type": "image/jpeg"}
+
 
 @dataclass(frozen=True, slots=True)
 class SentQueueMessage:
@@ -51,6 +59,16 @@ class FakeFlareSolverrClient:
         if self.exception is not None:
             raise self.exception
         return FakeFlareSolverrResult(html=self.html)
+
+
+class FakePublicBlobProvider:
+    """Fake public blob storage for route tests."""
+
+    def upload_cover(self, novel_id: str, content: bytes, content_type: str) -> str:
+        assert novel_id
+        assert content
+        assert content_type.startswith("image/")
+        return f"https://storage.test/public/novels/{novel_id}/cover.jpg"
 
 
 class FakeQueueProvider:
@@ -199,6 +217,11 @@ def flaresolverr_client() -> FakeFlareSolverrClient:
 
 
 @pytest.fixture
+def public_blob_provider() -> FakePublicBlobProvider:
+    return FakePublicBlobProvider()
+
+
+@pytest.fixture
 def client(
     monkeypatch: pytest.MonkeyPatch,
     _env: None,
@@ -209,6 +232,7 @@ def client(
     queue_publisher: FakeQueuePublisher,
     cache_provider: InMemoryCacheProvider,
     flaresolverr_client: FakeFlareSolverrClient,
+    public_blob_provider: FakePublicBlobProvider,
 ):
     """A TestClient with a fresh app and cleared settings cache."""
     from fastapi.testclient import TestClient
@@ -234,12 +258,14 @@ def client(
     service_provider.repository_novel = novel_repository
     service_provider.provider_cache = cache_provider
     service_provider.provider_proxy = flaresolverr_client
+    service_provider.provider_public_blob = public_blob_provider
     service_provider.queue_publisher = queue_publisher
 
     main_module.repository_user = user_repository
     main_module.repository_novel = novel_repository
     main_module.provider_cache = cache_provider
     main_module.provider_proxy = flaresolverr_client
+    main_module.provider_public_blob = public_blob_provider
 
     monkeypatch.setattr(health_router, "_check_cosmos", lambda logger, settings: True)
     monkeypatch.setattr(health_router, "_check_blob_storage", lambda logger, settings: True)

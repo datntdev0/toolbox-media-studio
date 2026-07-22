@@ -26,10 +26,9 @@ def test_user_can_create_list_update_and_delete_own_novel(client: TestClient) ->
     created = client.post(
         "/api/novels",
         headers=headers,
-        json={
+        data={
             "title": "The First Novel",
             "description": "A test novel",
-            "coverImageUrl": "https://example.com/cover.jpg",
             "language": "en",
             "author": "Author One",
             "tags": ["fantasy", "test"],
@@ -53,15 +52,30 @@ def test_user_can_create_list_update_and_delete_own_novel(client: TestClient) ->
     assert fetched.status_code == 200
     assert fetched.json()["author"] == "Author One"
 
-    updated = client.patch(
+    updated = client.put(
         f"/api/novels/{novel_id}",
         headers=headers,
-        json={"title": "Updated Title", "status": "active", "etag": etag},
+        data={"title": "Updated Title", "status": "active", "etag": etag},
     )
     assert updated.status_code == 200
     updated_body = updated.json()
     assert updated_body["title"] == "Updated Title"
     assert updated_body["status"] == "active"
+
+    cleared = client.put(
+        f"/api/novels/{novel_id}",
+        headers=headers,
+        data={
+                "description": "__null__",
+                "language": "__null__",
+            "clear_cover_image": "true",
+            "etag": updated_body["etag"],
+        },
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["description"] is None
+    assert cleared.json()["coverImageUrl"] is None
+    assert cleared.json()["language"] is None
 
     deleted = client.delete(
         f"/api/novels/{novel_id}",
@@ -91,7 +105,7 @@ def test_user_can_only_see_their_own_novels(client: TestClient) -> None:
     created_novel = client.post(
         "/api/novels",
         headers=admin_headers,
-        json={"title": "Admin Novel"},
+        data={"title": "Admin Novel"},
     )
     assert created_novel.status_code == 201
     novel_id = created_novel.json()["id"]
@@ -107,26 +121,64 @@ def test_user_can_only_see_their_own_novels(client: TestClient) -> None:
     assert member_get.status_code == 404
 
 
+def test_novel_cover_upload_accepts_jpeg_and_rejects_invalid_files(client: TestClient) -> None:
+    token = _login(client)
+    headers = _auth_headers(token)
+
+    created = client.post(
+        "/api/novels",
+        headers=headers,
+        data={"title": "Cover upload"},
+        files={"coverImage": ("cover.jpg", b"\xff\xd8\xffcover", "image/jpeg")},
+    )
+    assert created.status_code == 201
+    assert created.json()["coverImageUrl"].startswith("https://storage.test/public/")
+
+    invalid = client.post(
+        "/api/novels",
+        headers=headers,
+        data={"title": "Invalid cover"},
+        files={"coverImage": ("cover.gif", b"GIF89a", "image/gif")},
+    )
+    assert invalid.status_code == 422
+
+
 def test_novel_update_with_stale_etag_returns_412(client: TestClient) -> None:
     token = _login(client)
     headers = _auth_headers(token)
 
-    created = client.post("/api/novels", headers=headers, json={"title": "Concurrency Test"})
+    created = client.post("/api/novels", headers=headers, data={"title": "Concurrency Test"})
     assert created.status_code == 201
     body = created.json()
     novel_id = body["id"]
     etag = body["etag"]
 
-    first_update = client.patch(
+    first_update = client.put(
         f"/api/novels/{novel_id}",
         headers=headers,
-        json={"notes": "updated once", "etag": etag},
+        data={"notes": "updated once", "etag": etag},
     )
     assert first_update.status_code == 200
 
-    stale_update = client.patch(
+    stale_update = client.put(
         f"/api/novels/{novel_id}",
         headers=headers,
-        json={"notes": "updated twice", "etag": etag},
+        data={"notes": "updated twice", "etag": etag},
     )
     assert stale_update.status_code == 412
+
+
+def test_novel_update_rejects_explicit_null_required_fields(client: TestClient) -> None:
+    token = _login(client)
+    headers = _auth_headers(token)
+
+    created = client.post("/api/novels", headers=headers, data={"title": "Required fields"})
+    assert created.status_code == 201
+    novel_id = created.json()["id"]
+
+    response = client.put(
+        f"/api/novels/{novel_id}",
+        headers=headers,
+        data={"title": ""},
+    )
+    assert response.status_code == 422
