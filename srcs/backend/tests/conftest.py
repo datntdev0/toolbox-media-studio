@@ -7,8 +7,9 @@ from typing import Any
 import pytest
 
 from app.providers.cache_provider import InMemoryCacheProvider
-from app.repositories.job_repository import InMemoryJobRepository
 from app.repositories.novel_repository import InMemoryNovelRepository
+from app.repositories.scraping_repository import InMemoryScrapingRepository
+from app.repositories.scraping_result_repository import InMemoryScrapingResultRepository
 from app.repositories.user_repository import InMemoryUserRepository
 
 TEST_ADMIN_EMAIL = "admin@example.com"
@@ -128,6 +129,19 @@ class FakeQueuePublisher:
         self.messages.append((queue_name, dict(message)))
 
 
+class FakeQueueListener:
+    """No-op queue listener used during TestClient lifespan."""
+
+    def __init__(self) -> None:
+        self.started = False
+
+    def start(self) -> None:
+        self.started = True
+
+    def stop(self) -> None:
+        self.started = False
+
+
 @pytest.fixture(autouse=True)
 def _env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Set required env vars before settings are constructed.
@@ -182,10 +196,17 @@ def novel_repository() -> InMemoryNovelRepository:
 
 
 @pytest.fixture
-def job_repository() -> InMemoryJobRepository:
-    """Shared in-memory job repository for a test app instance."""
+def scraping_repository() -> InMemoryScrapingRepository:
+    """Shared in-memory Scraping repository for a test app instance."""
 
-    return InMemoryJobRepository()
+    return InMemoryScrapingRepository()
+
+
+@pytest.fixture
+def scraping_result_repository() -> InMemoryScrapingResultRepository:
+    """Shared in-memory ScrapingResult repository for a test app instance."""
+
+    return InMemoryScrapingResultRepository()
 
 
 @pytest.fixture
@@ -227,7 +248,8 @@ def client(
     _env: None,
     user_repository: InMemoryUserRepository,
     novel_repository: InMemoryNovelRepository,
-    job_repository: InMemoryJobRepository,
+    scraping_repository: InMemoryScrapingRepository,
+    scraping_result_repository: InMemoryScrapingResultRepository,
     queue_provider_factory: FakeQueueProviderFactory,
     queue_publisher: FakeQueuePublisher,
     cache_provider: InMemoryCacheProvider,
@@ -246,6 +268,15 @@ def client(
         lambda config: novel_repository,
     )
     monkeypatch.setattr(
+        "app.repositories.cosmosdb.cosmos_scraping_repository.build_cosmos_scraping_repository",
+        lambda config: scraping_repository,
+    )
+    monkeypatch.setattr(
+        "app.repositories.cosmosdb.cosmos_scraping_result_repository."
+        "build_cosmos_scraping_result_repository",
+        lambda config: scraping_result_repository,
+    )
+    monkeypatch.setattr(
         "app.providers.cache_provider.build_cosmos_cache_provider",
         lambda config: cache_provider,
     )
@@ -256,16 +287,25 @@ def client(
 
     service_provider.repository_user = user_repository
     service_provider.repository_novel = novel_repository
+    service_provider.repository_scraping = scraping_repository
+    service_provider.repository_scraping_result = scraping_result_repository
     service_provider.provider_cache = cache_provider
     service_provider.provider_proxy = flaresolverr_client
     service_provider.provider_public_blob = public_blob_provider
     service_provider.queue_publisher = queue_publisher
+    service_provider.queue_subscriber_sample = FakeQueueListener()
+    service_provider.queue_listener_scraping = FakeQueueListener()
 
     main_module.repository_user = user_repository
     main_module.repository_novel = novel_repository
+    main_module.repository_scraping = scraping_repository
+    main_module.repository_scraping_result = scraping_result_repository
     main_module.provider_cache = cache_provider
     main_module.provider_proxy = flaresolverr_client
     main_module.provider_public_blob = public_blob_provider
+    main_module.queue_publisher = queue_publisher
+    main_module.queue_subscriber_sample = FakeQueueListener()
+    main_module.queue_listener_scraping = FakeQueueListener()
 
     monkeypatch.setattr(health_router, "_check_cosmos", lambda logger, settings: True)
     monkeypatch.setattr(health_router, "_check_blob_storage", lambda logger, settings: True)

@@ -9,7 +9,11 @@ QueueClientFactory = Callable[[str], PollingQueueClient]
 
 
 class PollingQueuePublisher(Protocol):
-    def publish(self, queue_name: str, message: Mapping[str, Any]) -> None: ...
+    def publish(
+        self,
+        queue_name: str,
+        message: Mapping[str, Any],
+    ) -> QueueMessage | None: ...
 
 
 class AzureStorageQueuePublisher:
