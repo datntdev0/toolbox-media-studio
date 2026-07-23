@@ -217,6 +217,14 @@ async function deleteNovel(novel: NovelResponse) {
               description: 'line-clamp-5'
             }"
           >
+            <template #title>
+              <NuxtLink
+                :to="`/library/novels/${novel.id}`"
+                class="hover:text-primary focus-visible:outline-primary"
+              >
+                {{ novel.title }}
+              </NuxtLink>
+            </template>
             <img
               v-if="display(novel.coverImageUrl, '')"
               :src="display(novel.coverImageUrl, '')"
