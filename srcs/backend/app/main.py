@@ -15,7 +15,6 @@ from app.core.injection import (
     repository_novel,
     repository_user,
 )
-from app.routers import auth, crawlers, health, novels, users
 
 app_config = AppConfig()
 
@@ -58,10 +57,13 @@ app.add_middleware(CORSMiddleware,
 
 app.add_exception_handler(Exception, global_exception_handlers)
 
+from app.routers import auth, crawlers, health, novels, users, scrapings
+
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(novels.router)
 app.include_router(crawlers.router)
+app.include_router(scrapings.router)
 
 app.title = app_config.appName

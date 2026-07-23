@@ -33,6 +33,14 @@ const links = [
       }
     },
     {
+      label: 'Scrapings',
+      icon: 'lucide:loader',
+      to: '/scrapings',
+      onSelect: () => {
+        open.value = false
+      }
+    },
+    {
       label: 'Library',
       icon: 'lucide:library-big',
       to: '/library',
@@ -59,7 +67,6 @@ const links = [
       label: 'Settings',
       to: '/settings',
       icon: 'lucide:settings',
-      defaultOpen: true,
       type: 'trigger',
       children: [
         {

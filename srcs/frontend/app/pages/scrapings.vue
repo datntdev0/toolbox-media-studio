@@ -1,13 +1,13 @@
 <script setup lang="ts">
 definePageMeta({
-  title: 'Translations'
+  title: 'Scrapings'
 })
 </script>
 
 <template>
-  <UDashboardPanel id="translations">
+  <UDashboardPanel id="scrapings">
     <template #header>
-      <UDashboardNavbar title="Translations">
+      <UDashboardNavbar title="Scrapings">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -17,7 +17,7 @@ definePageMeta({
     <template #body>
       <div class="flex flex-col gap-4 sm:gap-6 lg:gap-12 w-full lg:max-w-2xl mx-auto">
         <p class="text-default">
-          Translations page content coming soon...
+          Scrapings page content coming soon...
         </p>
       </div>
     </template>
