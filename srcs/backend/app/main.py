@@ -14,13 +14,14 @@ from app.core.injection import (
     queue_listener_scraping,
     queue_publisher,
     queue_subscriber_sample,
+    realtime_hub,
     repository_novel,
     repository_scraping,
     repository_scraping_result,
     repository_user,
 )
 from app.events.scraping_handler import requeue_stale_scrapings
-from app.routers import auth, crawlers, health, novels, scrapings, users
+from app.routers import auth, crawlers, health, novels, realtime, scrapings, users
 
 app_config = AppConfig()
 
@@ -41,6 +42,7 @@ async def lifespan(app: FastAPI):
     app.state.provider_public_blob = provider_public_blob
     app.state.queue_subscriber_sample = queue_subscriber_sample
     app.state.queue_listener_scraping = queue_listener_scraping
+    app.state.realtime_hub = realtime_hub
 
     from app.core.security.authentication import seed_admin_user
     seed_admin_user(logger, app_config, repository_user)
@@ -63,6 +65,7 @@ async def lifespan(app: FastAPI):
             queue_listener_scraping.stop()
         except Exception:
             logger.exception("Scraping queue listener failed to stop")
+        await realtime_hub.close_all()
 
 app = FastAPI(lifespan=lifespan)
 
@@ -81,5 +84,6 @@ app.include_router(users.router)
 app.include_router(novels.router)
 app.include_router(crawlers.router)
 app.include_router(scrapings.router)
+app.include_router(realtime.router)
 
 app.title = app_config.appName

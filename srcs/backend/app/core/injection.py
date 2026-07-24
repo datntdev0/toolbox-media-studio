@@ -8,6 +8,7 @@ from app.core.events.polling_queue_publisher import (
     PollingQueuePublisher,
 )
 from app.core.logging import LogManager
+from app.core.realtime import RealtimeHub
 from app.events.sample_handler import SampleQueueListener
 from app.events.scraping_handler import ScrapingQueueListener
 from app.providers.blob_storage_provider import PublicBlobProvider, build_public_blob_provider
@@ -39,6 +40,7 @@ repository_scraping_result = build_cosmos_scraping_result_repository(config)
 provider_proxy = build_proxy_provider(config)
 provider_public_blob = build_public_blob_provider(config)
 provider_cache = build_cosmos_cache_provider(config)
+realtime_hub = RealtimeHub()
 
 # Queue publishers and subscribers can be registered
 queue_publisher = AzureStorageQueuePublisher(config)
@@ -50,6 +52,7 @@ queue_listener_scraping = ScrapingQueueListener(
     cache_provider=provider_cache,
     proxy_provider=provider_proxy,
     queue_publisher=queue_publisher,
+    realtime_hub=realtime_hub,
     workers=1,
 )
 
@@ -72,3 +75,4 @@ ProviderCacheDep = Annotated[CacheProvider, Depends(lambda: provider_cache)]
 ProviderProxyDep = Annotated[ProxyProvider, Depends(lambda: provider_proxy)]
 ProviderPublicBlobDep = Annotated[PublicBlobProvider, Depends(lambda: provider_public_blob)]
 PollingQueuePublisherDep = Annotated[PollingQueuePublisher, Depends(lambda: queue_publisher)]
+RealtimeHubDep = Annotated[RealtimeHub, Depends(lambda: realtime_hub)]

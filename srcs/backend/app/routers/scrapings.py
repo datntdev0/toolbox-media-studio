@@ -13,6 +13,7 @@ from app.core.injection import (
     PollingQueuePublisherDep,
     ProviderCacheDep,
     ProviderProxyDep,
+    RealtimeHubDep,
     RepositoryScrapingDep,
     RepositoryScrapingResultDep,
 )
@@ -35,6 +36,7 @@ from app.domain.scrapings import (
 from app.events.scraping_handler import (
     SCRAPING_QUEUE_NAME,
     build_scraping_event,
+    build_scraping_updated_payload,
 )
 from app.providers.crawler_provider import (
     CrawlerFetchError,
@@ -64,6 +66,7 @@ def create_scraping_route(
     provider_cache: ProviderCacheDep,
     provider_proxy: ProviderProxyDep,
     queue_publisher: PollingQueuePublisherDep,
+    realtime_hub: RealtimeHubDep,
     response: Response,
     body: ScrapingCreateRequest,
 ) -> ScrapingCreateResponse:
@@ -169,6 +172,11 @@ def create_scraping_route(
             ) from exc
 
     response.headers["Location"] = f"/api/scrapings/{scraping.id}"
+    if create_result.created:
+        realtime_hub.publish(
+            "scraping.updated",
+            build_scraping_updated_payload(scraping),
+        )
     summary = to_scraping_summary(scraping)
     return ScrapingCreateResponse(
         **summary.model_dump(),

@@ -14,6 +14,11 @@ definePageMeta({
 
 useHead({ title: 'Scrapings' })
 
+type ScrapingUpdatedPayload = {
+  scrapingId: string
+  taskId?: string
+}
+
 const route = useRoute()
 const router = useRouter()
 const breakpoints = useBreakpoints(breakpointsTailwind)
@@ -27,11 +32,31 @@ const listError = ref(false)
 const newScrapingOpen = ref(false)
 const crawlerNames = ref<Record<string, string>>({})
 const listRef = ref<{ focusSelected: () => void, focusRow: (id: string) => void } | null>(null)
+const detailRef = ref<{ refresh: () => void } | null>(null)
 const selectionPushed = ref(false)
 const listRequestInFlight = ref(false)
+const pendingListRefresh = ref(false)
 const deletingId = ref<string | null>(null)
 const confirm = useConfirmDialog()
 const toast = useToast()
+const pendingRealtimeScrapingIds = new Set<string>()
+let realtimeRefreshTimer: ReturnType<typeof setTimeout> | undefined
+
+useRealtime().onMessage<ScrapingUpdatedPayload>('scraping.updated', ({ payload }) => {
+  if (!payload.scrapingId) return
+  pendingRealtimeScrapingIds.add(payload.scrapingId)
+  if (realtimeRefreshTimer) return
+
+  realtimeRefreshTimer = setTimeout(() => {
+    realtimeRefreshTimer = undefined
+    const refreshSelected = selectedId.value
+      ? pendingRealtimeScrapingIds.has(selectedId.value)
+      : false
+    pendingRealtimeScrapingIds.clear()
+    void loadScrapings()
+    if (refreshSelected) detailRef.value?.refresh()
+  }, 200)
+})
 
 const selectedId = computed(() => {
   const value = route.query.id
@@ -47,6 +72,10 @@ const mobileDetailOpen = computed({
 
 onMounted(() => {
   void Promise.all([loadScrapings(), loadCrawlerNames()])
+})
+
+onBeforeUnmount(() => {
+  if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer)
 })
 
 async function loadCrawlerNames() {
@@ -73,7 +102,10 @@ function mergeScrapings(
 }
 
 async function loadScrapings(options: { more?: boolean } = {}) {
-  if (listRequestInFlight.value) return
+  if (listRequestInFlight.value) {
+    if (!options.more) pendingListRefresh.value = true
+    return
+  }
   listRequestInFlight.value = true
 
   if (options.more) loadingMore.value = true
@@ -103,6 +135,10 @@ async function loadScrapings(options: { more?: boolean } = {}) {
     loading.value = false
     loadingMore.value = false
     listRequestInFlight.value = false
+    if (pendingListRefresh.value) {
+      pendingListRefresh.value = false
+      void loadScrapings()
+    }
   }
 }
 
@@ -246,6 +282,7 @@ function onDetailUpdated(detail: ScrapingDetailResponse) {
 
   <ScrapingsScrapingDetail
     v-if="selectedId && !isMobile"
+    ref="detailRef"
     :scraping-id="selectedId"
     :crawler-name="crawlerNames[scrapings.find(item => item.id === selectedId)?.crawlerId || '']"
     @close="closeDetail"
@@ -275,6 +312,7 @@ function onDetailUpdated(detail: ScrapingDetailResponse) {
       <template #content>
         <ScrapingsScrapingDetail
           v-if="selectedId"
+          ref="detailRef"
           :scraping-id="selectedId"
           :crawler-name="crawlerNames[scrapings.find(item => item.id === selectedId)?.crawlerId || '']"
           @close="closeDetail"

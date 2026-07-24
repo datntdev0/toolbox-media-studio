@@ -110,7 +110,8 @@ sequenceDiagram
     A->>C: job.status = completed
     A->>Q: delete message
 
-    U->>A: GET /jobs/{id}  (UI polls)
+    A-->>U: typed WebSocket invalidation event
+    U->>A: GET /jobs/{id}
     A-->>C: read job doc
     A-->>U: status + counters
 ```
@@ -120,8 +121,10 @@ sequenceDiagram
   redelivers.
 - **Completion** is persisted by the consumer before deleting the source message. Failed messages
   retry with visibility delays and then move to an application-defined dead-letter queue.
-- **Progress** is a `GET /jobs/{id}` point-read (~1 RU) over the job rollup counters. An SSE
-  endpoint that server-side-polls the same status is an optional UX upgrade — not websockets.
+- **Progress** remains a `GET /jobs/{id}` point-read over persisted rollup counters. FastAPI also
+  publishes lightweight typed invalidation events through the authenticated `/api/ws` WebSocket.
+  The Nuxt app keeps one socket open and only mounted pages handle their registered message types,
+  then refetch the persisted resource as the source of truth.
 - **Short ops (single-chapter translation preview)** can remain synchronous with a short timeout,
   returning the result inline.
 

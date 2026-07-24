@@ -39,6 +39,7 @@ const loading = ref(true)
 const refreshing = ref(false)
 const error = ref(false)
 const requestInFlight = ref(false)
+const pendingBackgroundRefresh = ref(false)
 const failedCover = ref(false)
 const openTaskId = ref<string>()
 const chapterContainer = ref<HTMLElement | null>(null)
@@ -141,6 +142,10 @@ onBeforeUnmount(() => {
   if (chapterScrollFrame !== undefined) cancelAnimationFrame(chapterScrollFrame)
 })
 
+defineExpose({
+  refresh: () => loadDetail(true)
+})
+
 function cacheKey(taskId: string) {
   return `${props.scrapingId}:${taskId}`
 }
@@ -206,7 +211,10 @@ function errorStatus(cause: unknown) {
 }
 
 async function loadDetail(background = false) {
-  if (requestInFlight.value) return
+  if (requestInFlight.value) {
+    if (background) pendingBackgroundRefresh.value = true
+    return
+  }
   requestInFlight.value = true
   if (background) refreshing.value = true
   else loading.value = true
@@ -234,6 +242,10 @@ async function loadDetail(background = false) {
     loading.value = false
     refreshing.value = false
     requestInFlight.value = false
+    if (pendingBackgroundRefresh.value) {
+      pendingBackgroundRefresh.value = false
+      void loadDetail(true)
+    }
   }
 }
 

@@ -11,6 +11,7 @@ from typing import Any
 from app.core.events.message_handler import MessageHandler, QueueMessage
 from app.core.events.polling_queue_publisher import PollingQueuePublisher
 from app.core.events.polling_queue_subscriber import PollingQueueSubscriber
+from app.core.realtime import RealtimeHub
 from app.domain.scraping_results import ScrapingResult
 from app.domain.scrapings import Scraping, ScrapingStatus, ScrapingTask, ScrapingTaskStatus
 from app.providers.cache_provider import CacheProvider
@@ -71,6 +72,7 @@ class ScrapingHandler(MessageHandler):
         cache_provider: CacheProvider,
         proxy_provider: ProxyProvider,
         queue_publisher: PollingQueuePublisher,
+        realtime_hub: RealtimeHub | None = None,
         max_attempts: int = SCRAPING_MAX_ATTEMPTS,
     ) -> None:
         self._logger = logger
@@ -79,6 +81,7 @@ class ScrapingHandler(MessageHandler):
         self._cache = cache_provider
         self._proxy = proxy_provider
         self._publisher = queue_publisher
+        self._realtime = realtime_hub
         self._max_attempts = max_attempts
 
     def handle(self, message: QueueMessage) -> None:
@@ -222,7 +225,7 @@ class ScrapingHandler(MessageHandler):
     ) -> Scraping:
         for _ in range(3):
             try:
-                return self._scrapings.set_status(
+                updated = self._scrapings.set_status(
                     scraping.id,
                     scraping.created_by,
                     status,
@@ -230,6 +233,8 @@ class ScrapingHandler(MessageHandler):
                     error=error,
                     etag=scraping.etag,
                 )
+                self._publish_update(updated)
+                return updated
             except ScrapingConflictError:
                 scraping = self._scrapings.get(scraping.id, scraping.created_by) or scraping
         raise ScrapingConflictError("Scraping status update conflicted repeatedly")
@@ -247,7 +252,7 @@ class ScrapingHandler(MessageHandler):
     ) -> Scraping:
         for _ in range(3):
             try:
-                return self._scrapings.update_task(
+                updated = self._scrapings.update_task(
                     scraping.id,
                     scraping.created_by,
                     task_id,
@@ -258,6 +263,8 @@ class ScrapingHandler(MessageHandler):
                     completed_at=completed_at,
                     etag=scraping.etag,
                 )
+                self._publish_update(updated, task_id=task_id)
+                return updated
             except ScrapingConflictError:
                 scraping = self._scrapings.get(scraping.id, scraping.created_by) or scraping
         raise ScrapingConflictError("Scraping task update conflicted repeatedly")
@@ -265,14 +272,24 @@ class ScrapingHandler(MessageHandler):
     def _reconcile_with_retry(self, scraping: Scraping) -> Scraping:
         for _ in range(3):
             try:
-                return self._scrapings.reconcile(
+                updated = self._scrapings.reconcile(
                     scraping.id,
                     scraping.created_by,
                     etag=scraping.etag,
                 )
+                self._publish_update(updated)
+                return updated
             except ScrapingConflictError:
                 scraping = self._scrapings.get(scraping.id, scraping.created_by) or scraping
         raise ScrapingConflictError("Scraping reconciliation conflicted repeatedly")
+
+    def _publish_update(self, scraping: Scraping, task_id: str | None = None) -> None:
+        if self._realtime is None:
+            return
+        self._realtime.publish(
+            "scraping.updated",
+            build_scraping_updated_payload(scraping, task_id=task_id),
+        )
 
 
 class ScrapingQueueListener(PollingQueueSubscriber):
@@ -286,6 +303,7 @@ class ScrapingQueueListener(PollingQueueSubscriber):
         cache_provider: CacheProvider,
         proxy_provider: ProxyProvider,
         queue_publisher: PollingQueuePublisher,
+        realtime_hub: RealtimeHub | None = None,
         workers: int = 1,
     ) -> None:
         super().__init__(
@@ -298,6 +316,7 @@ class ScrapingQueueListener(PollingQueueSubscriber):
                 cache_provider,
                 proxy_provider,
                 queue_publisher,
+                realtime_hub,
             ),
             workers=workers,
         )
@@ -315,6 +334,28 @@ def build_scraping_event(scraping: Scraping, attempt: int = 1) -> dict[str, obje
         "attempt": attempt,
         "enqueuedAt": datetime.now(UTC).isoformat(),
     }
+
+
+def build_scraping_updated_payload(
+    scraping: Scraping,
+    *,
+    task_id: str | None = None,
+) -> dict[str, object]:
+    """Build the lightweight UI invalidation event sent over WebSockets."""
+
+    payload: dict[str, object] = {
+        "scrapingId": scraping.id,
+        "status": scraping.status.value,
+        "updatedAt": scraping.updated_at.isoformat(),
+        "progress": {
+            "total": scraping.progress.total,
+            "completed": scraping.progress.completed,
+            "failed": scraping.progress.failed,
+        },
+    }
+    if task_id is not None:
+        payload["taskId"] = task_id
+    return payload
 
 
 def requeue_stale_scrapings(
