@@ -2,6 +2,7 @@ import {
   AuthClient,
   CrawlersClient,
   NovelsClient,
+  ScrapingsClient,
   UsersClient
 } from '~~/shared/api-services/srv-core.client'
 
@@ -31,6 +32,7 @@ export function useApiClient() {
     auth: new AuthClient(baseUrl, http),
     users: new UsersClient(baseUrl, http),
     novels: new NovelsClient(baseUrl, http),
-    crawlers: new CrawlersClient(baseUrl, http)
+    crawlers: new CrawlersClient(baseUrl, http),
+    scrapings: new ScrapingsClient(baseUrl, http)
   }
 }

@@ -797,6 +797,428 @@ export class CrawlersClient {
     }
 }
 
+export class ScrapingsClient {
+    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
+    private baseUrl: string;
+    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
+
+    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
+        this.http = http ? http : window as any;
+        this.baseUrl = baseUrl ?? "";
+    }
+
+    /**
+     * Create Scraping Route
+     * @return Successful Response
+     */
+    create_scraping(body: ScrapingCreateRequest): Promise<ScrapingCreateResponse> {
+        let url_ = this.baseUrl + "/api/scrapings";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(body);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processCreate_scraping(_response);
+        });
+    }
+
+    protected processCreate_scraping(response: Response): Promise<ScrapingCreateResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 202) {
+            return response.text().then((_responseText) => {
+            let result202: any = null;
+            let resultData202 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result202 = ScrapingCreateResponse.fromJS(resultData202);
+            return result202;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ScrapingCreateResponse>(null as any);
+    }
+
+    /**
+     * List Scrapings Route
+     * @param limit (optional)
+     * @param continuationToken (optional)
+     * @param status (optional)
+     * @return Successful Response
+     */
+    list_scrapings(limit: number | undefined, continuationToken: Anonymous8 | undefined, status: Anonymous9 | undefined): Promise<ScrapingListResponse> {
+        let url_ = this.baseUrl + "/api/scrapings?";
+        if (limit === null)
+            throw new globalThis.Error("The parameter 'limit' cannot be null.");
+        else if (limit !== undefined)
+            url_ += "limit=" + encodeURIComponent("" + limit) + "&";
+        if (continuationToken === null)
+            throw new globalThis.Error("The parameter 'continuationToken' cannot be null.");
+        else if (continuationToken !== undefined)
+            url_ += "continuationToken=" + encodeURIComponent("" + continuationToken) + "&";
+        if (status === null)
+            throw new globalThis.Error("The parameter 'status' cannot be null.");
+        else if (status !== undefined)
+            url_ += "status=" + encodeURIComponent("" + status) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processList_scrapings(_response);
+        });
+    }
+
+    protected processList_scrapings(response: Response): Promise<ScrapingListResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = ScrapingListResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ScrapingListResponse>(null as any);
+    }
+
+    /**
+     * Get Scraping Route
+     * @return Successful Response
+     */
+    get_scraping(id: string): Promise<ScrapingDetailResponse> {
+        let url_ = this.baseUrl + "/api/scrapings/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGet_scraping(_response);
+        });
+    }
+
+    protected processGet_scraping(response: Response): Promise<ScrapingDetailResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = ScrapingDetailResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ScrapingDetailResponse>(null as any);
+    }
+
+    /**
+     * Delete Scraping Route
+     * @return Successful Response
+     */
+    delete_scraping(id: string): Promise<void> {
+        let url_ = this.baseUrl + "/api/scrapings/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "DELETE",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processDelete_scraping(_response);
+        });
+    }
+
+    protected processDelete_scraping(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 204) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    /**
+     * Get Scraping Result Route
+     * @return Successful Response
+     */
+    get_scraping_result(id: string, taskId: string): Promise<ScrapingResultResponse> {
+        let url_ = this.baseUrl + "/api/scrapings/{id}/results/{taskId}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (taskId === undefined || taskId === null)
+            throw new globalThis.Error("The parameter 'taskId' must be defined.");
+        url_ = url_.replace("{taskId}", encodeURIComponent("" + taskId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGet_scraping_result(_response);
+        });
+    }
+
+    protected processGet_scraping_result(response: Response): Promise<ScrapingResultResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = ScrapingResultResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ScrapingResultResponse>(null as any);
+    }
+}
+
+export class Body_create_novel implements IBody_create_novel {
+    title!: string;
+    description?: Description;
+    language?: Language;
+    author?: Author;
+    tags?: Tags;
+    notes?: Notes;
+    coverImage?: Coverimage;
+
+    [key: string]: any;
+
+    constructor(data?: IBody_create_novel) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.title = _data["title"];
+            this.description = _data["description"];
+            this.language = _data["language"];
+            this.author = _data["author"];
+            this.tags = _data["tags"];
+            this.notes = _data["notes"];
+            this.coverImage = _data["coverImage"];
+        }
+    }
+
+    static fromJS(data: any): Body_create_novel {
+        data = typeof data === 'object' ? data : {};
+        let result = new Body_create_novel();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["title"] = this.title;
+        data["description"] = this.description;
+        data["language"] = this.language;
+        data["author"] = this.author;
+        data["tags"] = this.tags;
+        data["notes"] = this.notes;
+        data["coverImage"] = this.coverImage;
+        return data;
+    }
+}
+
+export interface IBody_create_novel {
+    title: string;
+    description?: Description;
+    language?: Language;
+    author?: Author;
+    tags?: Tags;
+    notes?: Notes;
+    coverImage?: Coverimage;
+
+    [key: string]: any;
+}
+
+export class Body_update_novel implements IBody_update_novel {
+    title?: Title;
+    description?: Anonymous2;
+    language?: Anonymous3;
+    author?: Anonymous4;
+    tags?: Anonymous5;
+    notes?: Anonymous6;
+    status?: Status;
+    etag?: Etag;
+    coverImage?: Anonymous7;
+    clear_cover_image?: boolean;
+
+    [key: string]: any;
+
+    constructor(data?: IBody_update_novel) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+        if (!data) {
+            this.clear_cover_image = false;
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.title = _data["title"];
+            this.description = _data["description"];
+            this.language = _data["language"];
+            this.author = _data["author"];
+            this.tags = _data["tags"];
+            this.notes = _data["notes"];
+            this.status = _data["status"];
+            this.etag = _data["etag"];
+            this.coverImage = _data["coverImage"];
+            this.clear_cover_image = _data["clear_cover_image"] !== undefined ? _data["clear_cover_image"] : false;
+        }
+    }
+
+    static fromJS(data: any): Body_update_novel {
+        data = typeof data === 'object' ? data : {};
+        let result = new Body_update_novel();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["title"] = this.title;
+        data["description"] = this.description;
+        data["language"] = this.language;
+        data["author"] = this.author;
+        data["tags"] = this.tags;
+        data["notes"] = this.notes;
+        data["status"] = this.status;
+        data["etag"] = this.etag;
+        data["coverImage"] = this.coverImage;
+        data["clear_cover_image"] = this.clear_cover_image;
+        return data;
+    }
+}
+
+export interface IBody_update_novel {
+    title?: Title;
+    description?: Anonymous2;
+    language?: Anonymous3;
+    author?: Anonymous4;
+    tags?: Anonymous5;
+    notes?: Anonymous6;
+    status?: Status;
+    etag?: Etag;
+    coverImage?: Anonymous7;
+    clear_cover_image?: boolean;
+
+    [key: string]: any;
+}
+
 /** Chapter content returned by the crawler endpoint. */
 export class CrawlerChapterContentResponse implements ICrawlerChapterContentResponse {
     crawlerId!: string;
@@ -1011,11 +1433,11 @@ export class CrawlerMetadataResponse implements ICrawlerMetadataResponse {
     sourceUrl!: string;
     sourceNovelId!: string;
     title!: string;
-    author?: Author;
+    author?: Author2;
     category?: Category;
     updatedDate?: UpdatedDate;
     protagonists!: string[];
-    description?: Description;
+    description?: Description2;
     coverImageUrl?: CoverImageUrl;
     chapters!: CrawlerChapterResponse[];
     cached!: boolean;
@@ -1110,11 +1532,11 @@ export interface ICrawlerMetadataResponse {
     sourceUrl: string;
     sourceNovelId: string;
     title: string;
-    author?: Author;
+    author?: Author2;
     category?: Category;
     updatedDate?: UpdatedDate;
     protagonists: string[];
-    description?: Description;
+    description?: Description2;
     coverImageUrl?: CoverImageUrl;
     chapters: CrawlerChapterResponse[];
     cached: boolean;
@@ -1306,80 +1728,6 @@ export interface ILoginRequest {
     [key: string]: any;
 }
 
-/** Payload for creating a novel. */
-export class NovelCreateRequest implements INovelCreateRequest {
-    title!: string;
-    description?: Description2;
-    coverImageUrl?: CoverImageUrl2;
-    language?: Language;
-    author?: Author2;
-    tags?: Tags;
-    notes?: Notes;
-
-    [key: string]: any;
-
-    constructor(data?: INovelCreateRequest) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-            this.title = _data["title"];
-            this.description = _data["description"];
-            this.coverImageUrl = _data["coverImageUrl"];
-            this.language = _data["language"];
-            this.author = _data["author"];
-            this.tags = _data["tags"];
-            this.notes = _data["notes"];
-        }
-    }
-
-    static fromJS(data: any): NovelCreateRequest {
-        data = typeof data === 'object' ? data : {};
-        let result = new NovelCreateRequest();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        data["title"] = this.title;
-        data["description"] = this.description;
-        data["coverImageUrl"] = this.coverImageUrl;
-        data["language"] = this.language;
-        data["author"] = this.author;
-        data["tags"] = this.tags;
-        data["notes"] = this.notes;
-        return data;
-    }
-}
-
-/** Payload for creating a novel. */
-export interface INovelCreateRequest {
-    title: string;
-    description?: Description2;
-    coverImageUrl?: CoverImageUrl2;
-    language?: Language;
-    author?: Author2;
-    tags?: Tags;
-    notes?: Notes;
-
-    [key: string]: any;
-}
-
 /** Paged response for listing novels. */
 export class NovelListResponse implements INovelListResponse {
     items!: NovelResponse[];
@@ -1450,7 +1798,7 @@ export class NovelResponse implements INovelResponse {
     id!: string;
     title!: string;
     description?: Description3;
-    coverImageUrl?: CoverImageUrl3;
+    coverImageUrl?: CoverImageUrl2;
     language?: Language2;
     author?: Author3;
     tags!: string[];
@@ -1458,7 +1806,7 @@ export class NovelResponse implements INovelResponse {
     status!: NovelStatus;
     createdAt!: Date;
     updatedAt!: Date;
-    etag?: Etag;
+    etag?: Etag2;
 
     [key: string]: any;
 
@@ -1537,7 +1885,7 @@ export interface INovelResponse {
     id: string;
     title: string;
     description?: Description3;
-    coverImageUrl?: CoverImageUrl3;
+    coverImageUrl?: CoverImageUrl2;
     language?: Language2;
     author?: Author3;
     tags: string[];
@@ -1545,7 +1893,7 @@ export interface INovelResponse {
     status: NovelStatus;
     createdAt: Date;
     updatedAt: Date;
-    etag?: Etag;
+    etag?: Etag2;
 
     [key: string]: any;
 }
@@ -1558,21 +1906,251 @@ export enum NovelStatus {
     Deleted = "deleted",
 }
 
-/** Payload for partially updating a novel. */
-export class NovelUpdateRequest implements INovelUpdateRequest {
-    title?: Title;
-    description?: Description4;
-    coverImageUrl?: CoverImageUrl4;
-    language?: Language3;
-    author?: Author4;
-    tags?: Tags2;
-    notes?: Notes3;
-    status?: Status;
-    etag?: Etag2;
+/** Request accepted by POST /api/scrapings. */
+export class ScrapingCreateRequest implements IScrapingCreateRequest {
+    crawlerId!: string;
+    sourceUrl!: string;
+
+    constructor(data?: IScrapingCreateRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.crawlerId = _data["crawlerId"];
+            this.sourceUrl = _data["sourceUrl"];
+        }
+    }
+
+    static fromJS(data: any): ScrapingCreateRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new ScrapingCreateRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["crawlerId"] = this.crawlerId;
+        data["sourceUrl"] = this.sourceUrl;
+        return data;
+    }
+}
+
+/** Request accepted by POST /api/scrapings. */
+export interface IScrapingCreateRequest {
+    crawlerId: string;
+    sourceUrl: string;
+}
+
+/** Response returned after accepting a scraping. */
+export class ScrapingCreateResponse implements IScrapingCreateResponse {
+    id!: string;
+    crawlerId!: string;
+    sourceUrl!: string;
+    title!: string;
+    coverImageUrl?: CoverImageUrl3;
+    status!: ScrapingStatus;
+    progress!: ScrapingProgressSummaryResponse;
+    attempts!: number;
+    createdAt!: Date;
+    updatedAt!: Date;
+    reused!: boolean;
 
     [key: string]: any;
 
-    constructor(data?: INovelUpdateRequest) {
+    constructor(data?: IScrapingCreateResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+        if (!data) {
+            this.progress = new ScrapingProgressSummaryResponse();
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.id = _data["id"];
+            this.crawlerId = _data["crawlerId"];
+            this.sourceUrl = _data["sourceUrl"];
+            this.title = _data["title"];
+            this.coverImageUrl = _data["coverImageUrl"];
+            this.status = _data["status"];
+            this.progress = _data["progress"] ? ScrapingProgressSummaryResponse.fromJS(_data["progress"]) : new ScrapingProgressSummaryResponse();
+            this.attempts = _data["attempts"];
+            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
+            this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
+            this.reused = _data["reused"];
+        }
+    }
+
+    static fromJS(data: any): ScrapingCreateResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new ScrapingCreateResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["id"] = this.id;
+        data["crawlerId"] = this.crawlerId;
+        data["sourceUrl"] = this.sourceUrl;
+        data["title"] = this.title;
+        data["coverImageUrl"] = this.coverImageUrl;
+        data["status"] = this.status;
+        data["progress"] = this.progress ? this.progress.toJSON() : undefined as any;
+        data["attempts"] = this.attempts;
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
+        data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
+        data["reused"] = this.reused;
+        return data;
+    }
+}
+
+/** Response returned after accepting a scraping. */
+export interface IScrapingCreateResponse {
+    id: string;
+    crawlerId: string;
+    sourceUrl: string;
+    title: string;
+    coverImageUrl?: CoverImageUrl3;
+    status: ScrapingStatus;
+    progress: ScrapingProgressSummaryResponse;
+    attempts: number;
+    createdAt: Date;
+    updatedAt: Date;
+    reused: boolean;
+
+    [key: string]: any;
+}
+
+/** Scraping detail returned to the master-detail UI. */
+export class ScrapingDetailResponse implements IScrapingDetailResponse {
+    id!: string;
+    crawlerId!: string;
+    sourceUrl!: string;
+    status!: ScrapingStatus;
+    metadata!: ScrapingMetadataResponse;
+    progress!: ScrapingProgressResponse;
+    tasks?: ScrapingTaskResponse[];
+    attempts!: number;
+    lastError?: LastError;
+    createdAt!: Date;
+    updatedAt!: Date;
+
+    [key: string]: any;
+
+    constructor(data?: IScrapingDetailResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+        if (!data) {
+            this.metadata = new ScrapingMetadataResponse();
+            this.progress = new ScrapingProgressResponse();
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.id = _data["id"];
+            this.crawlerId = _data["crawlerId"];
+            this.sourceUrl = _data["sourceUrl"];
+            this.status = _data["status"];
+            this.metadata = _data["metadata"] ? ScrapingMetadataResponse.fromJS(_data["metadata"]) : new ScrapingMetadataResponse();
+            this.progress = _data["progress"] ? ScrapingProgressResponse.fromJS(_data["progress"]) : new ScrapingProgressResponse();
+            if (Array.isArray(_data["tasks"])) {
+                this.tasks = [] as any;
+                for (let item of _data["tasks"])
+                    this.tasks!.push(ScrapingTaskResponse.fromJS(item));
+            }
+            this.attempts = _data["attempts"];
+            this.lastError = _data["lastError"];
+            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
+            this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
+        }
+    }
+
+    static fromJS(data: any): ScrapingDetailResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new ScrapingDetailResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["id"] = this.id;
+        data["crawlerId"] = this.crawlerId;
+        data["sourceUrl"] = this.sourceUrl;
+        data["status"] = this.status;
+        data["metadata"] = this.metadata ? this.metadata.toJSON() : undefined as any;
+        data["progress"] = this.progress ? this.progress.toJSON() : undefined as any;
+        if (Array.isArray(this.tasks)) {
+            data["tasks"] = [];
+            for (let item of this.tasks)
+                data["tasks"].push(item ? item.toJSON() : undefined as any);
+        }
+        data["attempts"] = this.attempts;
+        data["lastError"] = this.lastError;
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
+        data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
+        return data;
+    }
+}
+
+/** Scraping detail returned to the master-detail UI. */
+export interface IScrapingDetailResponse {
+    id: string;
+    crawlerId: string;
+    sourceUrl: string;
+    status: ScrapingStatus;
+    metadata: ScrapingMetadataResponse;
+    progress: ScrapingProgressResponse;
+    tasks?: ScrapingTaskResponse[];
+    attempts: number;
+    lastError?: LastError;
+    createdAt: Date;
+    updatedAt: Date;
+
+    [key: string]: any;
+}
+
+/** Paged scraping list response. */
+export class ScrapingListResponse implements IScrapingListResponse {
+    items?: ScrapingSummaryResponse[];
+    continuationToken?: ContinuationToken2;
+
+    [key: string]: any;
+
+    constructor(data?: IScrapingListResponse) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -1587,21 +2165,18 @@ export class NovelUpdateRequest implements INovelUpdateRequest {
                 if (_data.hasOwnProperty(property))
                     this[property] = _data[property];
             }
-            this.title = _data["title"];
-            this.description = _data["description"];
-            this.coverImageUrl = _data["coverImageUrl"];
-            this.language = _data["language"];
-            this.author = _data["author"];
-            this.tags = _data["tags"];
-            this.notes = _data["notes"];
-            this.status = _data["status"];
-            this.etag = _data["etag"];
+            if (Array.isArray(_data["items"])) {
+                this.items = [] as any;
+                for (let item of _data["items"])
+                    this.items!.push(ScrapingSummaryResponse.fromJS(item));
+            }
+            this.continuationToken = _data["continuationToken"];
         }
     }
 
-    static fromJS(data: any): NovelUpdateRequest {
+    static fromJS(data: any): ScrapingListResponse {
         data = typeof data === 'object' ? data : {};
-        let result = new NovelUpdateRequest();
+        let result = new ScrapingListResponse();
         result.init(data);
         return result;
     }
@@ -1612,35 +2187,570 @@ export class NovelUpdateRequest implements INovelUpdateRequest {
             if (this.hasOwnProperty(property))
                 data[property] = this[property];
         }
+        if (Array.isArray(this.items)) {
+            data["items"] = [];
+            for (let item of this.items)
+                data["items"].push(item ? item.toJSON() : undefined as any);
+        }
+        data["continuationToken"] = this.continuationToken;
+        return data;
+    }
+}
+
+/** Paged scraping list response. */
+export interface IScrapingListResponse {
+    items?: ScrapingSummaryResponse[];
+    continuationToken?: ContinuationToken2;
+
+    [key: string]: any;
+}
+
+/** Novel metadata stored with a scraping. */
+export class ScrapingMetadataResponse implements IScrapingMetadataResponse {
+    sourceNovelId!: string;
+    title!: string;
+    author?: Author4;
+    category?: Category2;
+    updatedDate?: UpdatedDate2;
+    protagonists?: string[];
+    description?: Description4;
+    coverImageUrl?: CoverImageUrl4;
+    fetchedAt!: Date;
+
+    [key: string]: any;
+
+    constructor(data?: IScrapingMetadataResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.sourceNovelId = _data["sourceNovelId"];
+            this.title = _data["title"];
+            this.author = _data["author"];
+            this.category = _data["category"];
+            this.updatedDate = _data["updatedDate"];
+            if (Array.isArray(_data["protagonists"])) {
+                this.protagonists = [] as any;
+                for (let item of _data["protagonists"])
+                    this.protagonists!.push(item);
+            }
+            this.description = _data["description"];
+            this.coverImageUrl = _data["coverImageUrl"];
+            this.fetchedAt = _data["fetchedAt"] ? new Date(_data["fetchedAt"].toString()) : undefined as any;
+        }
+    }
+
+    static fromJS(data: any): ScrapingMetadataResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new ScrapingMetadataResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["sourceNovelId"] = this.sourceNovelId;
         data["title"] = this.title;
+        data["author"] = this.author;
+        data["category"] = this.category;
+        data["updatedDate"] = this.updatedDate;
+        if (Array.isArray(this.protagonists)) {
+            data["protagonists"] = [];
+            for (let item of this.protagonists)
+                data["protagonists"].push(item);
+        }
         data["description"] = this.description;
         data["coverImageUrl"] = this.coverImageUrl;
-        data["language"] = this.language;
-        data["author"] = this.author;
-        data["tags"] = this.tags;
-        data["notes"] = this.notes;
-        data["status"] = this.status;
-        data["etag"] = this.etag;
+        data["fetchedAt"] = this.fetchedAt ? this.fetchedAt.toISOString() : undefined as any;
         return data;
+    }
+}
+
+/** Novel metadata stored with a scraping. */
+export interface IScrapingMetadataResponse {
+    sourceNovelId: string;
+    title: string;
+    author?: Author4;
+    category?: Category2;
+    updatedDate?: UpdatedDate2;
+    protagonists?: string[];
+    description?: Description4;
+    coverImageUrl?: CoverImageUrl4;
+    fetchedAt: Date;
+
+    [key: string]: any;
+}
+
+/** Complete progress returned by the detail endpoint. */
+export class ScrapingProgressResponse implements IScrapingProgressResponse {
+    total!: number;
+    completed!: number;
+    failed!: number;
+    pending!: number;
+    processing!: number;
+    retrying!: number;
+
+    [key: string]: any;
+
+    constructor(data?: IScrapingProgressResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.total = _data["total"];
+            this.completed = _data["completed"];
+            this.failed = _data["failed"];
+            this.pending = _data["pending"];
+            this.processing = _data["processing"];
+            this.retrying = _data["retrying"];
+        }
+    }
+
+    static fromJS(data: any): ScrapingProgressResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new ScrapingProgressResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["total"] = this.total;
+        data["completed"] = this.completed;
+        data["failed"] = this.failed;
+        data["pending"] = this.pending;
+        data["processing"] = this.processing;
+        data["retrying"] = this.retrying;
+        return data;
+    }
+}
+
+/** Complete progress returned by the detail endpoint. */
+export interface IScrapingProgressResponse {
+    total: number;
+    completed: number;
+    failed: number;
+    pending: number;
+    processing: number;
+    retrying: number;
+
+    [key: string]: any;
+}
+
+/** Compact progress returned in list/create responses. */
+export class ScrapingProgressSummaryResponse implements IScrapingProgressSummaryResponse {
+    total!: number;
+    completed!: number;
+    failed!: number;
+
+    [key: string]: any;
+
+    constructor(data?: IScrapingProgressSummaryResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.total = _data["total"];
+            this.completed = _data["completed"];
+            this.failed = _data["failed"];
+        }
+    }
+
+    static fromJS(data: any): ScrapingProgressSummaryResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new ScrapingProgressSummaryResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["total"] = this.total;
+        data["completed"] = this.completed;
+        data["failed"] = this.failed;
+        return data;
+    }
+}
+
+/** Compact progress returned in list/create responses. */
+export interface IScrapingProgressSummaryResponse {
+    total: number;
+    completed: number;
+    failed: number;
+
+    [key: string]: any;
+}
+
+/** One task result returned by the API. */
+export class ScrapingResultResponse implements IScrapingResultResponse {
+    scrapingId!: string;
+    taskId!: string;
+    title!: string;
+    chapterNumber?: ChapterNumber3;
+    content?: string[];
+    createdAt!: Date;
+
+    [key: string]: any;
+
+    constructor(data?: IScrapingResultResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.scrapingId = _data["scrapingId"];
+            this.taskId = _data["taskId"];
+            this.title = _data["title"];
+            this.chapterNumber = _data["chapterNumber"];
+            if (Array.isArray(_data["content"])) {
+                this.content = [] as any;
+                for (let item of _data["content"])
+                    this.content!.push(item);
+            }
+            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
+        }
+    }
+
+    static fromJS(data: any): ScrapingResultResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new ScrapingResultResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["scrapingId"] = this.scrapingId;
+        data["taskId"] = this.taskId;
+        data["title"] = this.title;
+        data["chapterNumber"] = this.chapterNumber;
+        if (Array.isArray(this.content)) {
+            data["content"] = [];
+            for (let item of this.content)
+                data["content"].push(item);
+        }
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
+        return data;
+    }
+}
+
+/** One task result returned by the API. */
+export interface IScrapingResultResponse {
+    scrapingId: string;
+    taskId: string;
+    title: string;
+    chapterNumber?: ChapterNumber3;
+    content?: string[];
+    createdAt: Date;
+
+    [key: string]: any;
+}
+
+/** Scraping lifecycle states. */
+export enum ScrapingStatus {
+    Queued = "queued",
+    Processing = "processing",
+    Retrying = "retrying",
+    Completed = "completed",
+    Failed = "failed",
+}
+
+/** Scraping list item. */
+export class ScrapingSummaryResponse implements IScrapingSummaryResponse {
+    id!: string;
+    crawlerId!: string;
+    sourceUrl!: string;
+    title!: string;
+    coverImageUrl?: CoverImageUrl5;
+    status!: ScrapingStatus;
+    progress!: ScrapingProgressSummaryResponse;
+    attempts!: number;
+    createdAt!: Date;
+    updatedAt!: Date;
+
+    [key: string]: any;
+
+    constructor(data?: IScrapingSummaryResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+        if (!data) {
+            this.progress = new ScrapingProgressSummaryResponse();
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.id = _data["id"];
+            this.crawlerId = _data["crawlerId"];
+            this.sourceUrl = _data["sourceUrl"];
+            this.title = _data["title"];
+            this.coverImageUrl = _data["coverImageUrl"];
+            this.status = _data["status"];
+            this.progress = _data["progress"] ? ScrapingProgressSummaryResponse.fromJS(_data["progress"]) : new ScrapingProgressSummaryResponse();
+            this.attempts = _data["attempts"];
+            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
+            this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
+        }
+    }
+
+    static fromJS(data: any): ScrapingSummaryResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new ScrapingSummaryResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["id"] = this.id;
+        data["crawlerId"] = this.crawlerId;
+        data["sourceUrl"] = this.sourceUrl;
+        data["title"] = this.title;
+        data["coverImageUrl"] = this.coverImageUrl;
+        data["status"] = this.status;
+        data["progress"] = this.progress ? this.progress.toJSON() : undefined as any;
+        data["attempts"] = this.attempts;
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
+        data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
+        return data;
+    }
+}
+
+/** Scraping list item. */
+export interface IScrapingSummaryResponse {
+    id: string;
+    crawlerId: string;
+    sourceUrl: string;
+    title: string;
+    coverImageUrl?: CoverImageUrl5;
+    status: ScrapingStatus;
+    progress: ScrapingProgressSummaryResponse;
+    attempts: number;
+    createdAt: Date;
+    updatedAt: Date;
+
+    [key: string]: any;
+}
+
+/** Public embedded scraping task. */
+export class ScrapingTaskResponse implements IScrapingTaskResponse {
+    id!: string;
+    title!: string;
+    chapterNumber?: ChapterNumber4;
+    manifestIndex!: number;
+    status!: ScrapingTaskStatus;
+    attempts!: number;
+    resultAvailable!: boolean;
+    completedAt?: CompletedAt;
+
+    [key: string]: any;
+
+    constructor(data?: IScrapingTaskResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.id = _data["id"];
+            this.title = _data["title"];
+            this.chapterNumber = _data["chapterNumber"];
+            this.manifestIndex = _data["manifestIndex"];
+            this.status = _data["status"];
+            this.attempts = _data["attempts"];
+            this.resultAvailable = _data["resultAvailable"];
+            this.completedAt = _data["completedAt"];
+        }
+    }
+
+    static fromJS(data: any): ScrapingTaskResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new ScrapingTaskResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["id"] = this.id;
+        data["title"] = this.title;
+        data["chapterNumber"] = this.chapterNumber;
+        data["manifestIndex"] = this.manifestIndex;
+        data["status"] = this.status;
+        data["attempts"] = this.attempts;
+        data["resultAvailable"] = this.resultAvailable;
+        data["completedAt"] = this.completedAt;
+        return data;
+    }
+}
+
+/** Public embedded scraping task. */
+export interface IScrapingTaskResponse {
+    id: string;
+    title: string;
+    chapterNumber?: ChapterNumber4;
+    manifestIndex: number;
+    status: ScrapingTaskStatus;
+    attempts: number;
+    resultAvailable: boolean;
+    completedAt?: CompletedAt;
+
+    [key: string]: any;
+}
+
+/** Embedded scraping task lifecycle states. */
+export enum ScrapingTaskStatus {
+    Pending = "pending",
+    Processing = "processing",
+    Retrying = "retrying",
+    Completed = "completed",
+    Failed = "failed",
+}
+
+/** Issued on successful login. */
+/** Payload for creating a novel. */
+export class NovelCreateRequest implements INovelCreateRequest {
+    title!: string;
+    description?: unknown;
+    coverImageUrl?: unknown;
+    language?: unknown;
+    author?: unknown;
+    tags?: unknown;
+    notes?: unknown;
+
+    [key: string]: any;
+
+    constructor(data?: INovelCreateRequest) {
+        if (data) Object.assign(this, data);
+    }
+}
+
+/** Payload for creating a novel. */
+export interface INovelCreateRequest {
+    title: string;
+    description?: unknown;
+    coverImageUrl?: unknown;
+    language?: unknown;
+    author?: unknown;
+    tags?: unknown;
+    notes?: unknown;
+
+    [key: string]: any;
+}
+
+/** Payload for partially updating a novel. */
+export class NovelUpdateRequest implements INovelUpdateRequest {
+    title?: unknown;
+    description?: unknown;
+    coverImageUrl?: unknown;
+    language?: unknown;
+    author?: unknown;
+    tags?: unknown;
+    notes?: unknown;
+    status?: unknown;
+    etag?: unknown;
+
+    [key: string]: any;
+
+    constructor(data?: INovelUpdateRequest) {
+        if (data) Object.assign(this, data);
     }
 }
 
 /** Payload for partially updating a novel. */
 export interface INovelUpdateRequest {
-    title?: Title;
-    description?: Description4;
-    coverImageUrl?: CoverImageUrl4;
-    language?: Language3;
-    author?: Author4;
-    tags?: Tags2;
-    notes?: Notes3;
-    status?: Status;
-    etag?: Etag2;
+    title?: unknown;
+    description?: unknown;
+    coverImageUrl?: unknown;
+    language?: unknown;
+    author?: unknown;
+    tags?: unknown;
+    notes?: unknown;
+    status?: unknown;
+    etag?: unknown;
 
     [key: string]: any;
 }
 
-/** Issued on successful login. */
 export class TokenResponse implements ITokenResponse {
     access_token!: string;
     token_type?: string;
@@ -1770,7 +2880,7 @@ export interface IUserCreateRequest {
 /** Paged response for listing users. */
 export class UserListResponse implements IUserListResponse {
     items!: UserResponse[];
-    continuationToken?: ContinuationToken2;
+    continuationToken?: ContinuationToken3;
 
     [key: string]: any;
 
@@ -1827,7 +2937,7 @@ export class UserListResponse implements IUserListResponse {
 /** Paged response for listing users. */
 export interface IUserListResponse {
     items: UserResponse[];
-    continuationToken?: ContinuationToken2;
+    continuationToken?: ContinuationToken3;
 
     [key: string]: any;
 }
@@ -2108,270 +3218,6 @@ export interface IContinuationtoken {
     [key: string]: any;
 }
 
-export class Anonymous implements IAnonymous {
-
-    [key: string]: any;
-
-    constructor(data?: IAnonymous) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Anonymous {
-        data = typeof data === 'object' ? data : {};
-        let result = new Anonymous();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IAnonymous {
-
-    [key: string]: any;
-}
-
-export class ChapterNumber implements IChapterNumber {
-
-    [key: string]: any;
-
-    constructor(data?: IChapterNumber) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): ChapterNumber {
-        data = typeof data === 'object' ? data : {};
-        let result = new ChapterNumber();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IChapterNumber {
-
-    [key: string]: any;
-}
-
-export class ChapterNumber2 implements IChapterNumber2 {
-
-    [key: string]: any;
-
-    constructor(data?: IChapterNumber2) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): ChapterNumber2 {
-        data = typeof data === 'object' ? data : {};
-        let result = new ChapterNumber2();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IChapterNumber2 {
-
-    [key: string]: any;
-}
-
-export class Author implements IAuthor {
-
-    [key: string]: any;
-
-    constructor(data?: IAuthor) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Author {
-        data = typeof data === 'object' ? data : {};
-        let result = new Author();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IAuthor {
-
-    [key: string]: any;
-}
-
-export class Category implements ICategory {
-
-    [key: string]: any;
-
-    constructor(data?: ICategory) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Category {
-        data = typeof data === 'object' ? data : {};
-        let result = new Category();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface ICategory {
-
-    [key: string]: any;
-}
-
-export class UpdatedDate implements IUpdatedDate {
-
-    [key: string]: any;
-
-    constructor(data?: IUpdatedDate) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): UpdatedDate {
-        data = typeof data === 'object' ? data : {};
-        let result = new UpdatedDate();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IUpdatedDate {
-
-    [key: string]: any;
-}
-
 export class Description implements IDescription {
 
     [key: string]: any;
@@ -2412,138 +3258,6 @@ export class Description implements IDescription {
 }
 
 export interface IDescription {
-
-    [key: string]: any;
-}
-
-export class CoverImageUrl implements ICoverImageUrl {
-
-    [key: string]: any;
-
-    constructor(data?: ICoverImageUrl) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): CoverImageUrl {
-        data = typeof data === 'object' ? data : {};
-        let result = new CoverImageUrl();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface ICoverImageUrl {
-
-    [key: string]: any;
-}
-
-export class Description2 implements IDescription2 {
-
-    [key: string]: any;
-
-    constructor(data?: IDescription2) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Description2 {
-        data = typeof data === 'object' ? data : {};
-        let result = new Description2();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IDescription2 {
-
-    [key: string]: any;
-}
-
-export class CoverImageUrl2 implements ICoverImageUrl2 {
-
-    [key: string]: any;
-
-    constructor(data?: ICoverImageUrl2) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): CoverImageUrl2 {
-        data = typeof data === 'object' ? data : {};
-        let result = new CoverImageUrl2();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface ICoverImageUrl2 {
 
     [key: string]: any;
 }
@@ -2592,11 +3306,11 @@ export interface ILanguage {
     [key: string]: any;
 }
 
-export class Author2 implements IAuthor2 {
+export class Author implements IAuthor {
 
     [key: string]: any;
 
-    constructor(data?: IAuthor2) {
+    constructor(data?: IAuthor) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -2614,9 +3328,9 @@ export class Author2 implements IAuthor2 {
         }
     }
 
-    static fromJS(data: any): Author2 {
+    static fromJS(data: any): Author {
         data = typeof data === 'object' ? data : {};
-        let result = new Author2();
+        let result = new Author();
         result.init(data);
         return result;
     }
@@ -2631,7 +3345,7 @@ export class Author2 implements IAuthor2 {
     }
 }
 
-export interface IAuthor2 {
+export interface IAuthor {
 
     [key: string]: any;
 }
@@ -2724,6 +3438,886 @@ export interface INotes {
     [key: string]: any;
 }
 
+export class Coverimage implements ICoverimage {
+
+    [key: string]: any;
+
+    constructor(data?: ICoverimage) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Coverimage {
+        data = typeof data === 'object' ? data : {};
+        let result = new Coverimage();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ICoverimage {
+
+    [key: string]: any;
+}
+
+export class Anonymous implements IAnonymous {
+
+    [key: string]: any;
+
+    constructor(data?: IAnonymous) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Anonymous {
+        data = typeof data === 'object' ? data : {};
+        let result = new Anonymous();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAnonymous {
+
+    [key: string]: any;
+}
+
+export class Title implements ITitle {
+
+    [key: string]: any;
+
+    constructor(data?: ITitle) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Title {
+        data = typeof data === 'object' ? data : {};
+        let result = new Title();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ITitle {
+
+    [key: string]: any;
+}
+
+export class Anonymous2 implements IAnonymous2 {
+
+    [key: string]: any;
+
+    constructor(data?: IAnonymous2) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Anonymous2 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Anonymous2();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAnonymous2 {
+
+    [key: string]: any;
+}
+
+export class Anonymous3 implements IAnonymous3 {
+
+    [key: string]: any;
+
+    constructor(data?: IAnonymous3) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Anonymous3 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Anonymous3();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAnonymous3 {
+
+    [key: string]: any;
+}
+
+export class Anonymous4 implements IAnonymous4 {
+
+    [key: string]: any;
+
+    constructor(data?: IAnonymous4) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Anonymous4 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Anonymous4();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAnonymous4 {
+
+    [key: string]: any;
+}
+
+export class Anonymous5 implements IAnonymous5 {
+
+    [key: string]: any;
+
+    constructor(data?: IAnonymous5) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Anonymous5 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Anonymous5();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAnonymous5 {
+
+    [key: string]: any;
+}
+
+export class Anonymous6 implements IAnonymous6 {
+
+    [key: string]: any;
+
+    constructor(data?: IAnonymous6) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Anonymous6 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Anonymous6();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAnonymous6 {
+
+    [key: string]: any;
+}
+
+export class Status implements IStatus {
+
+    [key: string]: any;
+
+    constructor(data?: IStatus) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Status {
+        data = typeof data === 'object' ? data : {};
+        let result = new Status();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IStatus {
+
+    [key: string]: any;
+}
+
+export class Etag implements IEtag {
+
+    [key: string]: any;
+
+    constructor(data?: IEtag) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Etag {
+        data = typeof data === 'object' ? data : {};
+        let result = new Etag();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IEtag {
+
+    [key: string]: any;
+}
+
+export class Anonymous7 implements IAnonymous7 {
+
+    [key: string]: any;
+
+    constructor(data?: IAnonymous7) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Anonymous7 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Anonymous7();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAnonymous7 {
+
+    [key: string]: any;
+}
+
+export class Anonymous8 implements IAnonymous8 {
+
+    [key: string]: any;
+
+    constructor(data?: IAnonymous8) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Anonymous8 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Anonymous8();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAnonymous8 {
+
+    [key: string]: any;
+}
+
+export class Anonymous9 implements IAnonymous9 {
+
+    [key: string]: any;
+
+    constructor(data?: IAnonymous9) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Anonymous9 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Anonymous9();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAnonymous9 {
+
+    [key: string]: any;
+}
+
+export class ChapterNumber implements IChapterNumber {
+
+    [key: string]: any;
+
+    constructor(data?: IChapterNumber) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): ChapterNumber {
+        data = typeof data === 'object' ? data : {};
+        let result = new ChapterNumber();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IChapterNumber {
+
+    [key: string]: any;
+}
+
+export class ChapterNumber2 implements IChapterNumber2 {
+
+    [key: string]: any;
+
+    constructor(data?: IChapterNumber2) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): ChapterNumber2 {
+        data = typeof data === 'object' ? data : {};
+        let result = new ChapterNumber2();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IChapterNumber2 {
+
+    [key: string]: any;
+}
+
+export class Author2 implements IAuthor2 {
+
+    [key: string]: any;
+
+    constructor(data?: IAuthor2) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Author2 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Author2();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAuthor2 {
+
+    [key: string]: any;
+}
+
+export class Category implements ICategory {
+
+    [key: string]: any;
+
+    constructor(data?: ICategory) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Category {
+        data = typeof data === 'object' ? data : {};
+        let result = new Category();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ICategory {
+
+    [key: string]: any;
+}
+
+export class UpdatedDate implements IUpdatedDate {
+
+    [key: string]: any;
+
+    constructor(data?: IUpdatedDate) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): UpdatedDate {
+        data = typeof data === 'object' ? data : {};
+        let result = new UpdatedDate();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IUpdatedDate {
+
+    [key: string]: any;
+}
+
+export class Description2 implements IDescription2 {
+
+    [key: string]: any;
+
+    constructor(data?: IDescription2) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Description2 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Description2();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IDescription2 {
+
+    [key: string]: any;
+}
+
+export class CoverImageUrl implements ICoverImageUrl {
+
+    [key: string]: any;
+
+    constructor(data?: ICoverImageUrl) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): CoverImageUrl {
+        data = typeof data === 'object' ? data : {};
+        let result = new CoverImageUrl();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ICoverImageUrl {
+
+    [key: string]: any;
+}
+
 export class ContinuationToken implements IContinuationToken {
 
     [key: string]: any;
@@ -2812,11 +4406,11 @@ export interface IDescription3 {
     [key: string]: any;
 }
 
-export class CoverImageUrl3 implements ICoverImageUrl3 {
+export class CoverImageUrl2 implements ICoverImageUrl2 {
 
     [key: string]: any;
 
-    constructor(data?: ICoverImageUrl3) {
+    constructor(data?: ICoverImageUrl2) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -2834,9 +4428,9 @@ export class CoverImageUrl3 implements ICoverImageUrl3 {
         }
     }
 
-    static fromJS(data: any): CoverImageUrl3 {
+    static fromJS(data: any): CoverImageUrl2 {
         data = typeof data === 'object' ? data : {};
-        let result = new CoverImageUrl3();
+        let result = new CoverImageUrl2();
         result.init(data);
         return result;
     }
@@ -2851,7 +4445,7 @@ export class CoverImageUrl3 implements ICoverImageUrl3 {
     }
 }
 
-export interface ICoverImageUrl3 {
+export interface ICoverImageUrl2 {
 
     [key: string]: any;
 }
@@ -2988,11 +4582,11 @@ export interface INotes2 {
     [key: string]: any;
 }
 
-export class Etag implements IEtag {
+export class Etag2 implements IEtag2 {
 
     [key: string]: any;
 
-    constructor(data?: IEtag) {
+    constructor(data?: IEtag2) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -3010,9 +4604,9 @@ export class Etag implements IEtag {
         }
     }
 
-    static fromJS(data: any): Etag {
+    static fromJS(data: any): Etag2 {
         data = typeof data === 'object' ? data : {};
-        let result = new Etag();
+        let result = new Etag2();
         result.init(data);
         return result;
     }
@@ -3027,16 +4621,16 @@ export class Etag implements IEtag {
     }
 }
 
-export interface IEtag {
+export interface IEtag2 {
 
     [key: string]: any;
 }
 
-export class Title implements ITitle {
+export class CoverImageUrl3 implements ICoverImageUrl3 {
 
     [key: string]: any;
 
-    constructor(data?: ITitle) {
+    constructor(data?: ICoverImageUrl3) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -3054,9 +4648,9 @@ export class Title implements ITitle {
         }
     }
 
-    static fromJS(data: any): Title {
+    static fromJS(data: any): CoverImageUrl3 {
         data = typeof data === 'object' ? data : {};
-        let result = new Title();
+        let result = new CoverImageUrl3();
         result.init(data);
         return result;
     }
@@ -3071,7 +4665,227 @@ export class Title implements ITitle {
     }
 }
 
-export interface ITitle {
+export interface ICoverImageUrl3 {
+
+    [key: string]: any;
+}
+
+export class LastError implements ILastError {
+
+    [key: string]: any;
+
+    constructor(data?: ILastError) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): LastError {
+        data = typeof data === 'object' ? data : {};
+        let result = new LastError();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ILastError {
+
+    [key: string]: any;
+}
+
+export class ContinuationToken2 implements IContinuationToken2 {
+
+    [key: string]: any;
+
+    constructor(data?: IContinuationToken2) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): ContinuationToken2 {
+        data = typeof data === 'object' ? data : {};
+        let result = new ContinuationToken2();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IContinuationToken2 {
+
+    [key: string]: any;
+}
+
+export class Author4 implements IAuthor4 {
+
+    [key: string]: any;
+
+    constructor(data?: IAuthor4) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Author4 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Author4();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAuthor4 {
+
+    [key: string]: any;
+}
+
+export class Category2 implements ICategory2 {
+
+    [key: string]: any;
+
+    constructor(data?: ICategory2) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Category2 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Category2();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ICategory2 {
+
+    [key: string]: any;
+}
+
+export class UpdatedDate2 implements IUpdatedDate2 {
+
+    [key: string]: any;
+
+    constructor(data?: IUpdatedDate2) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): UpdatedDate2 {
+        data = typeof data === 'object' ? data : {};
+        let result = new UpdatedDate2();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IUpdatedDate2 {
 
     [key: string]: any;
 }
@@ -3164,11 +4978,11 @@ export interface ICoverImageUrl4 {
     [key: string]: any;
 }
 
-export class Language3 implements ILanguage3 {
+export class ChapterNumber3 implements IChapterNumber3 {
 
     [key: string]: any;
 
-    constructor(data?: ILanguage3) {
+    constructor(data?: IChapterNumber3) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -3186,9 +5000,9 @@ export class Language3 implements ILanguage3 {
         }
     }
 
-    static fromJS(data: any): Language3 {
+    static fromJS(data: any): ChapterNumber3 {
         data = typeof data === 'object' ? data : {};
-        let result = new Language3();
+        let result = new ChapterNumber3();
         result.init(data);
         return result;
     }
@@ -3203,16 +5017,16 @@ export class Language3 implements ILanguage3 {
     }
 }
 
-export interface ILanguage3 {
+export interface IChapterNumber3 {
 
     [key: string]: any;
 }
 
-export class Author4 implements IAuthor4 {
+export class CoverImageUrl5 implements ICoverImageUrl5 {
 
     [key: string]: any;
 
-    constructor(data?: IAuthor4) {
+    constructor(data?: ICoverImageUrl5) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -3230,9 +5044,9 @@ export class Author4 implements IAuthor4 {
         }
     }
 
-    static fromJS(data: any): Author4 {
+    static fromJS(data: any): CoverImageUrl5 {
         data = typeof data === 'object' ? data : {};
-        let result = new Author4();
+        let result = new CoverImageUrl5();
         result.init(data);
         return result;
     }
@@ -3247,16 +5061,16 @@ export class Author4 implements IAuthor4 {
     }
 }
 
-export interface IAuthor4 {
+export interface ICoverImageUrl5 {
 
     [key: string]: any;
 }
 
-export class Tags2 implements ITags2 {
+export class ChapterNumber4 implements IChapterNumber4 {
 
     [key: string]: any;
 
-    constructor(data?: ITags2) {
+    constructor(data?: IChapterNumber4) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -3274,9 +5088,9 @@ export class Tags2 implements ITags2 {
         }
     }
 
-    static fromJS(data: any): Tags2 {
+    static fromJS(data: any): ChapterNumber4 {
         data = typeof data === 'object' ? data : {};
-        let result = new Tags2();
+        let result = new ChapterNumber4();
         result.init(data);
         return result;
     }
@@ -3291,16 +5105,16 @@ export class Tags2 implements ITags2 {
     }
 }
 
-export interface ITags2 {
+export interface IChapterNumber4 {
 
     [key: string]: any;
 }
 
-export class Notes3 implements INotes3 {
+export class CompletedAt implements ICompletedAt {
 
     [key: string]: any;
 
-    constructor(data?: INotes3) {
+    constructor(data?: ICompletedAt) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -3318,9 +5132,9 @@ export class Notes3 implements INotes3 {
         }
     }
 
-    static fromJS(data: any): Notes3 {
+    static fromJS(data: any): CompletedAt {
         data = typeof data === 'object' ? data : {};
-        let result = new Notes3();
+        let result = new CompletedAt();
         result.init(data);
         return result;
     }
@@ -3335,95 +5149,7 @@ export class Notes3 implements INotes3 {
     }
 }
 
-export interface INotes3 {
-
-    [key: string]: any;
-}
-
-export class Status implements IStatus {
-
-    [key: string]: any;
-
-    constructor(data?: IStatus) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Status {
-        data = typeof data === 'object' ? data : {};
-        let result = new Status();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IStatus {
-
-    [key: string]: any;
-}
-
-export class Etag2 implements IEtag2 {
-
-    [key: string]: any;
-
-    constructor(data?: IEtag2) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Etag2 {
-        data = typeof data === 'object' ? data : {};
-        let result = new Etag2();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IEtag2 {
+export interface ICompletedAt {
 
     [key: string]: any;
 }
@@ -3472,11 +5198,11 @@ export interface IDisplayName {
     [key: string]: any;
 }
 
-export class ContinuationToken2 implements IContinuationToken2 {
+export class ContinuationToken3 implements IContinuationToken3 {
 
     [key: string]: any;
 
-    constructor(data?: IContinuationToken2) {
+    constructor(data?: IContinuationToken3) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -3494,9 +5220,9 @@ export class ContinuationToken2 implements IContinuationToken2 {
         }
     }
 
-    static fromJS(data: any): ContinuationToken2 {
+    static fromJS(data: any): ContinuationToken3 {
         data = typeof data === 'object' ? data : {};
-        let result = new ContinuationToken2();
+        let result = new ContinuationToken3();
         result.init(data);
         return result;
     }
@@ -3511,7 +5237,7 @@ export class ContinuationToken2 implements IContinuationToken2 {
     }
 }
 
-export interface IContinuationToken2 {
+export interface IContinuationToken3 {
 
     [key: string]: any;
 }
