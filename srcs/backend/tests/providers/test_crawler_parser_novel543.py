@@ -32,6 +32,17 @@ NOVEL543_HTML = """
       <section class="description">
         簡介：瞎眼少年林牧下山行醫，意外救下聖女，兩人踏上尋找真相的旅程。
       </section>
+    </main>
+  </body>
+</html>
+"""
+
+NOVEL543_DIRECTORY_HTML = """
+<!doctype html>
+<html lang="zh-Hant">
+  <body>
+    <main class="book">
+      <h1>瞎眼神醫，開局遇到聖女報恩 章節列表</h1>
       <section class="latest-chapters">
         <h2>最新章節</h2>
         <ul>
@@ -55,7 +66,11 @@ NOVEL543_HTML = """
 
 
 def test_novel543_parser_extracts_expected_metadata() -> None:
-    metadata = parse_novel543_metadata(NOVEL543_HTML, SOURCE_URL)
+    metadata = parse_novel543_metadata(
+        NOVEL543_HTML,
+        SOURCE_URL,
+        directory_html=NOVEL543_DIRECTORY_HTML,
+    )
 
     assert metadata.source_novel_id == "0603625457"
     assert metadata.title == "瞎眼神醫，開局遇到聖女報恩"

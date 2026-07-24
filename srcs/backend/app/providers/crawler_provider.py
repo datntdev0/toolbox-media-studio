@@ -241,18 +241,31 @@ def fetch_metadata(
     metadata_cache_type = _cache_type(source.crawler_id, _CACHE_KIND_METADATA)
     cache_key = source.canonical_url
 
-    html = get_cached_html(cache_provider, source) if use_cache else None
-    html_from_cache = html is not None
-    if html is None:
-        html = _fetch_html(source.canonical_url, proxy_provider)
-        cache_provider.set(html_cache_type, cache_key, html)
+    directory_html = get_cached_html(cache_provider, source) if use_cache else None
+    directory_html_from_cache = directory_html is not None
+    if directory_html is None:
+        directory_html = _fetch_html(source.canonical_url, proxy_provider)
+        cache_provider.set(html_cache_type, cache_key, directory_html)
 
-    parsed = _parse_metadata(source, html)
+    novel_page_url = _novel_metadata_url(source)
+    novel_page_source = CrawlerSource(
+        crawler_id=source.crawler_id,
+        source_url=novel_page_url,
+        canonical_url=novel_page_url,
+        source_novel_id=source.source_novel_id,
+    )
+    novel_html = get_cached_html(cache_provider, novel_page_source) if use_cache else None
+    novel_html_from_cache = novel_html is not None
+    if novel_html is None:
+        novel_html = _fetch_html(novel_page_url, proxy_provider)
+        cache_provider.set(html_cache_type, novel_page_url, novel_html)
+
+    parsed = _parse_metadata(source, novel_html, directory_html)
     response = _to_metadata_response(
         crawler_id=source.crawler_id,
         source_url=source.canonical_url,
         parsed=parsed,
-        cached=html_from_cache,
+        cached=directory_html_from_cache and novel_html_from_cache,
         fetched_at=datetime.now(UTC),
     )
     cache_provider.set(metadata_cache_type, cache_key, response.model_dump(mode="json"))
@@ -331,14 +344,19 @@ def _fetch_html(canonical_url: str, proxy_provider: ProxyProvider) -> str:
     return result.html
 
 
-def _parse_metadata(source: CrawlerSource, html: str) -> ParsedNovelMetadata:
+def _parse_metadata(
+    source: CrawlerSource,
+    novel_html: str,
+    directory_html: str,
+) -> ParsedNovelMetadata:
     match source.crawler_id:
         case NOVEL543_CRAWLER.id:
             try:
                 return parse_novel543_metadata(
-                    html=html,
-                    canonical_url=source.canonical_url,
+                    html=novel_html,
+                    canonical_url=_novel_metadata_url(source),
                     source_novel_id=source.source_novel_id,
+                    directory_html=directory_html,
                 )
             except Novel543ParseError as exc:
                 raise CrawlerFetchError("Crawler HTML could not be parsed") from exc
@@ -444,6 +462,19 @@ def _novel_url_from_source(crawler_id: str, chapter_url: str, source_novel_id: s
 
 def _novel_url(crawler: CrawlerDefinition, host: str, source_novel_id: str) -> str:
     return f"{crawler.scheme}://{host}/{source_novel_id}/dir"
+
+
+def _novel_metadata_url(source: CrawlerSource) -> str:
+    parsed = urlsplit(source.canonical_url)
+    return urlunsplit(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            f"/{source.source_novel_id}",
+            "",
+            "",
+        )
+    )
 
 
 def _cache_type(crawler_id: str, kind: str) -> str:

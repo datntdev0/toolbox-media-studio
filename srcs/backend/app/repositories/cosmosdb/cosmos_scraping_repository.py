@@ -27,7 +27,7 @@ from app.repositories.scraping_repository import (
     reconciled_scraping_status,
 )
 
-SCRAPINGS_CONTAINER_NAME = "scrapings"
+SCRAPINGS_CONTAINER_NAME = "domain.scrapings"
 
 
 class CosmosScrapingRepository:
@@ -58,7 +58,17 @@ class CosmosScrapingRepository:
             return ScrapingCreateResult(scraping=existing, created=False)
         return ScrapingCreateResult(scraping=self._deserialize(item), created=True)
 
-    def get(self, id: str, created_by: str) -> Scraping | None:
+    def get(self, id: str, created_by: str | None = None) -> Scraping | None:
+        if created_by is None:
+            items = list(
+                self._container.query_items(
+                    query="SELECT TOP 1 * FROM c WHERE c.id = @id",
+                    parameters=[{"name": "@id", "value": id}],
+                    enable_cross_partition_query=True,
+                )
+            )
+            return self._deserialize(items[0]) if items else None
+
         try:
             item = cast(
                 dict[str, Any],
@@ -68,31 +78,46 @@ class CosmosScrapingRepository:
             return None
         return self._deserialize(item)
 
+    def delete(self, id: str, created_by: str) -> None:
+        try:
+            self._container.delete_item(item=id, partition_key=created_by)
+        except exceptions.CosmosResourceNotFoundError as exc:
+            raise ScrapingNotFoundError from exc
+
     def list(
         self,
-        created_by: str,
+        created_by: str | None,
         limit: int,
         continuation_token: str | None,
         status: ScrapingStatus | None,
     ) -> ScrapingPage:
-        query = """
-        SELECT * FROM c
-        WHERE c.createdBy = @created_by
-        """
-        parameters: list[dict[str, object]] = [
-            {"name": "@created_by", "value": created_by},
-        ]
+        query = "SELECT * FROM c"
+        conditions: list[str] = []
+        parameters: list[dict[str, object]] = []
+        if created_by is not None:
+            conditions.append("c.createdBy = @created_by")
+            parameters.append({"name": "@created_by", "value": created_by})
         if status is not None:
-            query += " AND c.status = @status"
+            conditions.append("c.status = @status")
             parameters.append({"name": "@status", "value": status.value})
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY c.updatedAt DESC"
 
-        iterator = self._container.query_items(
-            query=query,
-            parameters=parameters,
-            partition_key=created_by,
-            max_item_count=limit,
-        )
+        if created_by is None:
+            iterator = self._container.query_items(
+                query=query,
+                parameters=parameters,
+                enable_cross_partition_query=True,
+                max_item_count=limit,
+            )
+        else:
+            iterator = self._container.query_items(
+                query=query,
+                parameters=parameters,
+                partition_key=created_by,
+                max_item_count=limit,
+            )
         page_iterator = iterator.by_page(continuation_token=continuation_token)
         page = list(next(page_iterator, []))
         return ScrapingPage(

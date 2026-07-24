@@ -52,6 +52,7 @@ class FakeFlareSolverrClient:
 
     def __init__(self) -> None:
         self.html = "<html><body><h1>Test Novel</h1></body></html>"
+        self.html_by_url: dict[str, str] = {}
         self.calls: list[tuple[str, int | None]] = []
         self.exception: Exception | None = None
 
@@ -59,7 +60,7 @@ class FakeFlareSolverrClient:
         self.calls.append((url, max_timeout_ms))
         if self.exception is not None:
             raise self.exception
-        return FakeFlareSolverrResult(html=self.html)
+        return FakeFlareSolverrResult(html=self.html_by_url.get(url, self.html))
 
 
 class FakePublicBlobProvider:

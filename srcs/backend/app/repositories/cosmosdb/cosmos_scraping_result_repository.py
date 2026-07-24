@@ -13,7 +13,7 @@ from app.domain.scraping_results import ScrapingResult
 from app.repositories.scraping_repository import MAX_COSMOS_ITEM_BYTES, serialized_size
 from app.repositories.scraping_result_repository import ScrapingResultTooLargeError
 
-SCRAPING_RESULTS_CONTAINER_NAME = "scraping.results"
+SCRAPING_RESULTS_CONTAINER_NAME = "domain.scraping_results"
 
 
 class CosmosScrapingResultRepository:
@@ -46,6 +46,28 @@ class CosmosScrapingResultRepository:
             self._container.upsert_item(body=self._serialize(result)),
         )
         return self._deserialize(item)
+
+    def delete_by_scraping(self, scraping_id: str) -> None:
+        task_ids = list(
+            self._container.query_items(
+                query=(
+                    "SELECT VALUE c.id FROM c "
+                    "WHERE c.scrapingId = @scraping_id"
+                ),
+                parameters=[
+                    {"name": "@scraping_id", "value": scraping_id},
+                ],
+                partition_key=scraping_id,
+            )
+        )
+        for task_id in task_ids:
+            try:
+                self._container.delete_item(
+                    item=cast(str, task_id),
+                    partition_key=scraping_id,
+                )
+            except exceptions.CosmosResourceNotFoundError:
+                continue
 
     @staticmethod
     def _serialize(result: ScrapingResult) -> dict[str, Any]:

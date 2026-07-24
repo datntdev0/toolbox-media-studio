@@ -50,7 +50,7 @@ class ParsedNovelMetadata:
     chapters: list[ParsedChapter]
 
 
-_NOVEL_ID_PATTERN = re.compile(r"^/(?P<source_novel_id>[0-9]+)/dir$")
+_NOVEL_ID_PATTERN = re.compile(r"^/(?P<source_novel_id>[0-9]+)(?:/dir)?$")
 _DATE_PATTERN = re.compile(
     r"(?P<year>[0-9]{4})[-/.年](?P<month>[0-9]{1,2})[-/.月](?P<day>[0-9]{1,2})"
 )
@@ -79,14 +79,19 @@ def parse_novel543_metadata(
     source_url: str | None = None,
     source_novel_id: str | None = None,
     canonical_url: str | None = None,
+    directory_html: str | None = None,
 ) -> ParsedNovelMetadata:
-    """Parse a Novel543 novel directory page into normalized metadata."""
+    """Parse Novel543 book metadata and its directory into normalized metadata."""
 
     page_url = canonical_url or source_url
     if page_url is None:
         raise Novel543ParseError("Source URL is required")
 
     soup = BeautifulSoup(html, "html.parser")
+    directory_soup = BeautifulSoup(
+        html if directory_html is None else directory_html,
+        "html.parser",
+    )
     novel_id = source_novel_id or _source_novel_id_from_url(page_url)
     title = _extract_title(soup)
     if title is None:
@@ -101,7 +106,7 @@ def parse_novel543_metadata(
         protagonists=_split_people(_extract_labeled_text(soup, _PROTAGONIST_LABELS)),
         description=_extract_description(soup),
         cover_image_url=_extract_cover_image_url(soup, page_url),
-        chapters=_extract_chapters(soup, page_url, novel_id),
+        chapters=_extract_chapters(directory_soup, page_url, novel_id),
     )
 
 

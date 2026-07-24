@@ -13,7 +13,7 @@ from tests.conftest import (
     FakeFlareSolverrClient,
 )
 
-SAMPLE_HTML = """
+NOVEL_HTML = """
 <html>
   <body>
     <img src="/cover.jpg" alt="瞎眼神醫，開局遇到聖女報恩">
@@ -21,6 +21,14 @@ SAMPLE_HTML = """
     <div>作者： 十一條金魚 分類：奇幻 更新： 2025-07-31</div>
     <div>主角： 林牧,姬梧桐</div>
     <p>報恩，她是認真的！</p>
+  </body>
+</html>
+"""
+
+DIRECTORY_HTML = """
+<html>
+  <body>
+    <h1>瞎眼神醫，開局遇到聖女報恩 章節列表</h1>
     <h3>瞎眼神醫，開局遇到聖女報恩...最新章節</h3>
     <ul>
       <li><a href="/0603625457/536.html">第536章 常回來看看（大結局）</a></li>
@@ -36,6 +44,9 @@ SAMPLE_HTML = """
   </body>
 </html>
 """
+
+DIRECTORY_URL = "https://www.novel543.com/0603625457/dir"
+NOVEL_URL = "https://www.novel543.com/0603625457"
 
 
 def _login(client: TestClient) -> str:
@@ -136,7 +147,10 @@ def test_metadata_fetches_html_through_flaresolverr_on_cache_miss(
     client: TestClient,
     flaresolverr_client: FakeFlareSolverrClient,
 ) -> None:
-    flaresolverr_client.html = SAMPLE_HTML
+    flaresolverr_client.html_by_url = {
+        DIRECTORY_URL: DIRECTORY_HTML,
+        NOVEL_URL: NOVEL_HTML,
+    }
 
     response = client.get(_metadata_url(), headers=_headers(client))
 
@@ -154,14 +168,20 @@ def test_metadata_fetches_html_through_flaresolverr_on_cache_miss(
     assert body["coverImageUrl"] == "https://www.novel543.com/cover.jpg"
     assert [chapter["chapterNumber"] for chapter in body["chapters"]] == [1, 2, 535, 536]
     assert body["cached"] is False
-    assert flaresolverr_client.calls == [("https://www.novel543.com/0603625457/dir", None)]
+    assert flaresolverr_client.calls == [
+        (DIRECTORY_URL, None),
+        (NOVEL_URL, None),
+    ]
 
 
 def test_metadata_canonicalizes_url_before_fetching(
     client: TestClient,
     flaresolverr_client: FakeFlareSolverrClient,
 ) -> None:
-    flaresolverr_client.html = SAMPLE_HTML
+    flaresolverr_client.html_by_url = {
+        DIRECTORY_URL: DIRECTORY_HTML,
+        NOVEL_URL: NOVEL_HTML,
+    }
 
     response = client.get(
         _metadata_url("https://WWW.NOVEL543.COM/0603625457/dir"),
@@ -170,7 +190,10 @@ def test_metadata_canonicalizes_url_before_fetching(
 
     assert response.status_code == 200
     assert response.json()["sourceUrl"] == "https://www.novel543.com/0603625457/dir"
-    assert flaresolverr_client.calls == [("https://www.novel543.com/0603625457/dir", None)]
+    assert flaresolverr_client.calls == [
+        (DIRECTORY_URL, None),
+        (NOVEL_URL, None),
+    ]
 
 
 def test_metadata_writes_html_and_metadata_to_cache(
@@ -178,13 +201,17 @@ def test_metadata_writes_html_and_metadata_to_cache(
     cache_provider: InMemoryCacheProvider,
     flaresolverr_client: FakeFlareSolverrClient,
 ) -> None:
-    flaresolverr_client.html = SAMPLE_HTML
+    flaresolverr_client.html_by_url = {
+        DIRECTORY_URL: DIRECTORY_HTML,
+        NOVEL_URL: NOVEL_HTML,
+    }
 
     response = client.get(_metadata_url(), headers=_headers(client))
 
     assert response.status_code == 200
-    cache_key = "https://www.novel543.com/0603625457/dir"
-    assert cache_provider.get("crawler:novel543:html", cache_key) == SAMPLE_HTML
+    cache_key = DIRECTORY_URL
+    assert cache_provider.get("crawler:novel543:html", cache_key) == DIRECTORY_HTML
+    assert cache_provider.get("crawler:novel543:html", NOVEL_URL) == NOVEL_HTML
     cached_metadata = cache_provider.get("crawler:novel543:metadata", cache_key)
     assert isinstance(cached_metadata, dict)
     assert cached_metadata["title"] == "瞎眼神醫，開局遇到聖女報恩"
@@ -197,8 +224,13 @@ def test_metadata_uses_html_cache_without_fetching(
 ) -> None:
     cache_provider.set(
         "crawler:novel543:html",
-        "https://www.novel543.com/0603625457/dir",
-        SAMPLE_HTML,
+        DIRECTORY_URL,
+        DIRECTORY_HTML,
+    )
+    cache_provider.set(
+        "crawler:novel543:html",
+        NOVEL_URL,
+        NOVEL_HTML,
     )
 
     response = client.get(_metadata_url(), headers=_headers(client))
@@ -267,7 +299,10 @@ def test_metadata_cache_false_refetches_and_updates_cached_metadata(
             "fetched_at": "2026-07-11T00:00:00+00:00",
         },
     )
-    flaresolverr_client.html = SAMPLE_HTML
+    flaresolverr_client.html_by_url = {
+        DIRECTORY_URL: DIRECTORY_HTML,
+        NOVEL_URL: NOVEL_HTML,
+    }
 
     response = client.get(f"{_metadata_url()}&cache=false", headers=_headers(client))
 
@@ -275,7 +310,10 @@ def test_metadata_cache_false_refetches_and_updates_cached_metadata(
     body = response.json()
     assert body["title"] == "瞎眼神醫，開局遇到聖女報恩"
     assert body["cached"] is False
-    assert flaresolverr_client.calls == [(cache_key, None)]
+    assert flaresolverr_client.calls == [
+        (DIRECTORY_URL, None),
+        (NOVEL_URL, None),
+    ]
     cached_metadata = cache_provider.get("crawler:novel543:metadata", cache_key)
     assert isinstance(cached_metadata, dict)
     assert cached_metadata["title"] == "瞎眼神醫，開局遇到聖女報恩"

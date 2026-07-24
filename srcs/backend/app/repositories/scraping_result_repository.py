@@ -19,6 +19,8 @@ class ScrapingResultRepository(Protocol):
 
     def upsert(self, result: ScrapingResult) -> ScrapingResult: ...
 
+    def delete_by_scraping(self, scraping_id: str) -> None: ...
+
 
 class ScrapingResultTooLargeError(ValueError):
     """Raised when one task result cannot fit in a Cosmos item."""
@@ -51,3 +53,9 @@ class InMemoryScrapingResultRepository:
             stored.etag = datetime.now(UTC).isoformat()
             self._results[(stored.scraping_id, stored.task_id)] = stored
             return deepcopy(stored)
+
+    def delete_by_scraping(self, scraping_id: str) -> None:
+        with self._lock:
+            keys = [key for key in self._results if key[0] == scraping_id]
+            for key in keys:
+                del self._results[key]

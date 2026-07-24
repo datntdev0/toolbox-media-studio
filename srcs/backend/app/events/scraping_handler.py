@@ -92,10 +92,11 @@ class ScrapingHandler(MessageHandler):
             raise ValueError("Scraping event idempotency key does not match")
 
         self._logger.info(
-            "Processing Scraping event",
-            extra={
+            "Processing Scraping event: %s",
+            {
                 "messageId": message.id,
                 "scrapingId": scraping.id,
+                "createdBy": scraping.created_by,
                 "attempt": event.attempt,
             },
         )
@@ -111,6 +112,14 @@ class ScrapingHandler(MessageHandler):
                 continue
             try:
                 scraping = self._process_task(scraping, task)
+                self._logger.info(
+                    "Scraping task completed %s",
+                    {
+                        "messageId": message.id,
+                        "scrapingId": scraping.id,
+                        "taskId": task.id,
+                    },
+                )
             except Exception as exc:
                 scraping = self._record_task_failure(scraping, task.id, exc)
 

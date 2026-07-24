@@ -28,11 +28,13 @@ class ScrapingRepository(Protocol):
 
     def create_or_get_active(self, candidate: Scraping) -> ScrapingCreateResult: ...
 
-    def get(self, id: str, created_by: str) -> Scraping | None: ...
+    def get(self, id: str, created_by: str | None = None) -> Scraping | None: ...
+
+    def delete(self, id: str, created_by: str) -> None: ...
 
     def list(
         self,
-        created_by: str,
+        created_by: str | None,
         limit: int,
         continuation_token: str | None,
         status: ScrapingStatus | None,
@@ -108,14 +110,29 @@ class InMemoryScrapingRepository:
             self._scrapings[(stored.created_by, stored.id)] = stored
             return ScrapingCreateResult(scraping=deepcopy(stored), created=True)
 
-    def get(self, id: str, created_by: str) -> Scraping | None:
+    def get(self, id: str, created_by: str | None = None) -> Scraping | None:
         with self._lock:
-            scraping = self._scrapings.get((created_by, id))
+            if created_by is None:
+                scraping = next(
+                    (
+                        item
+                        for (_, scraping_id), item in self._scrapings.items()
+                        if scraping_id == id
+                    ),
+                    None,
+                )
+            else:
+                scraping = self._scrapings.get((created_by, id))
             return deepcopy(scraping) if scraping is not None else None
+
+    def delete(self, id: str, created_by: str) -> None:
+        with self._lock:
+            if self._scrapings.pop((created_by, id), None) is None:
+                raise ScrapingNotFoundError
 
     def list(
         self,
-        created_by: str,
+        created_by: str | None,
         limit: int,
         continuation_token: str | None,
         status: ScrapingStatus | None,
@@ -129,7 +146,8 @@ class InMemoryScrapingRepository:
             items = [
                 deepcopy(scraping)
                 for (owner, _), scraping in self._scrapings.items()
-                if owner == created_by and (status is None or scraping.status == status)
+                if (created_by is None or owner == created_by)
+                and (status is None or scraping.status == status)
             ]
         items.sort(key=lambda item: (item.updated_at, item.id), reverse=True)
         page = items[offset : offset + limit]

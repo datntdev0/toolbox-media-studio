@@ -6,6 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import pytest
+
 from app.domain.scraping_results import ScrapingResult
 from app.domain.scrapings import (
     Scraping,
@@ -15,7 +17,10 @@ from app.domain.scrapings import (
     ScrapingTask,
     ScrapingTaskStatus,
 )
-from app.repositories.scraping_repository import InMemoryScrapingRepository
+from app.repositories.scraping_repository import (
+    InMemoryScrapingRepository,
+    ScrapingNotFoundError,
+)
 from app.repositories.scraping_result_repository import InMemoryScrapingResultRepository
 
 
@@ -121,11 +126,28 @@ def test_list_is_owned_sorted_filtered_and_paginated() -> None:
         None,
     )
     failed_page = repository.list("user-1", 10, None, ScrapingStatus.FAILED)
+    all_page = repository.list(None, 10, None, None)
 
     assert len(first_page.items) == 1
     assert len(second_page.items) == 1
     assert {first_page.items[0].id, second_page.items[0].id} == {first.id, second.id}
     assert [item.id for item in failed_page.items] == [second.id]
+    assert len(all_page.items) == 3
+    assert repository.get(first.id) is not None
+
+
+def test_delete_is_scoped_to_the_scraping_owner() -> None:
+    repository = InMemoryScrapingRepository()
+    scraping = repository.create_or_get_active(_scraping(created_by="user-1")).scraping
+
+    with pytest.raises(ScrapingNotFoundError):
+        repository.delete(scraping.id, "user-2")
+
+    assert repository.get(scraping.id, "user-1") is not None
+
+    repository.delete(scraping.id, "user-1")
+
+    assert repository.get(scraping.id, "user-1") is None
 
 
 def test_scraping_results_are_isolated_by_scraping_and_task() -> None:
@@ -138,6 +160,19 @@ def test_scraping_results_are_isolated_by_scraping_and_task() -> None:
     assert repository.get("scraping-1", "task-1").content == ["updated"]  # type: ignore[union-attr]
     assert repository.get("scraping-2", "task-1").content == ["second"]  # type: ignore[union-attr]
     assert second.scraping_id != updated.scraping_id
+
+
+def test_delete_scraping_results_removes_only_the_requested_partition() -> None:
+    repository = InMemoryScrapingResultRepository()
+    repository.upsert(_result("scraping-1", "task-1", ["first"]))
+    repository.upsert(_result("scraping-1", "task-2", ["second"]))
+    repository.upsert(_result("scraping-2", "task-1", ["other"]))
+
+    repository.delete_by_scraping("scraping-1")
+
+    assert repository.get("scraping-1", "task-1") is None
+    assert repository.get("scraping-1", "task-2") is None
+    assert repository.get("scraping-2", "task-1") is not None
 
 
 def _scraping(

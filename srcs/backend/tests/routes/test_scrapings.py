@@ -178,6 +178,165 @@ def test_openapi_uses_scraping_result_task_id_path_parameter(client: TestClient)
     } >= {("id", "path"), ("taskId", "path")}
 
 
+def test_delete_scraping_removes_owned_resource(
+    client: TestClient,
+    flaresolverr_client: Any,
+    scraping_repository: InMemoryScrapingRepository,
+    scraping_result_repository: InMemoryScrapingResultRepository,
+) -> None:
+    flaresolverr_client.html = METADATA_HTML
+    token = _login(client)
+    created = _create(client, token)
+    scraping = scraping_repository.get(created["id"], _admin_id(client, token))
+    assert scraping is not None
+    task = scraping.tasks[0]
+    now = datetime.now(UTC)
+    scraping_result_repository.upsert(
+        ScrapingResult(
+            id=task.id,
+            scraping_id=scraping.id,
+            task_id=task.id,
+            title=task.title,
+            chapter_number=task.chapter_number,
+            content=["result"],
+            created_at=now,
+            updated_at=now,
+        )
+    )
+
+    unauthorized = client.delete(f"/api/scrapings/{created['id']}")
+    deleted = client.delete(
+        f"/api/scrapings/{created['id']}",
+        headers=_headers(token),
+    )
+    missing = client.get(
+        f"/api/scrapings/{created['id']}",
+        headers=_headers(token),
+    )
+    deleted_again = client.delete(
+        f"/api/scrapings/{created['id']}",
+        headers=_headers(token),
+    )
+
+    assert unauthorized.status_code == 401
+    assert deleted.status_code == 204
+    assert deleted.content == b""
+    assert scraping_result_repository.get(scraping.id, task.id) is None
+    assert missing.status_code == 404
+    assert deleted_again.status_code == 404
+
+
+def test_scraping_endpoints_are_not_owner_scoped(
+    client: TestClient,
+    flaresolverr_client: Any,
+    scraping_repository: InMemoryScrapingRepository,
+    scraping_result_repository: InMemoryScrapingResultRepository,
+) -> None:
+    flaresolverr_client.html = METADATA_HTML
+    admin_token = _login(client)
+    created = _create(client, admin_token)
+    scraping = scraping_repository.get(created["id"], _admin_id(client, admin_token))
+    assert scraping is not None
+    task = scraping.tasks[0]
+    now = datetime.now(UTC)
+    scraping_result_repository.upsert(
+        ScrapingResult(
+            id=task.id,
+            scraping_id=scraping.id,
+            task_id=task.id,
+            title=task.title,
+            chapter_number=task.chapter_number,
+            content=["result"],
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    scraping_repository.update_task(
+        scraping.id,
+        scraping.created_by,
+        task.id,
+        ScrapingTaskStatus.COMPLETED,
+        attempts=1,
+        error=None,
+        result_available=True,
+        completed_at=now,
+        etag=scraping.etag,
+    )
+    member = client.post(
+        "/api/users",
+        headers=_headers(admin_token),
+        json={
+            "email": "member@example.com",
+            "password": "member-password",
+            "displayName": "Member User",
+        },
+    )
+    assert member.status_code == 201
+    member_token = _login(
+        client,
+        email="member@example.com",
+        password="member-password",
+    )
+
+    listed = client.get("/api/scrapings", headers=_headers(member_token))
+    detail = client.get(
+        f"/api/scrapings/{created['id']}",
+        headers=_headers(member_token),
+    )
+    result = client.get(
+        f"/api/scrapings/{created['id']}/results/{task.id}",
+        headers=_headers(member_token),
+    )
+    deleted = client.delete(
+        f"/api/scrapings/{created['id']}",
+        headers=_headers(member_token),
+    )
+
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()["items"]] == [created["id"]]
+    assert detail.status_code == 200
+    assert result.status_code == 200
+    assert result.json()["content"] == ["result"]
+    assert deleted.status_code == 204
+    assert scraping_result_repository.get(scraping.id, task.id) is None
+    assert client.get(
+        f"/api/scrapings/{created['id']}",
+        headers=_headers(admin_token),
+    ).status_code == 404
+
+
+def test_delete_scraping_keeps_parent_when_result_cleanup_fails(
+    client: TestClient,
+    flaresolverr_client: Any,
+    scraping_repository: InMemoryScrapingRepository,
+    scraping_result_repository: InMemoryScrapingResultRepository,
+    monkeypatch: Any,
+) -> None:
+    flaresolverr_client.html = METADATA_HTML
+    token = _login(client)
+    created = _create(client, token)
+    owner_id = _admin_id(client, token)
+
+    def fail_cleanup(scraping_id: str) -> None:
+        del scraping_id
+        raise RuntimeError("storage unavailable")
+
+    monkeypatch.setattr(
+        scraping_result_repository,
+        "delete_by_scraping",
+        fail_cleanup,
+    )
+
+    response = client.delete(
+        f"/api/scrapings/{created['id']}",
+        headers=_headers(token),
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Scraping results could not be deleted"
+    assert scraping_repository.get(created["id"], owner_id) is not None
+
+
 def _create(client: TestClient, token: str) -> dict[str, Any]:
     response = client.post(
         "/api/scrapings",
@@ -191,10 +350,14 @@ def _create(client: TestClient, token: str) -> dict[str, Any]:
     return response.json()
 
 
-def _login(client: TestClient) -> str:
+def _login(
+    client: TestClient,
+    email: str = TEST_ADMIN_EMAIL,
+    password: str = TEST_ADMIN_PASSWORD,
+) -> str:
     response = client.post(
         "/auth/login",
-        json={"email": TEST_ADMIN_EMAIL, "password": TEST_ADMIN_PASSWORD},
+        json={"email": email, "password": password},
     )
     assert response.status_code == 200
     return response.json()["access_token"]

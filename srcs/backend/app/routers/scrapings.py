@@ -45,6 +45,7 @@ from app.providers.crawler_provider import (
 )
 from app.repositories.scraping_repository import (
     ScrapingContinuationTokenError,
+    ScrapingNotFoundError,
     ScrapingTooLargeError,
 )
 
@@ -187,11 +188,12 @@ def list_scrapings_route(
     continuation_token: Annotated[str | None, Query(alias="continuationToken")] = None,
     scraping_status: Annotated[ScrapingStatus | None, Query(alias="status")] = None,
 ) -> ScrapingListResponse:
-    """List the current user's Scrapings."""
+    """List Scrapings."""
 
+    del session_user
     try:
         page = repository_scraping.list(
-            created_by=session_user.id,
+            created_by=None,
             limit=limit,
             continuation_token=continuation_token,
             status=scraping_status,
@@ -217,15 +219,53 @@ def get_scraping_route(
     repository_scraping: RepositoryScrapingDep,
     id: str,
 ) -> ScrapingDetailResponse:
-    """Return one user-owned Scraping with embedded tasks."""
+    """Return one Scraping with embedded tasks."""
 
-    scraping = repository_scraping.get(id, session_user.id)
+    del session_user
+    scraping = repository_scraping.get(id)
     if scraping is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Scraping not found",
         )
     return to_scraping_detail(scraping)
+
+
+@router.delete(
+    "/{id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    operation_id="delete_scraping",
+)
+def delete_scraping_route(
+    session_user: SessionUser,
+    repository_scraping: RepositoryScrapingDep,
+    repository_scraping_result: RepositoryScrapingResultDep,
+    id: str,
+) -> Response:
+    """Delete one Scraping and its results."""
+
+    del session_user
+    scraping = repository_scraping.get(id)
+    if scraping is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Scraping not found",
+        )
+    try:
+        repository_scraping_result.delete_by_scraping(scraping.id)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Scraping results could not be deleted",
+        ) from exc
+    try:
+        repository_scraping.delete(scraping.id, scraping.created_by)
+    except ScrapingNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Scraping not found",
+        ) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
@@ -242,7 +282,8 @@ def get_scraping_result_route(
 ) -> ScrapingResultResponse:
     """Return the isolated result for one completed embedded task."""
 
-    scraping = repository_scraping.get(id, session_user.id)
+    del session_user
+    scraping = repository_scraping.get(id)
     if scraping is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
