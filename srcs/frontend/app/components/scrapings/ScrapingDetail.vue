@@ -2,7 +2,7 @@
 import type { AccordionItem } from '@nuxt/ui'
 import {
   ApiException,
-  ScrapingStatus,
+  ScrapingStartRequest,
   ScrapingTaskStatus,
   type ScrapingDetailResponse,
   type ScrapingResultResponse,
@@ -10,7 +10,7 @@ import {
 } from '~~/shared/api-services/srv-core.client'
 import {
   formatExactTime,
-  scrapingStatusMeta,
+  scrapingActivityMeta,
   scrapingTaskStatusMeta,
   sourceHost
 } from '~/utils/scrapings'
@@ -22,6 +22,15 @@ type ChapterItem = AccordionItem & {
 const CHAPTER_HEADER_HEIGHT = 52
 const CHAPTER_BODY_HEIGHT = 468
 const CHAPTER_OVERSCAN = 6
+const detailTabItems = [{
+  label: 'Overview',
+  value: 'overview',
+  icon: 'lucide:layout-dashboard'
+}, {
+  label: 'Chapters',
+  value: 'chapters',
+  icon: 'lucide:list-tree'
+}]
 
 const props = defineProps<{
   scrapingId: string
@@ -48,17 +57,47 @@ const pendingChapterScrollTop = shallowRef(0)
 let chapterScrollFrame: number | undefined
 const resultLoading = reactive<Record<string, boolean>>({})
 const resultErrors = reactive<Record<string, string>>({})
+const starting = ref(false)
+const stopping = ref(false)
+const startError = ref('')
+const rangeInitializedFor = ref('')
+const selectedDetailTab = ref('overview')
+const startState = reactive({
+  chapterFrom: 1,
+  chapterTo: 1,
+  refetch: false,
+  force: false
+})
+const toast = useToast()
 const resultCache = useState<Record<string, ScrapingResultResponse>>(
   'scrapings:result-cache',
   () => ({})
 )
 
-const statusMeta = computed(() => detail.value
-  ? scrapingStatusMeta[detail.value.status]
-  : scrapingStatusMeta[ScrapingStatus.Queued])
+const activityMeta = computed(() => detail.value
+  ? scrapingActivityMeta(detail.value.progress)
+  : null)
 
 const sortedTasks = computed(() => [...(detail.value?.tasks || [])]
   .sort((a, b) => a.manifestIndex - b.manifestIndex))
+const numberedTasks = computed(() => sortedTasks.value.filter(
+  task => parsedChapterNumber(task) !== null
+))
+const hasUnnumberedTasks = computed(
+  () => numberedTasks.value.length !== sortedTasks.value.length
+)
+const startValidationError = computed(() => {
+  if (!Number.isInteger(startState.chapterFrom) || startState.chapterFrom < 1) {
+    return 'Chapter from must be a positive whole number.'
+  }
+  if (!Number.isInteger(startState.chapterTo) || startState.chapterTo < 1) {
+    return 'Chapter to must be a positive whole number.'
+  }
+  if (startState.chapterFrom > startState.chapterTo) {
+    return 'Chapter from must be less than or equal to chapter to.'
+  }
+  return ''
+})
 
 const chapterItems = computed<ChapterItem[]>(() => sortedTasks.value.map(task => ({
   value: task.id,
@@ -125,6 +164,9 @@ watch(
     detail.value = null
     error.value = false
     failedCover.value = false
+    startError.value = ''
+    rangeInitializedFor.value = ''
+    selectedDetailTab.value = 'overview'
     openTaskId.value = undefined
     chapterScrollTop.value = 0
     pendingChapterScrollTop.value = 0
@@ -184,11 +226,18 @@ function onChapterScroll(event: Event) {
 
 function chapterLabel(task: ScrapingTaskResponse) {
   const title = task.title || 'Untitled chapter'
-  if (task.chapterNumber === undefined || task.chapterNumber === null) return title
-  const number = String(task.chapterNumber)
+  const chapterNumber = parsedChapterNumber(task)
+  if (chapterNumber === null) return title
+  const number = String(chapterNumber)
   return new RegExp(`\\b${number.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(title)
     ? title
     : `Chapter ${number}: ${title}`
+}
+
+function parsedChapterNumber(task: ScrapingTaskResponse) {
+  const value = task.chapterNumber as unknown
+  if (typeof value === 'number' && Number.isInteger(value)) return value
+  return null
 }
 
 function taskMeta(task: ScrapingTaskResponse) {
@@ -203,7 +252,7 @@ function taskMeta(task: ScrapingTaskResponse) {
 }
 
 function isSpinning(task: ScrapingTaskResponse) {
-  return task.status === ScrapingTaskStatus.Processing
+  return task.status === ScrapingTaskStatus.Running
 }
 
 function errorStatus(cause: unknown) {
@@ -223,6 +272,7 @@ async function loadDetail(background = false) {
     const { scrapings } = useApiClient()
     const response = await scrapings.get_scraping(props.scrapingId)
     detail.value = response
+    initializeChapterRange(response)
     error.value = false
     emit('updated', response)
 
@@ -247,6 +297,95 @@ async function loadDetail(background = false) {
       void loadDetail(true)
     }
   }
+}
+
+function initializeChapterRange(response: ScrapingDetailResponse) {
+  if (rangeInitializedFor.value === response.id) return
+  const numbers = (response.tasks || [])
+    .map(parsedChapterNumber)
+    .filter((number): number is number => number !== null)
+  if (numbers.length) {
+    startState.chapterFrom = Math.min(...numbers)
+    startState.chapterTo = Math.max(...numbers)
+  }
+  rangeInitializedFor.value = response.id
+}
+
+async function startTasks() {
+  startError.value = startValidationError.value
+  if (startError.value || !detail.value) return
+  const expectedQueuedCount = (detail.value.tasks || []).filter((task) => {
+    const chapterNumber = parsedChapterNumber(task)
+    if (
+      chapterNumber === null
+      || chapterNumber < startState.chapterFrom
+      || chapterNumber > startState.chapterTo
+    ) {
+      return false
+    }
+    return startState.force
+      || ![ScrapingTaskStatus.Queued, ScrapingTaskStatus.Running].includes(task.status)
+  }).length
+  starting.value = true
+  try {
+    const { scrapings } = useApiClient()
+    const response = await scrapings.start_scraping(
+      props.scrapingId,
+      new ScrapingStartRequest({
+        chapterFrom: startState.chapterFrom,
+        chapterTo: startState.chapterTo,
+        refetch: startState.refetch,
+        force: startState.force
+      })
+    )
+    detail.value = response
+    emit('updated', response)
+    startError.value = ''
+    toast.add({
+      title: expectedQueuedCount > 0 ? 'Chapter tasks queued' : 'No new tasks queued',
+      description: expectedQueuedCount > 0
+        ? `Queued chapters ${startState.chapterFrom}–${startState.chapterTo}.`
+        : 'The selected tasks are already queued or running.',
+      icon: expectedQueuedCount > 0 ? 'lucide:play' : 'lucide:info',
+      color: expectedQueuedCount > 0 ? 'success' : 'neutral'
+    })
+  } catch (cause) {
+    const publicationFailed = errorStatus(cause) === 503
+    startError.value = publicationFailed
+      ? 'Some tasks could not be published. Enable force and start the range again.'
+      : validationMessage(cause) || 'The selected chapter range could not be started.'
+  } finally {
+    starting.value = false
+  }
+}
+
+async function stopQueuedTasks() {
+  if (!detail.value?.progress.queued) return
+  stopping.value = true
+  startError.value = ''
+  try {
+    const { scrapings } = useApiClient()
+    const response = await scrapings.stop_scraping(props.scrapingId)
+    detail.value = response
+    emit('updated', response)
+    toast.add({
+      title: 'Queued tasks stopped',
+      description: 'Running chapters will continue; queued chapters are ready to start again.',
+      icon: 'lucide:square',
+      color: 'neutral'
+    })
+  } catch {
+    startError.value = 'Queued tasks could not be stopped. Please try again.'
+  } finally {
+    stopping.value = false
+  }
+}
+
+function validationMessage(cause: unknown) {
+  if (!cause || typeof cause !== 'object') return ''
+  const detail = (cause as { detail?: string | Array<{ msg?: string }> }).detail
+  if (typeof detail === 'string') return detail
+  return detail?.find(item => item.msg)?.msg || ''
 }
 
 async function loadResult(taskId: string) {
@@ -293,13 +432,13 @@ function resultFor(taskId: string) {
 
       <template #right>
         <UBadge
-          v-if="detail"
-          :label="statusMeta.label"
-          :icon="statusMeta.icon"
-          :color="statusMeta.color"
+          v-if="activityMeta"
+          :label="activityMeta.label"
+          :icon="activityMeta.icon"
+          :color="activityMeta.color"
           variant="subtle"
           :ui="{
-            leadingIcon: detail.status === ScrapingStatus.Processing
+            leadingIcon: activityMeta.spinning
               ? 'motion-safe:animate-spin'
               : undefined
           }"
@@ -356,9 +495,31 @@ function resultFor(taskId: string) {
                 {{ detail.progress.completed }} of {{ detail.progress.total }} chapters downloaded
               </p>
             </div>
-            <span class="text-sm font-medium text-toned">
-              {{ statusMeta.label }}
-            </span>
+            <div class="flex flex-wrap gap-2 text-xs">
+              <UBadge
+                :label="`${detail.progress.created} ready`"
+                color="neutral"
+                variant="subtle"
+              />
+              <UBadge
+                v-if="detail.progress.queued"
+                :label="`${detail.progress.queued} queued`"
+                color="neutral"
+                variant="subtle"
+              />
+              <UBadge
+                v-if="detail.progress.running"
+                :label="`${detail.progress.running} running`"
+                color="primary"
+                variant="subtle"
+              />
+              <UBadge
+                v-if="detail.progress.failed"
+                :label="`${detail.progress.failed} failed`"
+                color="error"
+                variant="subtle"
+              />
+            </div>
           </div>
           <UProgress
             :model-value="detail.progress.completed"
@@ -366,262 +527,349 @@ function resultFor(taskId: string) {
             size="sm"
           />
 
-          <UAlert
-            v-if="detail.status === ScrapingStatus.Retrying"
-            color="warning"
-            variant="subtle"
-            icon="lucide:rotate-ccw"
-            title="Retrying automatically"
-            description="The source was temporarily unavailable. Downloading will resume automatically."
-          />
-          <UAlert
-            v-else-if="detail.status === ScrapingStatus.Failed"
-            color="error"
-            variant="subtle"
-            icon="lucide:circle-x"
-            title="Scraping failed"
-            :description="String(detail.lastError || 'The scraping could not be completed.')"
-          />
-        </section>
-
-        <UPageCard
-          orientation="horizontal"
-          reverse
-          variant="naked"
-          class="overflow-hidden rounded-xl border border-default bg-elevated/30"
-          :ui="{
-            container: 'flex flex-row items-center gap-4 p-4 sm:p-4 lg:flex lg:flex-row lg:items-center lg:gap-4',
-            wrapper: 'min-w-0 p-5 sm:p-3 sm:py-0',
-            title: 'line-clamp-2 text-2xl',
-            description: 'line-clamp-5'
-          }"
-        >
-          <div class="flex min-h-52 w-full shrink-0 items-center justify-center overflow-hidden bg-primary/10 sm:w-40">
-            <img
-              v-if="detail.metadata.coverImageUrl && !failedCover"
-              :src="String(detail.metadata.coverImageUrl)"
-              :alt="`${detail.metadata.title} cover`"
-              class="h-64 w-full object-cover sm:h-full"
-              @error="failedCover = true"
-            >
-            <UIcon v-else name="lucide:book-open" class="size-10 text-primary/70" />
-          </div>
-
-          <template #title>
-            <div class="flex justify-between">
-              <h1 class="text-2xl font-semibold text-highlighted">
-                {{ detail.metadata.title }}
-              </h1>
-              <UButton
-                :label="sourceLabel"
-                icon="lucide:external-link"
-                color="neutral"
-                variant="link"
-                class="h-auto p-0"
-                :to="detail.sourceUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                :aria-label="`${sourceLabel} source (opens in a new tab)`"
-              />
-            </div>
-          </template>
-
-          <template #description>
-            <p class="text-sm/6 text-muted">
-              {{ String(detail.metadata.description || 'No description available.') }}
-            </p>
-          </template>
-
-          <template #footer>
-            <div class="space-y-4 text-sm">
-              <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-3">
-                <div>
-                  <dt class="text-muted">
-                    Author
-                  </dt>
-                  <dd class="font-medium text-highlighted">
-                    {{ String(detail.metadata.author || 'Unknown author') }}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-muted">
-                    Category
-                  </dt>
-                  <dd class="font-medium text-highlighted">
-                    {{ String(detail.metadata.category || 'Uncategorized') }}
-                  </dd>
-                </div>
-                <div v-if="detail.metadata.protagonists?.length">
-                  <p class="mb-2 text-muted">
-                    Protagonists
-                  </p>
-                  <div class="flex flex-wrap gap-2">
-                    <UBadge
-                      v-for="protagonist in detail.metadata.protagonists"
-                      :key="protagonist"
-                      :label="protagonist"
-                      color="neutral"
-                      variant="subtle"
-                    />
-                  </div>
-                </div>
-              </dl>
-
-              <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-                <div>
-                  <dt class="text-muted">
-                    Source updated
-                  </dt>
-                  <dd class="font-medium text-highlighted">
-                    {{ String(detail.metadata.updatedDate || 'Unknown date') }}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-muted">
-                    Metadata fetched
-                  </dt>
-                  <dd class="font-medium text-highlighted">
-                    {{ formatExactTime(detail.metadata.fetchedAt) }}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-          </template>
-        </UPageCard>
-
-        <section aria-labelledby="chapters-heading">
-          <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <h2 id="chapters-heading" class="text-lg font-semibold text-highlighted">
-                Chapters
-              </h2>
-              <p class="text-sm text-muted">
-                {{ detail.progress.completed }} downloaded of {{ detail.progress.total }}
-              </p>
-            </div>
-          </div>
-          <UProgress
-            :model-value="detail.progress.completed"
-            :max="Math.max(detail.progress.total, 1)"
-            size="xs"
-            class="mb-4"
+          <UTabs
+            v-model="selectedDetailTab"
+            :items="detailTabItems"
+            :content="false"
+            class="w-full"
           />
 
           <div
-            v-if="chapterItems.length"
-            ref="chapterContainer"
-            class="touch-pan-y overflow-y-auto overscroll-contain rounded-lg border border-default [contain:strict] [overflow-anchor:none]"
-            :style="{ height: chapterViewportHeight }"
-            @scroll.passive="onChapterScroll"
+            v-show="selectedDetailTab === 'overview'"
+            class="space-y-7 pt-1"
+            role="tabpanel"
+            aria-label="Overview"
           >
-            <div
-              class="[overflow-anchor:none]"
-              :style="chapterWrapperStyle"
-            >
-              <UAccordion
-                v-model="openTaskId"
-                :items="visibleChapterItems"
-                type="single"
-                collapsible
-                :unmount-on-hide="false"
-                class="px-4"
-              >
-                <template #default="{ item }">
-                  <span class="min-w-0 flex-1 truncate text-left">
-                    {{ item.label }}
-                  </span>
-                </template>
-
-                <template #leading="{ item }">
-                  <UIcon
-                    :name="taskMeta(item.task).icon"
-                    class="size-4 shrink-0"
-                    :class="[
-                      isSpinning(item.task) && 'motion-safe:animate-spin',
-                      taskMeta(item.task).color === 'success' && 'text-success',
-                      taskMeta(item.task).color === 'warning' && 'text-warning',
-                      taskMeta(item.task).color === 'error' && 'text-error',
-                      taskMeta(item.task).color === 'primary' && 'text-primary',
-                      taskMeta(item.task).color === 'neutral' && 'text-muted'
-                    ]"
+            <UPageCard title="Start scraping chapter by range" variant="subtle">
+              <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
+                <UFormField label="Chapter from" name="chapterFrom" required>
+                  <UInputNumber
+                    v-model="startState.chapterFrom"
+                    :min="1"
+                    :step="1"
+                    :disabled="starting || stopping || !numberedTasks.length"
+                    class="w-full"
                   />
-                </template>
+                </UFormField>
+                <UFormField label="Chapter to" name="chapterTo" required>
+                  <UInputNumber
+                    v-model="startState.chapterTo"
+                    :min="1"
+                    :step="1"
+                    :disabled="starting || stopping || !numberedTasks.length"
+                    class="w-full"
+                  />
+                </UFormField>
+                <div class="flex items-end gap-2">
+                  <UButton
+                    label="Start"
+                    icon="lucide:play"
+                    :loading="starting"
+                    :disabled="stopping || !numberedTasks.length || Boolean(startValidationError)"
+                    @click="startTasks"
+                  />
+                  <UButton
+                    label="Stop queued"
+                    icon="lucide:square"
+                    color="neutral"
+                    variant="soft"
+                    :loading="stopping"
+                    :disabled="starting || detail.progress.queued === 0"
+                    @click="stopQueuedTasks"
+                  />
+                </div>
+              </div>
 
-                <template #trailing="{ item, open }">
-                  <div class="ms-auto flex shrink-0 items-center gap-2">
-                    <UBadge
-                      :label="taskMeta(item.task).label"
-                      :color="taskMeta(item.task).color"
-                      variant="subtle"
-                      size="sm"
-                    />
-                    <UIcon
-                      v-if="item.task.resultAvailable"
-                      name="lucide:chevron-down"
-                      class="ms-1 size-4 shrink-0 text-muted transition-transform"
-                      :class="open && 'rotate-180'"
-                    />
-                  </div>
-                </template>
+              <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                <USwitch
+                  v-model="startState.refetch"
+                  label="Refetch chapter content"
+                  description="Bypass saved results and crawler caches."
+                  :disabled="starting || stopping"
+                />
+                <USwitch
+                  v-model="startState.force"
+                  label="Force active tasks"
+                  description="Requeue queued or running tasks; concurrent workers may race."
+                  :disabled="starting || stopping"
+                />
+              </div>
 
-                <template #body="{ item }">
-                  <div :aria-label="`${item.label} content`">
-                    <div
-                      v-if="resultLoading[cacheKey(item.task.id)]"
-                      class="space-y-3 py-2"
-                      aria-label="Loading chapter content"
-                    >
-                      <USkeleton
-                        v-for="index in 5"
-                        :key="index"
-                        class="h-4"
-                        :class="index % 2 === 0 ? 'w-11/12' : 'w-full'"
-                      />
+              <UAlert
+                v-if="startError || startValidationError"
+                class="mt-4"
+                color="error"
+                variant="subtle"
+                icon="lucide:circle-alert"
+                title="Unable to start this range"
+                :description="startError || startValidationError"
+              />
+              <p v-else-if="hasUnnumberedTasks" class="mt-4 text-xs text-muted">
+                Chapters without a parsed number remain visible in Chapters but cannot be selected by range.
+              </p>
+              <p v-else-if="!numberedTasks.length" class="mt-4 text-xs text-muted">
+                This manifest has no numbered chapters to start.
+              </p>
+            </UPageCard>
+
+            <UPageCard
+              orientation="horizontal"
+              reverse
+              variant="naked"
+              class="overflow-hidden rounded-xl border border-default bg-elevated/30"
+              :ui="{
+                container: 'flex flex-row items-start gap-4 p-4 sm:p-4 lg:flex lg:flex-row lg:items-start lg:gap-4',
+                wrapper: 'min-w-0 p-0 sm:p-0 sm:py-0',
+                title: 'line-clamp-2 text-2xl',
+                description: 'line-clamp-5'
+              }"
+            >
+              <div class="flex min-h-52 w-full shrink-0 items-center justify-center overflow-hidden bg-primary/10 sm:w-40">
+                <img
+                  v-if="detail.metadata.coverImageUrl && !failedCover"
+                  :src="String(detail.metadata.coverImageUrl)"
+                  :alt="`${detail.metadata.title} cover`"
+                  class="h-64 w-full object-cover sm:h-full"
+                  @error="failedCover = true"
+                >
+                <UIcon v-else name="lucide:book-open" class="size-10 text-primary/70" />
+              </div>
+
+              <template #title>
+                <div class="flex justify-between">
+                  <h1 class="text-2xl font-semibold text-highlighted">
+                    {{ detail.metadata.title }}
+                  </h1>
+                  <UButton
+                    :label="sourceLabel"
+                    icon="lucide:external-link"
+                    color="neutral"
+                    variant="link"
+                    class="h-auto p-0"
+                    :to="detail.sourceUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    :aria-label="`${sourceLabel} source (opens in a new tab)`"
+                  />
+                </div>
+              </template>
+
+              <template #description>
+                <p class="text-sm/6 text-muted">
+                  {{ String(detail.metadata.description || 'No description available.').trim() }}
+                </p>
+              </template>
+
+              <template #footer>
+                <div class="space-y-4 text-sm">
+                  <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-3">
+                    <div>
+                      <dt class="text-muted">
+                        Author
+                      </dt>
+                      <dd class="font-medium text-highlighted">
+                        {{ String(detail.metadata.author || 'Unknown author') }}
+                      </dd>
                     </div>
-
-                    <UAlert
-                      v-else-if="resultErrors[cacheKey(item.task.id)]"
-                      color="error"
-                      variant="subtle"
-                      icon="lucide:circle-alert"
-                      title="Unable to load chapter"
-                      :description="resultErrors[cacheKey(item.task.id)]"
-                      :actions="[{
-                        label: 'Retry',
-                        color: 'error',
-                        variant: 'soft',
-                        onClick: () => loadResult(item.task.id)
-                      }]"
-                    />
-
-                    <article
-                      v-else-if="resultFor(item.task.id)"
-                      class="mx-auto max-w-3xl space-y-3 py-1 text-sm/6 text-toned"
-                    >
-                      <p
-                        v-for="(paragraph, index) in resultFor(item.task.id)?.content || []"
-                        :key="index"
-                      >
-                        {{ paragraph }}
+                    <div>
+                      <dt class="text-muted">
+                        Category
+                      </dt>
+                      <dd class="font-medium text-highlighted">
+                        {{ String(detail.metadata.category || 'Uncategorized') }}
+                      </dd>
+                    </div>
+                    <div v-if="detail.metadata.protagonists?.length">
+                      <p class="mb-2 text-muted">
+                        Protagonists
                       </p>
-                      <p v-if="!resultFor(item.task.id)?.content?.length" class="italic text-muted">
-                        This chapter has no text content.
-                      </p>
-                    </article>
-                  </div>
-                </template>
-              </UAccordion>
-            </div>
+                      <div class="flex flex-wrap gap-2">
+                        <UBadge
+                          v-for="protagonist in detail.metadata.protagonists"
+                          :key="protagonist"
+                          :label="protagonist"
+                          color="neutral"
+                          variant="subtle"
+                        />
+                      </div>
+                    </div>
+                  </dl>
+
+                  <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                    <div>
+                      <dt class="text-muted">
+                        Source updated
+                      </dt>
+                      <dd class="font-medium text-highlighted">
+                        {{ String(detail.metadata.updatedDate || 'Unknown date') }}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted">
+                        Metadata fetched
+                      </dt>
+                      <dd class="font-medium text-highlighted">
+                        {{ formatExactTime(detail.metadata.fetchedAt) }}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              </template>
+            </UPageCard>
           </div>
 
-          <UEmpty
-            v-else
-            icon="lucide:book-open"
-            title="No chapters"
-            description="This scraping does not contain a chapter manifest."
-            variant="subtle"
-            size="sm"
-          />
+          <section
+            v-show="selectedDetailTab === 'chapters'"
+            class="pt-1"
+            aria-labelledby="chapters-heading"
+            role="tabpanel"
+          >
+            <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 id="chapters-heading" class="text-lg font-semibold text-highlighted">
+                  Chapters
+                </h2>
+                <p class="text-sm text-muted">
+                  {{ detail.progress.completed }} downloaded of {{ detail.progress.total }}
+                </p>
+              </div>
+            </div>
+            <UProgress
+              :model-value="detail.progress.completed"
+              :max="Math.max(detail.progress.total, 1)"
+              size="xs"
+              class="mb-4"
+            />
+
+            <div
+              v-if="chapterItems.length"
+              ref="chapterContainer"
+              class="touch-pan-y overflow-y-auto overscroll-contain rounded-lg border border-default [contain:strict] [overflow-anchor:none]"
+              :style="{ height: chapterViewportHeight }"
+              @scroll.passive="onChapterScroll"
+            >
+              <div
+                class="[overflow-anchor:none]"
+                :style="chapterWrapperStyle"
+              >
+                <UAccordion
+                  v-model="openTaskId"
+                  :items="visibleChapterItems"
+                  type="single"
+                  collapsible
+                  :unmount-on-hide="false"
+                  class="px-4"
+                >
+                  <template #default="{ item }">
+                    <div class="min-w-0 flex-1 text-left">
+                      <p class="truncate">
+                        {{ item.label }}
+                      </p>
+                      <p v-if="item.task.lastError" class="truncate text-xs text-error">
+                        {{ String(item.task.lastError) }}
+                      </p>
+                    </div>
+                  </template>
+
+                  <template #leading="{ item }">
+                    <UIcon
+                      :name="taskMeta(item.task).icon"
+                      class="size-4 shrink-0"
+                      :class="[
+                        isSpinning(item.task) && 'motion-safe:animate-spin',
+                        taskMeta(item.task).color === 'success' && 'text-success',
+                        taskMeta(item.task).color === 'error' && 'text-error',
+                        taskMeta(item.task).color === 'primary' && 'text-primary',
+                        taskMeta(item.task).color === 'neutral' && 'text-muted'
+                      ]"
+                    />
+                  </template>
+
+                  <template #trailing="{ item, open }">
+                    <div class="ms-auto flex shrink-0 items-center gap-2">
+                      <UBadge
+                        :label="taskMeta(item.task).label"
+                        :color="taskMeta(item.task).color"
+                        variant="subtle"
+                        size="sm"
+                      />
+                      <UIcon
+                        v-if="item.task.resultAvailable"
+                        name="lucide:chevron-down"
+                        class="ms-1 size-4 shrink-0 text-muted transition-transform"
+                        :class="open && 'rotate-180'"
+                      />
+                    </div>
+                  </template>
+
+                  <template #body="{ item }">
+                    <div :aria-label="`${item.label} content`">
+                      <UAlert
+                        v-if="item.task.lastError"
+                        class="mb-4"
+                        color="error"
+                        variant="subtle"
+                        icon="lucide:circle-alert"
+                        title="Latest fetch failed"
+                        :description="String(item.task.lastError)"
+                      />
+                      <div
+                        v-if="resultLoading[cacheKey(item.task.id)]"
+                        class="space-y-3 py-2"
+                        aria-label="Loading chapter content"
+                      >
+                        <USkeleton
+                          v-for="index in 5"
+                          :key="index"
+                          class="h-4"
+                          :class="index % 2 === 0 ? 'w-11/12' : 'w-full'"
+                        />
+                      </div>
+
+                      <UAlert
+                        v-else-if="resultErrors[cacheKey(item.task.id)]"
+                        color="error"
+                        variant="subtle"
+                        icon="lucide:circle-alert"
+                        title="Unable to load chapter"
+                        :description="resultErrors[cacheKey(item.task.id)]"
+                        :actions="[{
+                          label: 'Retry',
+                          color: 'error',
+                          variant: 'soft',
+                          onClick: () => loadResult(item.task.id)
+                        }]"
+                      />
+
+                      <article
+                        v-else-if="resultFor(item.task.id)"
+                        class="mx-auto max-w-3xl space-y-3 py-1 text-sm/6 text-toned"
+                      >
+                        <p
+                          v-for="(paragraph, index) in resultFor(item.task.id)?.content || []"
+                          :key="index"
+                        >
+                          {{ paragraph }}
+                        </p>
+                        <p v-if="!resultFor(item.task.id)?.content?.length" class="italic text-muted">
+                          This chapter has no text content.
+                        </p>
+                      </article>
+                    </div>
+                  </template>
+                </UAccordion>
+              </div>
+            </div>
+
+            <UEmpty
+              v-else
+              icon="lucide:book-open"
+              title="No chapters"
+              description="This scraping does not contain a chapter manifest."
+              variant="subtle"
+              size="sm"
+            />
+          </section>
         </section>
       </div>
     </div>

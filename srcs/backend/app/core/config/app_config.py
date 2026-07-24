@@ -30,7 +30,7 @@ class FlareSolverrSettings:
     default_max_timeout_ms: int
 
 CACHE_TTL_DEFAULT = 3600
-CACHE_TTL_CRAWLER = 604800
+CACHE_TTL_CRAWLER = 3600 * 24 * 30
 
 @singleton
 class AppConfig:

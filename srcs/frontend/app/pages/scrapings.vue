@@ -116,7 +116,7 @@ async function loadScrapings(options: { more?: boolean } = {}) {
     const token = options.more && continuationToken.value
       ? continuationToken.value as unknown as Anonymous8
       : undefined
-    const response = await client.list_scrapings(50, token, undefined)
+    const response = await client.list_scrapings(50, token)
     const incoming = response.items || []
 
     if (options.more) {
@@ -235,11 +235,13 @@ async function deleteScraping(scraping: ScrapingSummaryResponse) {
 function onDetailUpdated(detail: ScrapingDetailResponse) {
   const existing = scrapings.value.find(item => item.id === detail.id)
   if (existing) {
-    existing.status = detail.status
     existing.title = detail.metadata.title
     existing.coverImageUrl = detail.metadata.coverImageUrl
     existing.updatedAt = detail.updatedAt
     existing.progress.total = detail.progress.total
+    existing.progress.created = detail.progress.created
+    existing.progress.queued = detail.progress.queued
+    existing.progress.running = detail.progress.running
     existing.progress.completed = detail.progress.completed
     existing.progress.failed = detail.progress.failed
     return
@@ -252,9 +254,7 @@ function onDetailUpdated(detail: ScrapingDetailResponse) {
       sourceUrl: detail.sourceUrl,
       title: detail.metadata.title,
       coverImageUrl: detail.metadata.coverImageUrl,
-      status: detail.status,
       progress: detail.progress,
-      attempts: detail.attempts,
       createdAt: detail.createdAt,
       updatedAt: detail.updatedAt
     })

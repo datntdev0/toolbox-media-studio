@@ -6,33 +6,15 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
-
-
-class ScrapingStatus(StrEnum):
-    """Scraping lifecycle states."""
-
-    QUEUED = "queued"
-    PROCESSING = "processing"
-    RETRYING = "retrying"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-    @property
-    def is_terminal(self) -> bool:
-        return self in {ScrapingStatus.COMPLETED, ScrapingStatus.FAILED}
-
-    @property
-    def is_active(self) -> bool:
-        return not self.is_terminal
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ScrapingTaskStatus(StrEnum):
     """Embedded scraping task lifecycle states."""
 
-    PENDING = "pending"
-    PROCESSING = "processing"
-    RETRYING = "retrying"
+    CREATED = "created"
+    QUEUED = "queued"
+    RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
 
@@ -65,7 +47,7 @@ class ScrapingTask:
     title: str
     chapter_number: int | None
     manifest_index: int
-    status: ScrapingTaskStatus = ScrapingTaskStatus.PENDING
+    status: ScrapingTaskStatus = ScrapingTaskStatus.CREATED
     attempts: int = 0
     last_error: str | None = None
     result_available: bool = False
@@ -77,9 +59,9 @@ class ScrapingProgress:
     """Rollup counters stored with a Scraping."""
 
     total: int
-    pending: int
-    processing: int = 0
-    retrying: int = 0
+    created: int
+    queued: int = 0
+    running: int = 0
     completed: int = 0
     failed: int = 0
 
@@ -90,9 +72,9 @@ class ScrapingProgress:
             counts[task.status] += 1
         return cls(
             total=len(tasks),
-            pending=counts[ScrapingTaskStatus.PENDING],
-            processing=counts[ScrapingTaskStatus.PROCESSING],
-            retrying=counts[ScrapingTaskStatus.RETRYING],
+            created=counts[ScrapingTaskStatus.CREATED],
+            queued=counts[ScrapingTaskStatus.QUEUED],
+            running=counts[ScrapingTaskStatus.RUNNING],
             completed=counts[ScrapingTaskStatus.COMPLETED],
             failed=counts[ScrapingTaskStatus.FAILED],
         )
@@ -106,17 +88,12 @@ class Scraping:
     crawler_id: str
     source_url: str
     metadata: ScrapingMetadata
-    status: ScrapingStatus
     tasks: list[ScrapingTask]
     progress: ScrapingProgress
-    attempts: int
-    last_error: str | None
     idempotency_key: str
-    active_key: str
     created_by: str
     created_at: datetime
     updated_at: datetime
-    completed_at: datetime | None = None
     etag: str | None = None
 
 
@@ -126,6 +103,14 @@ class ScrapingCreateResult:
 
     scraping: Scraping
     created: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ScrapingQueueResult:
+    """Result of queueing a chapter-number range."""
+
+    scraping: Scraping
+    tasks: list[ScrapingTask]
 
 
 @dataclass(slots=True)
@@ -145,20 +130,32 @@ class ScrapingCreateRequest(BaseModel):
     source_url: str = Field(min_length=1, alias="sourceUrl")
 
 
-class ScrapingProgressSummaryResponse(BaseModel):
-    """Compact progress returned in list/create responses."""
+class ScrapingStartRequest(BaseModel):
+    """Task range accepted by PATCH /api/scrapings/{id}/start."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    chapter_from: int = Field(ge=1, alias="chapterFrom")
+    chapter_to: int = Field(ge=1, alias="chapterTo")
+    refetch: bool = False
+    force: bool = False
+
+    @model_validator(mode="after")
+    def validate_chapter_range(self) -> ScrapingStartRequest:
+        if self.chapter_from > self.chapter_to:
+            raise ValueError("chapterFrom must be less than or equal to chapterTo")
+        return self
+
+
+class ScrapingProgressResponse(BaseModel):
+    """Task progress returned with a Scraping."""
 
     total: int
+    created: int
+    queued: int
+    running: int
     completed: int
     failed: int
-
-
-class ScrapingProgressResponse(ScrapingProgressSummaryResponse):
-    """Complete progress returned by the detail endpoint."""
-
-    pending: int
-    processing: int
-    retrying: int
 
 
 class ScrapingSummaryResponse(BaseModel):
@@ -171,9 +168,7 @@ class ScrapingSummaryResponse(BaseModel):
     source_url: str = Field(alias="sourceUrl")
     title: str
     cover_image_url: str | None = Field(default=None, alias="coverImageUrl")
-    status: ScrapingStatus
-    progress: ScrapingProgressSummaryResponse
-    attempts: int
+    progress: ScrapingProgressResponse
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
 
@@ -211,6 +206,7 @@ class ScrapingTaskResponse(BaseModel):
     manifest_index: int = Field(alias="manifestIndex")
     status: ScrapingTaskStatus
     attempts: int
+    last_error: str | None = Field(default=None, alias="lastError")
     result_available: bool = Field(alias="resultAvailable")
     completed_at: datetime | None = Field(default=None, alias="completedAt")
 
@@ -223,12 +219,9 @@ class ScrapingDetailResponse(BaseModel):
     id: str
     crawler_id: str = Field(alias="crawlerId")
     source_url: str = Field(alias="sourceUrl")
-    status: ScrapingStatus
     metadata: ScrapingMetadataResponse
     progress: ScrapingProgressResponse
     tasks: list[ScrapingTaskResponse] = Field(default_factory=list)
-    attempts: int
-    last_error: str | None = Field(default=None, alias="lastError")
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
 
@@ -249,13 +242,14 @@ def to_scraping_summary(scraping: Scraping) -> ScrapingSummaryResponse:
         source_url=scraping.source_url,
         title=scraping.metadata.title,
         cover_image_url=scraping.metadata.cover_image_url,
-        status=scraping.status,
-        progress=ScrapingProgressSummaryResponse(
+        progress=ScrapingProgressResponse(
             total=scraping.progress.total,
+            created=scraping.progress.created,
+            queued=scraping.progress.queued,
+            running=scraping.progress.running,
             completed=scraping.progress.completed,
             failed=scraping.progress.failed,
         ),
-        attempts=scraping.attempts,
         created_at=scraping.created_at,
         updated_at=scraping.updated_at,
     )
@@ -268,7 +262,6 @@ def to_scraping_detail(scraping: Scraping) -> ScrapingDetailResponse:
         id=scraping.id,
         crawler_id=scraping.crawler_id,
         source_url=scraping.source_url,
-        status=scraping.status,
         metadata=ScrapingMetadataResponse(
             source_novel_id=metadata.source_novel_id,
             title=metadata.title,
@@ -282,9 +275,9 @@ def to_scraping_detail(scraping: Scraping) -> ScrapingDetailResponse:
         ),
         progress=ScrapingProgressResponse(
             total=progress.total,
-            pending=progress.pending,
-            processing=progress.processing,
-            retrying=progress.retrying,
+            created=progress.created,
+            queued=progress.queued,
+            running=progress.running,
             completed=progress.completed,
             failed=progress.failed,
         ),
@@ -296,13 +289,12 @@ def to_scraping_detail(scraping: Scraping) -> ScrapingDetailResponse:
                 manifest_index=task.manifest_index,
                 status=task.status,
                 attempts=task.attempts,
+                last_error=task.last_error,
                 result_available=task.result_available,
                 completed_at=task.completed_at,
             )
             for task in scraping.tasks
         ],
-        attempts=scraping.attempts,
-        last_error=scraping.last_error,
         created_at=scraping.created_at,
         updated_at=scraping.updated_at,
     )

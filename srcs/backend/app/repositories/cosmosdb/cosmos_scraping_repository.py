@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import builtins
-from datetime import UTC, datetime
+from copy import deepcopy
+from datetime import datetime
 from typing import Any, cast
 
 from azure.core import MatchConditions
@@ -16,47 +17,65 @@ from app.domain.scrapings import (
     ScrapingMetadata,
     ScrapingPage,
     ScrapingProgress,
-    ScrapingStatus,
+    ScrapingQueueResult,
     ScrapingTask,
     ScrapingTaskStatus,
 )
 from app.repositories.scraping_repository import (
+    ScrapingChapterRangeError,
     ScrapingConflictError,
     ScrapingNotFoundError,
     ensure_scraping_size,
-    reconciled_scraping_status,
+    merge_scraping,
+    touch_scraping,
 )
 
 SCRAPINGS_CONTAINER_NAME = "domain.scrapings"
 
 
 class CosmosScrapingRepository:
-    """Scraping repository backed by Cosmos DB."""
+    """Scraping repository backed by Azure Cosmos DB."""
 
     def __init__(self, client: CosmosClient, database_name: str) -> None:
         self._database = client.create_database_if_not_exists(id=database_name)
         self._container = self._database.create_container_if_not_exists(
             id=SCRAPINGS_CONTAINER_NAME,
             partition_key=PartitionKey(path="/createdBy"),
-            unique_key_policy={"uniqueKeys": [{"paths": ["/activeKey"]}]},
+            unique_key_policy={"uniqueKeys": [{"paths": ["/idempotencyKey"]}]},
         )
 
-    def create_or_get_active(self, candidate: Scraping) -> ScrapingCreateResult:
+    def create_or_merge(self, candidate: Scraping) -> ScrapingCreateResult:
         ensure_scraping_size(candidate)
-        candidate.active_key = candidate.idempotency_key
         try:
             item = cast(
                 dict[str, Any],
                 self._container.create_item(body=self._serialize(candidate)),
             )
+            return ScrapingCreateResult(scraping=self._deserialize(item), created=True)
         except exceptions.CosmosHttpResponseError as exc:
             if getattr(exc, "status_code", None) != 409:
                 raise
-            existing = self._get_active(candidate.created_by, candidate.idempotency_key)
-            if existing is None:
-                raise
-            return ScrapingCreateResult(scraping=existing, created=False)
-        return ScrapingCreateResult(scraping=self._deserialize(item), created=True)
+
+        existing = self._get_by_idempotency(
+            candidate.created_by,
+            candidate.idempotency_key,
+        )
+        if existing is None:
+            raise ScrapingConflictError("Existing Scraping could not be loaded")
+        for _ in range(3):
+            merge_scraping(existing, candidate)
+            ensure_scraping_size(existing)
+            try:
+                merged = self._replace(existing, etag=existing.etag)
+                return ScrapingCreateResult(scraping=merged, created=False)
+            except ScrapingConflictError:
+                existing = self._get_by_idempotency(
+                    candidate.created_by,
+                    candidate.idempotency_key,
+                )
+                if existing is None:
+                    raise ScrapingNotFoundError from None
+        raise ScrapingConflictError("Scraping merge conflicted repeatedly")
 
     def get(self, id: str, created_by: str | None = None) -> Scraping | None:
         if created_by is None:
@@ -89,19 +108,12 @@ class CosmosScrapingRepository:
         created_by: str | None,
         limit: int,
         continuation_token: str | None,
-        status: ScrapingStatus | None,
     ) -> ScrapingPage:
         query = "SELECT * FROM c"
-        conditions: list[str] = []
         parameters: list[dict[str, object]] = []
         if created_by is not None:
-            conditions.append("c.createdBy = @created_by")
+            query += " WHERE c.createdBy = @created_by"
             parameters.append({"name": "@created_by", "value": created_by})
-        if status is not None:
-            conditions.append("c.status = @status")
-            parameters.append({"name": "@status", "value": status.value})
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY c.updatedAt DESC"
 
         if created_by is None:
@@ -128,48 +140,92 @@ class CosmosScrapingRepository:
             ),
         )
 
-    def set_status(
+    def queue_tasks(
         self,
         id: str,
         created_by: str,
-        status: ScrapingStatus,
         *,
-        attempt: int | None = None,
-        error: str | None = None,
+        chapter_from: int,
+        chapter_to: int,
+        force: bool,
+        etag: str | None = None,
+    ) -> ScrapingQueueResult:
+        scraping = self._require(id, created_by)
+        self._check_etag(scraping, etag)
+        matching = [
+            task
+            for task in scraping.tasks
+            if task.chapter_number is not None
+            and chapter_from <= task.chapter_number <= chapter_to
+        ]
+        if not matching:
+            raise ScrapingChapterRangeError(
+                "No scraping tasks match the requested chapter range"
+            )
+        queued = [
+            task
+            for task in matching
+            if force
+            or task.status
+            not in {ScrapingTaskStatus.QUEUED, ScrapingTaskStatus.RUNNING}
+        ]
+        if not queued:
+            return ScrapingQueueResult(scraping=scraping, tasks=[])
+
+        queued_ids = {task.id for task in queued}
+        for task in queued:
+            task.status = ScrapingTaskStatus.QUEUED
+            task.last_error = None
+        touch_scraping(scraping)
+        ensure_scraping_size(scraping)
+        updated = self._replace(scraping, etag=etag or scraping.etag)
+        return ScrapingQueueResult(
+            scraping=updated,
+            tasks=deepcopy([task for task in updated.tasks if task.id in queued_ids]),
+        )
+
+    def stop_queued_tasks(
+        self,
+        id: str,
+        created_by: str,
+        *,
         etag: str | None = None,
     ) -> Scraping:
         scraping = self._require(id, created_by)
-        if scraping.status.is_terminal and status != scraping.status:
-            raise ScrapingConflictError("Terminal Scrapings cannot change status")
-
-        now = datetime.now(UTC)
-        attempts = max(scraping.attempts, attempt or 0)
-        operations: list[dict[str, object]] = [
-            {"op": "replace", "path": "/status", "value": status.value},
-            {"op": "replace", "path": "/attempts", "value": attempts},
-            {"op": "replace", "path": "/lastError", "value": error},
-            {"op": "replace", "path": "/updatedAt", "value": now.isoformat()},
+        self._check_etag(scraping, etag)
+        queued = [
+            task
+            for task in scraping.tasks
+            if task.status == ScrapingTaskStatus.QUEUED
         ]
-        if status.is_terminal:
-            operations.extend(
-                [
-                    {
-                        "op": "replace",
-                        "path": "/activeKey",
-                        "value": f"terminal:{scraping.id}",
-                    },
-                    {
-                        "op": "replace",
-                        "path": "/completedAt",
-                        "value": now.isoformat(),
-                    },
-                ]
-            )
-        return self._patch(
-            scraping,
-            operations,
-            etag=etag or scraping.etag,
-        )
+        if not queued:
+            return scraping
+        for task in queued:
+            task.status = ScrapingTaskStatus.CREATED
+        touch_scraping(scraping)
+        ensure_scraping_size(scraping)
+        return self._replace(scraping, etag=etag or scraping.etag)
+
+    def claim_task(
+        self,
+        id: str,
+        created_by: str,
+        task_id: str,
+        *,
+        etag: str | None = None,
+    ) -> Scraping | None:
+        scraping = self._require(id, created_by)
+        self._check_etag(scraping, etag)
+        index = _task_index(scraping, task_id)
+        task = scraping.tasks[index]
+        if task.status != ScrapingTaskStatus.QUEUED:
+            return None
+
+        task.status = ScrapingTaskStatus.RUNNING
+        task.attempts += 1
+        task.last_error = None
+        touch_scraping(scraping)
+        return self._patch_task(scraping, index, etag=etag or scraping.etag)
 
     def update_task(
         self,
@@ -185,122 +241,60 @@ class CosmosScrapingRepository:
         etag: str | None = None,
     ) -> Scraping:
         scraping = self._require(id, created_by)
-        index = next(
-            (index for index, task in enumerate(scraping.tasks) if task.id == task_id),
-            None,
-        )
-        if index is None:
-            raise ScrapingNotFoundError
-
+        self._check_etag(scraping, etag)
+        index = _task_index(scraping, task_id)
         task = scraping.tasks[index]
         task.status = status
         task.attempts = max(task.attempts, attempts)
         task.last_error = error
         task.result_available = result_available
         task.completed_at = completed_at
-        scraping.progress = ScrapingProgress.from_tasks(scraping.tasks)
-        now = datetime.now(UTC)
+        touch_scraping(scraping)
+        return self._patch_task(scraping, index, etag=etag or scraping.etag)
 
+    def _patch_task(
+        self,
+        scraping: Scraping,
+        index: int,
+        *,
+        etag: str | None,
+    ) -> Scraping:
         return self._patch(
             scraping,
             [
                 {
                     "op": "replace",
                     "path": f"/tasks/{index}",
-                    "value": self._serialize_task(task),
+                    "value": self._serialize_task(scraping.tasks[index]),
                 },
                 {
                     "op": "replace",
                     "path": "/progress",
                     "value": self._serialize_progress(scraping.progress),
                 },
-                {"op": "replace", "path": "/updatedAt", "value": now.isoformat()},
-            ],
-            etag=etag or scraping.etag,
-        )
-
-    def reconcile(self, id: str, created_by: str, etag: str | None = None) -> Scraping:
-        scraping = self._require(id, created_by)
-        progress = ScrapingProgress.from_tasks(scraping.tasks)
-        status = reconciled_scraping_status(progress)
-
-        now = datetime.now(UTC)
-        operations: list[dict[str, object]] = [
-            {
-                "op": "replace",
-                "path": "/progress",
-                "value": self._serialize_progress(progress),
-            },
-            {"op": "replace", "path": "/status", "value": status.value},
-            {"op": "replace", "path": "/updatedAt", "value": now.isoformat()},
-        ]
-        if status.is_terminal:
-            operations.extend(
-                [
-                    {
-                        "op": "replace",
-                        "path": "/activeKey",
-                        "value": f"terminal:{scraping.id}",
-                    },
-                    {
-                        "op": "replace",
-                        "path": "/completedAt",
-                        "value": now.isoformat(),
-                    },
-                ]
-            )
-        return self._patch(scraping, operations, etag=etag or scraping.etag)
-
-    def list_stale_active(
-        self,
-        updated_before: datetime,
-        limit: int,
-    ) -> builtins.list[Scraping]:
-        query = """
-        SELECT TOP @limit * FROM c
-        WHERE ARRAY_CONTAINS(@statuses, c.status)
-        AND c.updatedAt < @updated_before
-        ORDER BY c.updatedAt
-        """
-        items = self._container.query_items(
-            query=query,
-            parameters=[
-                {"name": "@limit", "value": limit},
                 {
-                    "name": "@statuses",
-                    "value": [
-                        ScrapingStatus.QUEUED.value,
-                        ScrapingStatus.PROCESSING.value,
-                        ScrapingStatus.RETRYING.value,
-                    ],
+                    "op": "replace",
+                    "path": "/updatedAt",
+                    "value": scraping.updated_at.isoformat(),
                 },
-                {"name": "@updated_before", "value": updated_before.isoformat()},
             ],
-            enable_cross_partition_query=True,
+            etag=etag,
         )
-        return [self._deserialize(item) for item in items]
 
-    def _get_active(self, created_by: str, idempotency_key: str) -> Scraping | None:
-        query = """
-        SELECT TOP 1 * FROM c
-        WHERE c.createdBy = @created_by
-        AND c.idempotencyKey = @idempotency_key
-        AND ARRAY_CONTAINS(@statuses, c.status)
-        """
+    def _get_by_idempotency(
+        self,
+        created_by: str,
+        idempotency_key: str,
+    ) -> Scraping | None:
         items = list(
             self._container.query_items(
-                query=query,
+                query=(
+                    "SELECT TOP 1 * FROM c WHERE c.createdBy = @created_by "
+                    "AND c.idempotencyKey = @idempotency_key"
+                ),
                 parameters=[
                     {"name": "@created_by", "value": created_by},
                     {"name": "@idempotency_key", "value": idempotency_key},
-                    {
-                        "name": "@statuses",
-                        "value": [
-                            ScrapingStatus.QUEUED.value,
-                            ScrapingStatus.PROCESSING.value,
-                            ScrapingStatus.RETRYING.value,
-                        ],
-                    },
                 ],
                 partition_key=created_by,
             )
@@ -312,6 +306,11 @@ class CosmosScrapingRepository:
         if scraping is None:
             raise ScrapingNotFoundError
         return scraping
+
+    @staticmethod
+    def _check_etag(scraping: Scraping, etag: str | None) -> None:
+        if etag is not None and scraping.etag != etag:
+            raise ScrapingConflictError("Scraping has changed")
 
     def _patch(
         self,
@@ -339,7 +338,27 @@ class CosmosScrapingRepository:
             raise ScrapingConflictError("Scraping has changed") from exc
         except exceptions.CosmosResourceNotFoundError as exc:
             raise ScrapingNotFoundError from exc
-        return self._deserialize(item)
+        return self._deserialize(cast(dict[str, Any], item))
+
+    def _replace(self, scraping: Scraping, *, etag: str | None) -> Scraping:
+        try:
+            if etag is None:
+                item = self._container.replace_item(
+                    item=scraping.id,
+                    body=self._serialize(scraping),
+                )
+            else:
+                item = self._container.replace_item(
+                    item=scraping.id,
+                    body=self._serialize(scraping),
+                    etag=etag,
+                    match_condition=MatchConditions.IfNotModified,
+                )
+        except exceptions.CosmosAccessConditionFailedError as exc:
+            raise ScrapingConflictError("Scraping has changed") from exc
+        except exceptions.CosmosResourceNotFoundError as exc:
+            raise ScrapingNotFoundError from exc
+        return self._deserialize(cast(dict[str, Any], item))
 
     @classmethod
     def _serialize(cls, scraping: Scraping) -> dict[str, Any]:
@@ -348,19 +367,12 @@ class CosmosScrapingRepository:
             "crawlerId": scraping.crawler_id,
             "sourceUrl": scraping.source_url,
             "metadata": cls._serialize_metadata(scraping.metadata),
-            "status": scraping.status.value,
             "tasks": [cls._serialize_task(task) for task in scraping.tasks],
             "progress": cls._serialize_progress(scraping.progress),
-            "attempts": scraping.attempts,
-            "lastError": scraping.last_error,
             "idempotencyKey": scraping.idempotency_key,
-            "activeKey": scraping.active_key,
             "createdBy": scraping.created_by,
             "createdAt": scraping.created_at.isoformat(),
             "updatedAt": scraping.updated_at.isoformat(),
-            "completedAt": (
-                scraping.completed_at.isoformat() if scraping.completed_at is not None else None
-            ),
         }
 
     @staticmethod
@@ -396,9 +408,9 @@ class CosmosScrapingRepository:
     def _serialize_progress(progress: ScrapingProgress) -> dict[str, int]:
         return {
             "total": progress.total,
-            "pending": progress.pending,
-            "processing": progress.processing,
-            "retrying": progress.retrying,
+            "created": progress.created,
+            "queued": progress.queued,
+            "running": progress.running,
             "completed": progress.completed,
             "failed": progress.failed,
         }
@@ -423,7 +435,6 @@ class CosmosScrapingRepository:
                 cover_image_url=cast(str | None, metadata.get("coverImageUrl")),
                 fetched_at=datetime.fromisoformat(cast(str, metadata["fetchedAt"])),
             ),
-            status=ScrapingStatus(cast(str, item["status"])),
             tasks=[
                 ScrapingTask(
                     id=cast(str, task["id"]),
@@ -441,20 +452,16 @@ class CosmosScrapingRepository:
             ],
             progress=ScrapingProgress(
                 total=cast(int, progress["total"]),
-                pending=cast(int, progress["pending"]),
-                processing=cast(int, progress.get("processing", 0)),
-                retrying=cast(int, progress.get("retrying", 0)),
+                created=cast(int, progress.get("created", 0)),
+                queued=cast(int, progress.get("queued", 0)),
+                running=cast(int, progress.get("running", 0)),
                 completed=cast(int, progress.get("completed", 0)),
                 failed=cast(int, progress.get("failed", 0)),
             ),
-            attempts=cast(int, item.get("attempts", 0)),
-            last_error=cast(str | None, item.get("lastError")),
             idempotency_key=cast(str, item["idempotencyKey"]),
-            active_key=cast(str, item["activeKey"]),
             created_by=cast(str, item["createdBy"]),
             created_at=datetime.fromisoformat(cast(str, item["createdAt"])),
             updated_at=datetime.fromisoformat(cast(str, item["updatedAt"])),
-            completed_at=_parse_optional_datetime(item.get("completedAt")),
             etag=cast(str | None, item.get("_etag")),
         )
 
@@ -465,6 +472,16 @@ def build_cosmos_scraping_repository(config: AppConfig) -> CosmosScrapingReposit
         connection_verify=config.environment.lower() != "localhost",
     )
     return CosmosScrapingRepository(client, config.azCosmosDbDatabaseName)
+
+
+def _task_index(scraping: Scraping, task_id: str) -> int:
+    index = next(
+        (index for index, task in enumerate(scraping.tasks) if task.id == task_id),
+        None,
+    )
+    if index is None:
+        raise ScrapingNotFoundError
+    return index
 
 
 def _parse_optional_datetime(value: Any) -> datetime | None:

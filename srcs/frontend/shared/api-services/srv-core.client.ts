@@ -384,6 +384,7 @@ export class NovelsClient {
 
     /**
      * Create Novel Route
+     * @param coverImage (optional)
      * @return Successful Response
      */
     create_novel(body: NovelCreateRequest, coverImage?: Blob | null): Promise<NovelResponse> {
@@ -537,6 +538,7 @@ export class NovelsClient {
 
     /**
      * Update Novel Route
+     * @param coverImage (optional)
      * @return Successful Response
      */
     update_novel(id: string, body: NovelUpdateRequest, coverImage?: Blob | null, clearCoverImage = false): Promise<NovelResponse> {
@@ -860,10 +862,9 @@ export class ScrapingsClient {
      * List Scrapings Route
      * @param limit (optional)
      * @param continuationToken (optional)
-     * @param status (optional)
      * @return Successful Response
      */
-    list_scrapings(limit: number | undefined, continuationToken: Anonymous8 | undefined, status: Anonymous9 | undefined): Promise<ScrapingListResponse> {
+    list_scrapings(limit: number | undefined, continuationToken: Anonymous8 | undefined): Promise<ScrapingListResponse> {
         let url_ = this.baseUrl + "/api/scrapings?";
         if (limit === null)
             throw new globalThis.Error("The parameter 'limit' cannot be null.");
@@ -873,10 +874,6 @@ export class ScrapingsClient {
             throw new globalThis.Error("The parameter 'continuationToken' cannot be null.");
         else if (continuationToken !== undefined)
             url_ += "continuationToken=" + encodeURIComponent("" + continuationToken) + "&";
-        if (status === null)
-            throw new globalThis.Error("The parameter 'status' cannot be null.");
-        else if (status !== undefined)
-            url_ += "status=" + encodeURIComponent("" + status) + "&";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -914,6 +911,106 @@ export class ScrapingsClient {
             });
         }
         return Promise.resolve<ScrapingListResponse>(null as any);
+    }
+
+    /**
+     * Start Scraping Route
+     * @return Successful Response
+     */
+    start_scraping(id: string, body: ScrapingStartRequest): Promise<ScrapingDetailResponse> {
+        let url_ = this.baseUrl + "/api/scrapings/{id}/start";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(body);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processStart_scraping(_response);
+        });
+    }
+
+    protected processStart_scraping(response: Response): Promise<ScrapingDetailResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 202) {
+            return response.text().then((_responseText) => {
+            let result202: any = null;
+            let resultData202 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result202 = ScrapingDetailResponse.fromJS(resultData202);
+            return result202;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ScrapingDetailResponse>(null as any);
+    }
+
+    /**
+     * Stop Scraping Route
+     * @return Successful Response
+     */
+    stop_scraping(id: string): Promise<ScrapingDetailResponse> {
+        let url_ = this.baseUrl + "/api/scrapings/{id}/stop";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "PATCH",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processStop_scraping(_response);
+        });
+    }
+
+    protected processStop_scraping(response: Response): Promise<ScrapingDetailResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = ScrapingDetailResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ScrapingDetailResponse>(null as any);
     }
 
     /**
@@ -1955,9 +2052,7 @@ export class ScrapingCreateResponse implements IScrapingCreateResponse {
     sourceUrl!: string;
     title!: string;
     coverImageUrl?: CoverImageUrl3;
-    status!: ScrapingStatus;
-    progress!: ScrapingProgressSummaryResponse;
-    attempts!: number;
+    progress!: ScrapingProgressResponse;
     createdAt!: Date;
     updatedAt!: Date;
     reused!: boolean;
@@ -1972,7 +2067,7 @@ export class ScrapingCreateResponse implements IScrapingCreateResponse {
             }
         }
         if (!data) {
-            this.progress = new ScrapingProgressSummaryResponse();
+            this.progress = new ScrapingProgressResponse();
         }
     }
 
@@ -1987,9 +2082,7 @@ export class ScrapingCreateResponse implements IScrapingCreateResponse {
             this.sourceUrl = _data["sourceUrl"];
             this.title = _data["title"];
             this.coverImageUrl = _data["coverImageUrl"];
-            this.status = _data["status"];
-            this.progress = _data["progress"] ? ScrapingProgressSummaryResponse.fromJS(_data["progress"]) : new ScrapingProgressSummaryResponse();
-            this.attempts = _data["attempts"];
+            this.progress = _data["progress"] ? ScrapingProgressResponse.fromJS(_data["progress"]) : new ScrapingProgressResponse();
             this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
             this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
             this.reused = _data["reused"];
@@ -2014,9 +2107,7 @@ export class ScrapingCreateResponse implements IScrapingCreateResponse {
         data["sourceUrl"] = this.sourceUrl;
         data["title"] = this.title;
         data["coverImageUrl"] = this.coverImageUrl;
-        data["status"] = this.status;
         data["progress"] = this.progress ? this.progress.toJSON() : undefined as any;
-        data["attempts"] = this.attempts;
         data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
         data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
         data["reused"] = this.reused;
@@ -2031,9 +2122,7 @@ export interface IScrapingCreateResponse {
     sourceUrl: string;
     title: string;
     coverImageUrl?: CoverImageUrl3;
-    status: ScrapingStatus;
-    progress: ScrapingProgressSummaryResponse;
-    attempts: number;
+    progress: ScrapingProgressResponse;
     createdAt: Date;
     updatedAt: Date;
     reused: boolean;
@@ -2046,12 +2135,9 @@ export class ScrapingDetailResponse implements IScrapingDetailResponse {
     id!: string;
     crawlerId!: string;
     sourceUrl!: string;
-    status!: ScrapingStatus;
     metadata!: ScrapingMetadataResponse;
     progress!: ScrapingProgressResponse;
     tasks?: ScrapingTaskResponse[];
-    attempts!: number;
-    lastError?: LastError;
     createdAt!: Date;
     updatedAt!: Date;
 
@@ -2079,7 +2165,6 @@ export class ScrapingDetailResponse implements IScrapingDetailResponse {
             this.id = _data["id"];
             this.crawlerId = _data["crawlerId"];
             this.sourceUrl = _data["sourceUrl"];
-            this.status = _data["status"];
             this.metadata = _data["metadata"] ? ScrapingMetadataResponse.fromJS(_data["metadata"]) : new ScrapingMetadataResponse();
             this.progress = _data["progress"] ? ScrapingProgressResponse.fromJS(_data["progress"]) : new ScrapingProgressResponse();
             if (Array.isArray(_data["tasks"])) {
@@ -2087,8 +2172,6 @@ export class ScrapingDetailResponse implements IScrapingDetailResponse {
                 for (let item of _data["tasks"])
                     this.tasks!.push(ScrapingTaskResponse.fromJS(item));
             }
-            this.attempts = _data["attempts"];
-            this.lastError = _data["lastError"];
             this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
             this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
         }
@@ -2110,7 +2193,6 @@ export class ScrapingDetailResponse implements IScrapingDetailResponse {
         data["id"] = this.id;
         data["crawlerId"] = this.crawlerId;
         data["sourceUrl"] = this.sourceUrl;
-        data["status"] = this.status;
         data["metadata"] = this.metadata ? this.metadata.toJSON() : undefined as any;
         data["progress"] = this.progress ? this.progress.toJSON() : undefined as any;
         if (Array.isArray(this.tasks)) {
@@ -2118,8 +2200,6 @@ export class ScrapingDetailResponse implements IScrapingDetailResponse {
             for (let item of this.tasks)
                 data["tasks"].push(item ? item.toJSON() : undefined as any);
         }
-        data["attempts"] = this.attempts;
-        data["lastError"] = this.lastError;
         data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
         data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
         return data;
@@ -2131,12 +2211,9 @@ export interface IScrapingDetailResponse {
     id: string;
     crawlerId: string;
     sourceUrl: string;
-    status: ScrapingStatus;
     metadata: ScrapingMetadataResponse;
     progress: ScrapingProgressResponse;
     tasks?: ScrapingTaskResponse[];
-    attempts: number;
-    lastError?: LastError;
     createdAt: Date;
     updatedAt: Date;
 
@@ -2295,14 +2372,14 @@ export interface IScrapingMetadataResponse {
     [key: string]: any;
 }
 
-/** Complete progress returned by the detail endpoint. */
+/** Task progress returned with a Scraping. */
 export class ScrapingProgressResponse implements IScrapingProgressResponse {
     total!: number;
+    created!: number;
+    queued!: number;
+    running!: number;
     completed!: number;
     failed!: number;
-    pending!: number;
-    processing!: number;
-    retrying!: number;
 
     [key: string]: any;
 
@@ -2322,11 +2399,11 @@ export class ScrapingProgressResponse implements IScrapingProgressResponse {
                     this[property] = _data[property];
             }
             this.total = _data["total"];
+            this.created = _data["created"];
+            this.queued = _data["queued"];
+            this.running = _data["running"];
             this.completed = _data["completed"];
             this.failed = _data["failed"];
-            this.pending = _data["pending"];
-            this.processing = _data["processing"];
-            this.retrying = _data["retrying"];
         }
     }
 
@@ -2344,79 +2421,21 @@ export class ScrapingProgressResponse implements IScrapingProgressResponse {
                 data[property] = this[property];
         }
         data["total"] = this.total;
+        data["created"] = this.created;
+        data["queued"] = this.queued;
+        data["running"] = this.running;
         data["completed"] = this.completed;
         data["failed"] = this.failed;
-        data["pending"] = this.pending;
-        data["processing"] = this.processing;
-        data["retrying"] = this.retrying;
         return data;
     }
 }
 
-/** Complete progress returned by the detail endpoint. */
+/** Task progress returned with a Scraping. */
 export interface IScrapingProgressResponse {
     total: number;
-    completed: number;
-    failed: number;
-    pending: number;
-    processing: number;
-    retrying: number;
-
-    [key: string]: any;
-}
-
-/** Compact progress returned in list/create responses. */
-export class ScrapingProgressSummaryResponse implements IScrapingProgressSummaryResponse {
-    total!: number;
-    completed!: number;
-    failed!: number;
-
-    [key: string]: any;
-
-    constructor(data?: IScrapingProgressSummaryResponse) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-            this.total = _data["total"];
-            this.completed = _data["completed"];
-            this.failed = _data["failed"];
-        }
-    }
-
-    static fromJS(data: any): ScrapingProgressSummaryResponse {
-        data = typeof data === 'object' ? data : {};
-        let result = new ScrapingProgressSummaryResponse();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        data["total"] = this.total;
-        data["completed"] = this.completed;
-        data["failed"] = this.failed;
-        return data;
-    }
-}
-
-/** Compact progress returned in list/create responses. */
-export interface IScrapingProgressSummaryResponse {
-    total: number;
+    created: number;
+    queued: number;
+    running: number;
     completed: number;
     failed: number;
 
@@ -2501,13 +2520,58 @@ export interface IScrapingResultResponse {
     [key: string]: any;
 }
 
-/** Scraping lifecycle states. */
-export enum ScrapingStatus {
-    Queued = "queued",
-    Processing = "processing",
-    Retrying = "retrying",
-    Completed = "completed",
-    Failed = "failed",
+/** Task range accepted by PATCH /api/scrapings/{id}/start. */
+export class ScrapingStartRequest implements IScrapingStartRequest {
+    chapterFrom!: number;
+    chapterTo!: number;
+    refetch?: boolean;
+    force?: boolean;
+
+    constructor(data?: IScrapingStartRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+        if (!data) {
+            this.refetch = false;
+            this.force = false;
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.chapterFrom = _data["chapterFrom"];
+            this.chapterTo = _data["chapterTo"];
+            this.refetch = _data["refetch"] !== undefined ? _data["refetch"] : false;
+            this.force = _data["force"] !== undefined ? _data["force"] : false;
+        }
+    }
+
+    static fromJS(data: any): ScrapingStartRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new ScrapingStartRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["chapterFrom"] = this.chapterFrom;
+        data["chapterTo"] = this.chapterTo;
+        data["refetch"] = this.refetch;
+        data["force"] = this.force;
+        return data;
+    }
+}
+
+/** Task range accepted by PATCH /api/scrapings/{id}/start. */
+export interface IScrapingStartRequest {
+    chapterFrom: number;
+    chapterTo: number;
+    refetch?: boolean;
+    force?: boolean;
 }
 
 /** Scraping list item. */
@@ -2517,9 +2581,7 @@ export class ScrapingSummaryResponse implements IScrapingSummaryResponse {
     sourceUrl!: string;
     title!: string;
     coverImageUrl?: CoverImageUrl5;
-    status!: ScrapingStatus;
-    progress!: ScrapingProgressSummaryResponse;
-    attempts!: number;
+    progress!: ScrapingProgressResponse;
     createdAt!: Date;
     updatedAt!: Date;
 
@@ -2533,7 +2595,7 @@ export class ScrapingSummaryResponse implements IScrapingSummaryResponse {
             }
         }
         if (!data) {
-            this.progress = new ScrapingProgressSummaryResponse();
+            this.progress = new ScrapingProgressResponse();
         }
     }
 
@@ -2548,9 +2610,7 @@ export class ScrapingSummaryResponse implements IScrapingSummaryResponse {
             this.sourceUrl = _data["sourceUrl"];
             this.title = _data["title"];
             this.coverImageUrl = _data["coverImageUrl"];
-            this.status = _data["status"];
-            this.progress = _data["progress"] ? ScrapingProgressSummaryResponse.fromJS(_data["progress"]) : new ScrapingProgressSummaryResponse();
-            this.attempts = _data["attempts"];
+            this.progress = _data["progress"] ? ScrapingProgressResponse.fromJS(_data["progress"]) : new ScrapingProgressResponse();
             this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
             this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
         }
@@ -2574,9 +2634,7 @@ export class ScrapingSummaryResponse implements IScrapingSummaryResponse {
         data["sourceUrl"] = this.sourceUrl;
         data["title"] = this.title;
         data["coverImageUrl"] = this.coverImageUrl;
-        data["status"] = this.status;
         data["progress"] = this.progress ? this.progress.toJSON() : undefined as any;
-        data["attempts"] = this.attempts;
         data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
         data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
         return data;
@@ -2590,9 +2648,7 @@ export interface IScrapingSummaryResponse {
     sourceUrl: string;
     title: string;
     coverImageUrl?: CoverImageUrl5;
-    status: ScrapingStatus;
-    progress: ScrapingProgressSummaryResponse;
-    attempts: number;
+    progress: ScrapingProgressResponse;
     createdAt: Date;
     updatedAt: Date;
 
@@ -2607,6 +2663,7 @@ export class ScrapingTaskResponse implements IScrapingTaskResponse {
     manifestIndex!: number;
     status!: ScrapingTaskStatus;
     attempts!: number;
+    lastError?: LastError;
     resultAvailable!: boolean;
     completedAt?: CompletedAt;
 
@@ -2633,6 +2690,7 @@ export class ScrapingTaskResponse implements IScrapingTaskResponse {
             this.manifestIndex = _data["manifestIndex"];
             this.status = _data["status"];
             this.attempts = _data["attempts"];
+            this.lastError = _data["lastError"];
             this.resultAvailable = _data["resultAvailable"];
             this.completedAt = _data["completedAt"];
         }
@@ -2657,6 +2715,7 @@ export class ScrapingTaskResponse implements IScrapingTaskResponse {
         data["manifestIndex"] = this.manifestIndex;
         data["status"] = this.status;
         data["attempts"] = this.attempts;
+        data["lastError"] = this.lastError;
         data["resultAvailable"] = this.resultAvailable;
         data["completedAt"] = this.completedAt;
         return data;
@@ -2671,6 +2730,7 @@ export interface IScrapingTaskResponse {
     manifestIndex: number;
     status: ScrapingTaskStatus;
     attempts: number;
+    lastError?: LastError;
     resultAvailable: boolean;
     completedAt?: CompletedAt;
 
@@ -2679,14 +2739,13 @@ export interface IScrapingTaskResponse {
 
 /** Embedded scraping task lifecycle states. */
 export enum ScrapingTaskStatus {
-    Pending = "pending",
-    Processing = "processing",
-    Retrying = "retrying",
+    Created = "created",
+    Queued = "queued",
+    Running = "running",
     Completed = "completed",
     Failed = "failed",
 }
 
-/** Issued on successful login. */
 /** Payload for creating a novel. */
 export class NovelCreateRequest implements INovelCreateRequest {
     title!: string;
@@ -2751,6 +2810,7 @@ export interface INovelUpdateRequest {
     [key: string]: any;
 }
 
+/** Issued on successful login. */
 export class TokenResponse implements ITokenResponse {
     access_token!: string;
     token_type?: string;
@@ -3966,50 +4026,6 @@ export interface IAnonymous8 {
     [key: string]: any;
 }
 
-export class Anonymous9 implements IAnonymous9 {
-
-    [key: string]: any;
-
-    constructor(data?: IAnonymous9) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Anonymous9 {
-        data = typeof data === 'object' ? data : {};
-        let result = new Anonymous9();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IAnonymous9 {
-
-    [key: string]: any;
-}
-
 export class ChapterNumber implements IChapterNumber {
 
     [key: string]: any;
@@ -4670,50 +4686,6 @@ export interface ICoverImageUrl3 {
     [key: string]: any;
 }
 
-export class LastError implements ILastError {
-
-    [key: string]: any;
-
-    constructor(data?: ILastError) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): LastError {
-        data = typeof data === 'object' ? data : {};
-        let result = new LastError();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface ILastError {
-
-    [key: string]: any;
-}
-
 export class ContinuationToken2 implements IContinuationToken2 {
 
     [key: string]: any;
@@ -5106,6 +5078,50 @@ export class ChapterNumber4 implements IChapterNumber4 {
 }
 
 export interface IChapterNumber4 {
+
+    [key: string]: any;
+}
+
+export class LastError implements ILastError {
+
+    [key: string]: any;
+
+    constructor(data?: ILastError) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): LastError {
+        data = typeof data === 'object' ? data : {};
+        let result = new LastError();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ILastError {
 
     [key: string]: any;
 }

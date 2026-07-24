@@ -51,9 +51,8 @@ queue_listener_scraping = ScrapingQueueListener(
     scraping_result_repository=repository_scraping_result,
     cache_provider=provider_cache,
     proxy_provider=provider_proxy,
-    queue_publisher=queue_publisher,
     realtime_hub=realtime_hub,
-    workers=1,
+    workers=3,
 )
 
 # Dependency injection for FastAPI routes

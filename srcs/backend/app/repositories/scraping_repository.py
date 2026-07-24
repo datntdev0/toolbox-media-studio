@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import builtins
 import json
 from copy import deepcopy
 from dataclasses import asdict
@@ -16,7 +15,7 @@ from app.domain.scrapings import (
     ScrapingCreateResult,
     ScrapingPage,
     ScrapingProgress,
-    ScrapingStatus,
+    ScrapingQueueResult,
     ScrapingTaskStatus,
 )
 
@@ -26,7 +25,7 @@ MAX_COSMOS_ITEM_BYTES = 1_900_000
 class ScrapingRepository(Protocol):
     """Persistence contract for Scrapings."""
 
-    def create_or_get_active(self, candidate: Scraping) -> ScrapingCreateResult: ...
+    def create_or_merge(self, candidate: Scraping) -> ScrapingCreateResult: ...
 
     def get(self, id: str, created_by: str | None = None) -> Scraping | None: ...
 
@@ -37,19 +36,35 @@ class ScrapingRepository(Protocol):
         created_by: str | None,
         limit: int,
         continuation_token: str | None,
-        status: ScrapingStatus | None,
     ) -> ScrapingPage: ...
 
-    def set_status(
+    def queue_tasks(
         self,
         id: str,
         created_by: str,
-        status: ScrapingStatus,
         *,
-        attempt: int | None = None,
-        error: str | None = None,
+        chapter_from: int,
+        chapter_to: int,
+        force: bool,
+        etag: str | None = None,
+    ) -> ScrapingQueueResult: ...
+
+    def stop_queued_tasks(
+        self,
+        id: str,
+        created_by: str,
+        *,
         etag: str | None = None,
     ) -> Scraping: ...
+
+    def claim_task(
+        self,
+        id: str,
+        created_by: str,
+        task_id: str,
+        *,
+        etag: str | None = None,
+    ) -> Scraping | None: ...
 
     def update_task(
         self,
@@ -64,14 +79,6 @@ class ScrapingRepository(Protocol):
         completed_at: datetime | None,
         etag: str | None = None,
     ) -> Scraping: ...
-
-    def reconcile(self, id: str, created_by: str, etag: str | None = None) -> Scraping: ...
-
-    def list_stale_active(
-        self,
-        updated_before: datetime,
-        limit: int,
-    ) -> builtins.list[Scraping]: ...
 
 
 class ScrapingNotFoundError(Exception):
@@ -90,6 +97,10 @@ class ScrapingContinuationTokenError(ValueError):
     """Raised when an in-memory continuation token is invalid."""
 
 
+class ScrapingChapterRangeError(ValueError):
+    """Raised when a chapter-number range matches no tasks."""
+
+
 class InMemoryScrapingRepository:
     """Thread-safe in-memory Scraping repository used by tests."""
 
@@ -97,15 +108,20 @@ class InMemoryScrapingRepository:
         self._scrapings: dict[tuple[str, str], Scraping] = {}
         self._lock = Lock()
 
-    def create_or_get_active(self, candidate: Scraping) -> ScrapingCreateResult:
+    def create_or_merge(self, candidate: Scraping) -> ScrapingCreateResult:
         ensure_scraping_size(candidate)
         with self._lock:
-            active = self._find_active(candidate.created_by, candidate.idempotency_key)
-            if active is not None:
-                return ScrapingCreateResult(scraping=deepcopy(active), created=False)
+            existing = self._find_by_idempotency(
+                candidate.created_by,
+                candidate.idempotency_key,
+            )
+            if existing is not None:
+                merge_scraping(existing, candidate)
+                existing.etag = self._next_etag()
+                ensure_scraping_size(existing)
+                return ScrapingCreateResult(scraping=deepcopy(existing), created=False)
 
             stored = deepcopy(candidate)
-            stored.active_key = stored.idempotency_key
             stored.etag = self._next_etag()
             self._scrapings[(stored.created_by, stored.id)] = stored
             return ScrapingCreateResult(scraping=deepcopy(stored), created=True)
@@ -135,7 +151,6 @@ class InMemoryScrapingRepository:
         created_by: str | None,
         limit: int,
         continuation_token: str | None,
-        status: ScrapingStatus | None,
     ) -> ScrapingPage:
         try:
             offset = int(continuation_token or "0")
@@ -147,7 +162,6 @@ class InMemoryScrapingRepository:
                 deepcopy(scraping)
                 for (owner, _), scraping in self._scrapings.items()
                 if (created_by is None or owner == created_by)
-                and (status is None or scraping.status == status)
             ]
         items.sort(key=lambda item: (item.updated_at, item.id), reverse=True)
         page = items[offset : offset + limit]
@@ -155,31 +169,93 @@ class InMemoryScrapingRepository:
         next_token = str(next_offset) if next_offset < len(items) else None
         return ScrapingPage(items=page, continuation_token=next_token)
 
-    def set_status(
+    def queue_tasks(
         self,
         id: str,
         created_by: str,
-        status: ScrapingStatus,
         *,
-        attempt: int | None = None,
-        error: str | None = None,
+        chapter_from: int,
+        chapter_to: int,
+        force: bool,
+        etag: str | None = None,
+    ) -> ScrapingQueueResult:
+        with self._lock:
+            scraping = self._require(id, created_by)
+            self._check_etag(scraping, etag)
+            matching = [
+                task
+                for task in scraping.tasks
+                if task.chapter_number is not None
+                and chapter_from <= task.chapter_number <= chapter_to
+            ]
+            if not matching:
+                raise ScrapingChapterRangeError(
+                    "No scraping tasks match the requested chapter range"
+                )
+
+            queued = [
+                task
+                for task in matching
+                if force
+                or task.status
+                not in {ScrapingTaskStatus.QUEUED, ScrapingTaskStatus.RUNNING}
+            ]
+            if queued:
+                for task in queued:
+                    task.status = ScrapingTaskStatus.QUEUED
+                    task.last_error = None
+                touch_scraping(scraping)
+                scraping.etag = self._next_etag()
+                ensure_scraping_size(scraping)
+            return ScrapingQueueResult(
+                scraping=deepcopy(scraping),
+                tasks=deepcopy(queued),
+            )
+
+    def stop_queued_tasks(
+        self,
+        id: str,
+        created_by: str,
+        *,
         etag: str | None = None,
     ) -> Scraping:
         with self._lock:
             scraping = self._require(id, created_by)
             self._check_etag(scraping, etag)
-            if scraping.status.is_terminal and status != scraping.status:
-                raise ScrapingConflictError("Terminal Scrapings cannot change status")
+            queued = [
+                task
+                for task in scraping.tasks
+                if task.status == ScrapingTaskStatus.QUEUED
+            ]
+            if queued:
+                for task in queued:
+                    task.status = ScrapingTaskStatus.CREATED
+                touch_scraping(scraping)
+                scraping.etag = self._next_etag()
+                ensure_scraping_size(scraping)
+            return deepcopy(scraping)
 
-            now = datetime.now(UTC)
-            scraping.status = status
-            if attempt is not None:
-                scraping.attempts = max(scraping.attempts, attempt)
-            scraping.last_error = error
-            scraping.updated_at = now
-            if status.is_terminal:
-                scraping.active_key = f"terminal:{scraping.id}"
-                scraping.completed_at = now
+    def claim_task(
+        self,
+        id: str,
+        created_by: str,
+        task_id: str,
+        *,
+        etag: str | None = None,
+    ) -> Scraping | None:
+        with self._lock:
+            scraping = self._require(id, created_by)
+            self._check_etag(scraping, etag)
+            task = next((item for item in scraping.tasks if item.id == task_id), None)
+            if task is None:
+                raise ScrapingNotFoundError
+            if task.status != ScrapingTaskStatus.QUEUED:
+                return None
+
+            task.status = ScrapingTaskStatus.RUNNING
+            task.attempts += 1
+            task.last_error = None
+            touch_scraping(scraping)
             scraping.etag = self._next_etag()
             ensure_scraping_size(scraping)
             return deepcopy(scraping)
@@ -209,50 +285,22 @@ class InMemoryScrapingRepository:
             task.last_error = error
             task.result_available = result_available
             task.completed_at = completed_at
-            scraping.progress = ScrapingProgress.from_tasks(scraping.tasks)
-            scraping.updated_at = datetime.now(UTC)
+            touch_scraping(scraping)
             scraping.etag = self._next_etag()
             ensure_scraping_size(scraping)
             return deepcopy(scraping)
 
-    def reconcile(self, id: str, created_by: str, etag: str | None = None) -> Scraping:
-        with self._lock:
-            scraping = self._require(id, created_by)
-            self._check_etag(scraping, etag)
-            scraping.progress = ScrapingProgress.from_tasks(scraping.tasks)
-            now = datetime.now(UTC)
-            scraping.status = reconciled_scraping_status(scraping.progress)
-
-            if scraping.status.is_terminal:
-                scraping.active_key = f"terminal:{scraping.id}"
-                scraping.completed_at = now
-            scraping.updated_at = now
-            scraping.etag = self._next_etag()
-            ensure_scraping_size(scraping)
-            return deepcopy(scraping)
-
-    def list_stale_active(
+    def _find_by_idempotency(
         self,
-        updated_before: datetime,
-        limit: int,
-    ) -> builtins.list[Scraping]:
-        with self._lock:
-            items = [
-                deepcopy(scraping)
-                for scraping in self._scrapings.values()
-                if scraping.status.is_active and scraping.updated_at < updated_before
-            ]
-        items.sort(key=lambda item: item.updated_at)
-        return items[:limit]
-
-    def _find_active(self, created_by: str, idempotency_key: str) -> Scraping | None:
+        created_by: str,
+        idempotency_key: str,
+    ) -> Scraping | None:
         return next(
             (
                 scraping
                 for scraping in self._scrapings.values()
                 if scraping.created_by == created_by
                 and scraping.idempotency_key == idempotency_key
-                and scraping.status.is_active
             ),
             None,
         )
@@ -278,15 +326,35 @@ def ensure_scraping_size(scraping: Scraping) -> None:
         raise ScrapingTooLargeError("Scraping chapter manifest is too large")
 
 
-def reconciled_scraping_status(progress: ScrapingProgress) -> ScrapingStatus:
-    """Derive the aggregate status without abandoning retryable tasks."""
+def merge_scraping(existing: Scraping, candidate: Scraping) -> None:
+    existing.crawler_id = candidate.crawler_id
+    existing.source_url = candidate.source_url
+    existing.metadata = deepcopy(candidate.metadata)
 
-    terminal_count = progress.completed + progress.failed
-    if terminal_count == progress.total:
-        return ScrapingStatus.FAILED if progress.failed else ScrapingStatus.COMPLETED
-    if progress.retrying:
-        return ScrapingStatus.RETRYING
-    return ScrapingStatus.PROCESSING
+    candidate_tasks = {task.id: task for task in candidate.tasks}
+    existing_ids = {task.id for task in existing.tasks}
+    for task in existing.tasks:
+        refreshed = candidate_tasks.get(task.id)
+        if refreshed is None:
+            continue
+        task.source_url = refreshed.source_url
+        task.title = refreshed.title
+        task.chapter_number = refreshed.chapter_number
+
+    next_index = max((task.manifest_index for task in existing.tasks), default=-1) + 1
+    for candidate_task in candidate.tasks:
+        if candidate_task.id in existing_ids:
+            continue
+        appended = deepcopy(candidate_task)
+        appended.manifest_index = next_index
+        next_index += 1
+        existing.tasks.append(appended)
+    touch_scraping(existing)
+
+
+def touch_scraping(scraping: Scraping) -> None:
+    scraping.progress = ScrapingProgress.from_tasks(scraping.tasks)
+    scraping.updated_at = datetime.now(UTC)
 
 
 def serialized_size(value: object) -> int:

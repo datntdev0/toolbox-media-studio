@@ -114,13 +114,14 @@ async function createScraping(data: Schema) {
 
     toast.add(created.reused
       ? {
-          title: 'An active scraping already exists.',
+          title: 'Scraping manifest refreshed',
+          description: `${created.title} was updated with any newly discovered chapters.`,
           icon: 'lucide:info',
           color: 'neutral'
         }
       : {
-          title: 'Scraping queued',
-          description: `${created.title} was added to your scrapings.`,
+          title: 'Scraping created',
+          description: `${created.title} is ready for you to choose a chapter range.`,
           icon: 'lucide:circle-check',
           color: 'success'
         })
@@ -156,7 +157,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   <UModal
     v-model:open="open"
     title="New Scraping"
-    description="Preview a novel source, then download all of its chapters."
+    description="Preview a novel source, then save its reusable chapter manifest."
     :dismissible="!submitting"
   >
     <template #body>
@@ -266,7 +267,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
           <UButton
             type="submit"
             :label="preview ? 'Create Scraping' : 'Preview'"
-            :icon="preview ? 'lucide:download' : 'lucide:scan-search'"
+            :icon="preview ? 'lucide:list-plus' : 'lucide:scan-search'"
             :loading="previewing || submitting"
             :disabled="crawlersLoading || crawlersError"
           />

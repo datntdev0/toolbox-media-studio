@@ -1,52 +1,24 @@
 import { format, formatDistanceToNowStrict } from 'date-fns'
 import {
-  ScrapingStatus,
-  ScrapingTaskStatus
+  ScrapingTaskStatus,
+  type ScrapingProgressResponse
 } from '~~/shared/api-services/srv-core.client'
 
-export const scrapingStatusMeta = {
-  [ScrapingStatus.Queued]: {
+export const scrapingTaskStatusMeta = {
+  [ScrapingTaskStatus.Created]: {
+    label: 'Created',
+    color: 'neutral',
+    icon: 'lucide:circle-dashed'
+  },
+  [ScrapingTaskStatus.Queued]: {
     label: 'Queued',
     color: 'neutral',
     icon: 'lucide:clock-3'
   },
-  [ScrapingStatus.Processing]: {
-    label: 'Processing',
+  [ScrapingTaskStatus.Running]: {
+    label: 'Running',
     color: 'primary',
     icon: 'lucide:loader-circle'
-  },
-  [ScrapingStatus.Retrying]: {
-    label: 'Retrying',
-    color: 'warning',
-    icon: 'lucide:rotate-ccw'
-  },
-  [ScrapingStatus.Completed]: {
-    label: 'Completed',
-    color: 'success',
-    icon: 'lucide:circle-check'
-  },
-  [ScrapingStatus.Failed]: {
-    label: 'Failed',
-    color: 'error',
-    icon: 'lucide:circle-x'
-  }
-} as const
-
-export const scrapingTaskStatusMeta = {
-  [ScrapingTaskStatus.Pending]: {
-    label: 'Pending',
-    color: 'neutral',
-    icon: 'lucide:clock-3'
-  },
-  [ScrapingTaskStatus.Processing]: {
-    label: 'Processing',
-    color: 'primary',
-    icon: 'lucide:loader-circle'
-  },
-  [ScrapingTaskStatus.Retrying]: {
-    label: 'Retrying',
-    color: 'warning',
-    icon: 'lucide:rotate-ccw'
   },
   [ScrapingTaskStatus.Completed]: {
     label: 'Downloaded',
@@ -60,8 +32,49 @@ export const scrapingTaskStatusMeta = {
   }
 } as const
 
-export function isActiveScraping(status: ScrapingStatus) {
-  return status !== ScrapingStatus.Completed && status !== ScrapingStatus.Failed
+export function scrapingActivityMeta(progress: ScrapingProgressResponse) {
+  if (progress.running > 0) {
+    return {
+      label: `${progress.running} running`,
+      color: 'primary' as const,
+      icon: 'lucide:loader-circle',
+      spinning: true
+    }
+  }
+  if (progress.queued > 0) {
+    return {
+      label: `${progress.queued} queued`,
+      color: 'neutral' as const,
+      icon: 'lucide:clock-3',
+      spinning: false
+    }
+  }
+  if (progress.failed > 0) {
+    return {
+      label: `${progress.failed} failed`,
+      color: 'error' as const,
+      icon: 'lucide:circle-x',
+      spinning: false
+    }
+  }
+  if (progress.completed === progress.total && progress.total > 0) {
+    return {
+      label: 'Downloaded',
+      color: 'success' as const,
+      icon: 'lucide:circle-check',
+      spinning: false
+    }
+  }
+  return {
+    label: `${progress.created} ready`,
+    color: 'neutral' as const,
+    icon: 'lucide:circle-dashed',
+    spinning: false
+  }
+}
+
+export function isActiveScraping(progress: ScrapingProgressResponse) {
+  return progress.queued > 0 || progress.running > 0
 }
 
 export function formatRelativeTime(value: Date | string | undefined) {

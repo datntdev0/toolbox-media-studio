@@ -53,7 +53,7 @@ def test_create_requires_auth_and_exact_request_fields(client: TestClient) -> No
     assert invalid.status_code == 422
 
 
-def test_create_persists_embedded_tasks_and_publishes_once(
+def test_create_persists_created_tasks_without_publishing(
     client: TestClient,
     flaresolverr_client: Any,
     scraping_repository: InMemoryScrapingRepository,
@@ -72,17 +72,26 @@ def test_create_persists_embedded_tasks_and_publishes_once(
     assert first.status_code == 202
     assert first.headers["location"] == f"/api/scrapings/{first.json()['id']}"
     assert first.json()["reused"] is False
-    assert first.json()["progress"] == {"total": 2, "completed": 0, "failed": 0}
+    assert first.json()["progress"] == {
+        "total": 2,
+        "created": 2,
+        "queued": 0,
+        "running": 0,
+        "completed": 0,
+        "failed": 0,
+    }
+    assert "status" not in first.json()
+    assert "attempts" not in first.json()
     assert second.status_code == 202
     assert second.json()["id"] == first.json()["id"]
     assert second.json()["reused"] is True
-    assert len(queue_publisher.messages) == 1
-    assert queue_publisher.messages[0][0] == "scrapings"
+    assert queue_publisher.messages == []
 
     stored = scraping_repository.get(first.json()["id"], _admin_id(client, token))
     assert stored is not None
     assert [task.title for task in stored.tasks] == ["Chapter 1", "Chapter 2"]
     assert [task.manifest_index for task in stored.tasks] == [0, 1]
+    assert all(task.status == ScrapingTaskStatus.CREATED for task in stored.tasks)
 
 
 def test_list_and_detail_return_summaries_and_embedded_tasks(
@@ -109,6 +118,161 @@ def test_list_and_detail_return_summaries_and_embedded_tasks(
         "Chapter 2",
     ]
     assert all(task["resultAvailable"] is False for task in detail.json()["tasks"])
+    assert "status" not in detail.json()
+    assert "lastError" not in detail.json()
+
+
+def test_duplicate_create_refreshes_metadata_and_appends_new_chapters(
+    client: TestClient,
+    flaresolverr_client: Any,
+    scraping_repository: InMemoryScrapingRepository,
+) -> None:
+    flaresolverr_client.html = METADATA_HTML
+    token = _login(client)
+    first = _create(client, token)
+    flaresolverr_client.html = METADATA_HTML.replace(
+        "</ul>",
+        '<li><a href="/0603625457/3.html">Chapter 3</a></li></ul>',
+    ).replace("Test Novel</h1>", "Refreshed Novel</h1>")
+
+    second = client.post(
+        "/api/scrapings",
+        headers=_headers(token),
+        json={
+            "crawlerId": "novel543",
+            "sourceUrl": "https://www.novel543.com/0603625457/dir",
+        },
+    )
+
+    assert second.status_code == 202
+    assert second.json()["id"] == first["id"]
+    assert second.json()["reused"] is True
+    stored = scraping_repository.get(first["id"], _admin_id(client, token))
+    assert stored is not None
+    assert stored.metadata.title == "Refreshed Novel"
+    assert [task.chapter_number for task in stored.tasks] == [1, 2, 3]
+    assert stored.tasks[2].status == ScrapingTaskStatus.CREATED
+
+
+def test_start_and_stop_manage_task_queue_messages(
+    client: TestClient,
+    flaresolverr_client: Any,
+    scraping_repository: InMemoryScrapingRepository,
+    queue_publisher: Any,
+) -> None:
+    flaresolverr_client.html = METADATA_HTML
+    token = _login(client)
+    created = _create(client, token)
+
+    started = client.patch(
+        f"/api/scrapings/{created['id']}/start",
+        headers=_headers(token),
+        json={
+            "chapterFrom": 1,
+            "chapterTo": 2,
+            "refetch": True,
+        },
+    )
+
+    assert started.status_code == 202
+    assert started.json()["progress"]["queued"] == 2
+    assert len(queue_publisher.messages) == 2
+    assert {message[1]["taskId"] for message in queue_publisher.messages} == {
+        task["id"] for task in started.json()["tasks"]
+    }
+    assert all(message[1]["refetch"] is True for message in queue_publisher.messages)
+
+    repeated = client.patch(
+        f"/api/scrapings/{created['id']}/start",
+        headers=_headers(token),
+        json={"chapterFrom": 1, "chapterTo": 2},
+    )
+    assert repeated.status_code == 202
+    assert len(queue_publisher.messages) == 2
+
+    forced = client.patch(
+        f"/api/scrapings/{created['id']}/start",
+        headers=_headers(token),
+        json={"chapterFrom": 1, "chapterTo": 2, "force": True},
+    )
+    assert forced.status_code == 202
+    assert len(queue_publisher.messages) == 4
+
+    stopped = client.patch(
+        f"/api/scrapings/{created['id']}/stop",
+        headers=_headers(token),
+    )
+    assert stopped.status_code == 200
+    assert stopped.json()["progress"]["created"] == 2
+    assert stopped.json()["progress"]["queued"] == 0
+    stored = scraping_repository.get(created["id"], _admin_id(client, token))
+    assert stored is not None
+    assert all(task.status == ScrapingTaskStatus.CREATED for task in stored.tasks)
+
+
+def test_start_validates_range_and_openapi_has_task_scoped_contract(
+    client: TestClient,
+    flaresolverr_client: Any,
+) -> None:
+    flaresolverr_client.html = METADATA_HTML
+    token = _login(client)
+    created = _create(client, token)
+
+    reversed_range = client.patch(
+        f"/api/scrapings/{created['id']}/start",
+        headers=_headers(token),
+        json={"chapterFrom": 2, "chapterTo": 1},
+    )
+    missing_range = client.patch(
+        f"/api/scrapings/{created['id']}/start",
+        headers=_headers(token),
+        json={"chapterFrom": 99, "chapterTo": 100},
+    )
+    openapi = client.get("/openapi.json").json()
+
+    assert reversed_range.status_code == 422
+    assert missing_range.status_code == 422
+    parameters = openapi["paths"]["/api/scrapings"]["get"]["parameters"]
+    assert "status" not in {parameter["name"] for parameter in parameters}
+    summary_schema = openapi["components"]["schemas"]["ScrapingSummaryResponse"]
+    assert "status" not in summary_schema["properties"]
+    assert "/api/scrapings/{id}/start" in openapi["paths"]
+    assert "/api/scrapings/{id}/stop" in openapi["paths"]
+
+
+def test_start_publication_failure_leaves_tasks_queued_for_force_retry(
+    client: TestClient,
+    flaresolverr_client: Any,
+    scraping_repository: InMemoryScrapingRepository,
+    queue_publisher: Any,
+    monkeypatch: Any,
+) -> None:
+    flaresolverr_client.html = METADATA_HTML
+    token = _login(client)
+    created = _create(client, token)
+    published = 0
+
+    def fail_second_message(queue_name: str, message: Any) -> None:
+        nonlocal published
+        del queue_name, message
+        published += 1
+        if published == 2:
+            raise RuntimeError("queue unavailable")
+
+    monkeypatch.setattr(queue_publisher, "publish", fail_second_message)
+    response = client.patch(
+        f"/api/scrapings/{created['id']}/start",
+        headers=_headers(token),
+        json={"chapterFrom": 1, "chapterTo": 2},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "Some scraping tasks could not be queued; retry with force"
+    )
+    stored = scraping_repository.get(created["id"], _admin_id(client, token))
+    assert stored is not None
+    assert stored.progress.queued == 2
 
 
 def test_result_endpoint_reads_one_completed_task_result(

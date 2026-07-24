@@ -12,7 +12,6 @@ from app.core.injection import (
     provider_proxy,
     provider_public_blob,
     queue_listener_scraping,
-    queue_publisher,
     queue_subscriber_sample,
     realtime_hub,
     repository_novel,
@@ -20,7 +19,6 @@ from app.core.injection import (
     repository_scraping_result,
     repository_user,
 )
-from app.events.scraping_handler import requeue_stale_scrapings
 from app.routers import auth, crawlers, health, novels, realtime, scrapings, users
 
 app_config = AppConfig()
@@ -48,10 +46,6 @@ async def lifespan(app: FastAPI):
     seed_admin_user(logger, app_config, repository_user)
 
     queue_subscriber_sample.start()
-    try:
-        requeue_stale_scrapings(repository_scraping, queue_publisher)
-    except Exception:
-        logger.exception("Stale Scrapings could not be requeued")
     queue_listener_scraping.start()
 
     try:

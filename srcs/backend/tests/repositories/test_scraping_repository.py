@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
-from uuid import uuid4
 
 import pytest
 
@@ -13,47 +12,61 @@ from app.domain.scrapings import (
     Scraping,
     ScrapingMetadata,
     ScrapingProgress,
-    ScrapingStatus,
     ScrapingTask,
     ScrapingTaskStatus,
 )
 from app.repositories.scraping_repository import (
     InMemoryScrapingRepository,
+    ScrapingChapterRangeError,
     ScrapingNotFoundError,
 )
 from app.repositories.scraping_result_repository import InMemoryScrapingResultRepository
 
 
-def test_create_or_get_active_is_user_scoped_and_releases_after_terminal() -> None:
+def test_create_or_merge_is_permanent_and_preserves_existing_task_state() -> None:
     repository = InMemoryScrapingRepository()
-
-    first = repository.create_or_get_active(_scraping(created_by="user-1"))
-    duplicate = repository.create_or_get_active(_scraping(created_by="user-1"))
-    other_user = repository.create_or_get_active(_scraping(created_by="user-2"))
-    repository.set_status(
-        first.scraping.id,
-        first.scraping.created_by,
-        ScrapingStatus.COMPLETED,
+    original = repository.create_or_merge(_scraping()).scraping
+    completed_at = datetime.now(UTC)
+    original = repository.update_task(
+        original.id,
+        original.created_by,
+        original.tasks[0].id,
+        ScrapingTaskStatus.COMPLETED,
+        attempts=1,
+        error=None,
+        result_available=True,
+        completed_at=completed_at,
+        etag=original.etag,
     )
-    after_terminal = repository.create_or_get_active(_scraping(created_by="user-1"))
 
-    assert first.created is True
-    assert duplicate.created is False
-    assert duplicate.scraping.id == first.scraping.id
-    assert other_user.created is True
-    assert other_user.scraping.id != first.scraping.id
-    assert after_terminal.created is True
-    assert after_terminal.scraping.id != first.scraping.id
+    candidate = _scraping(title="Refreshed Novel")
+    candidate.tasks[0].title = "Refreshed Chapter 1"
+    candidate.tasks.append(_task(2))
+    candidate.progress = ScrapingProgress.from_tasks(candidate.tasks)
+    merged = repository.create_or_merge(candidate)
+
+    assert merged.created is False
+    assert merged.scraping.id == original.id
+    assert merged.scraping.metadata.title == "Refreshed Novel"
+    assert [task.title for task in merged.scraping.tasks] == [
+        "Refreshed Chapter 1",
+        "Chapter 2",
+    ]
+    assert [task.status for task in merged.scraping.tasks] == [
+        ScrapingTaskStatus.COMPLETED,
+        ScrapingTaskStatus.CREATED,
+    ]
+    assert merged.scraping.tasks[0].completed_at == completed_at
 
 
-def test_concurrent_create_or_get_active_creates_one_scraping() -> None:
+def test_concurrent_create_or_merge_creates_one_scraping() -> None:
     repository = InMemoryScrapingRepository()
 
     with ThreadPoolExecutor(max_workers=8) as executor:
         results = list(
             executor.map(
-                lambda _: repository.create_or_get_active(_scraping()),
-                range(20),
+                lambda _: repository.create_or_merge(_scraping()),
+                range(24),
             )
         )
 
@@ -61,163 +74,178 @@ def test_concurrent_create_or_get_active_creates_one_scraping() -> None:
     assert len({result.scraping.id for result in results}) == 1
 
 
-def test_embedded_task_update_recalculates_progress_and_reconciles() -> None:
+def test_queue_claim_stop_and_progress_are_task_scoped() -> None:
     repository = InMemoryScrapingRepository()
-    created = repository.create_or_get_active(_scraping()).scraping
-    task = created.tasks[0]
+    candidate = _scraping()
+    candidate.tasks.append(_task(2))
+    candidate.progress = ScrapingProgress.from_tasks(candidate.tasks)
+    scraping = repository.create_or_merge(candidate).scraping
 
-    processing = repository.update_task(
-        created.id,
-        created.created_by,
-        task.id,
-        ScrapingTaskStatus.PROCESSING,
-        attempts=1,
-        error=None,
-        result_available=False,
-        completed_at=None,
-        etag=created.etag,
+    queued = repository.queue_tasks(
+        scraping.id,
+        scraping.created_by,
+        chapter_from=1,
+        chapter_to=2,
+        force=False,
+        etag=scraping.etag,
     )
-    completed_at = datetime.now(UTC)
-    completed = repository.update_task(
-        processing.id,
-        processing.created_by,
-        task.id,
-        ScrapingTaskStatus.COMPLETED,
-        attempts=1,
-        error=None,
-        result_available=True,
-        completed_at=completed_at,
-        etag=processing.etag,
+    assert len(queued.tasks) == 2
+    assert queued.scraping.progress.queued == 2
+
+    claimed = repository.claim_task(
+        scraping.id,
+        scraping.created_by,
+        queued.tasks[0].id,
+        etag=queued.scraping.etag,
     )
-    terminal = repository.reconcile(
-        completed.id,
-        completed.created_by,
-        etag=completed.etag,
+    assert claimed is not None
+    assert claimed.progress.running == 1
+    assert claimed.progress.queued == 1
+    assert claimed.tasks[0].attempts == 1
+    assert repository.claim_task(
+        scraping.id,
+        scraping.created_by,
+        queued.tasks[0].id,
+        etag=claimed.etag,
+    ) is None
+
+    stopped = repository.stop_queued_tasks(
+        scraping.id,
+        scraping.created_by,
+        etag=claimed.etag,
     )
+    assert [task.status for task in stopped.tasks] == [
+        ScrapingTaskStatus.RUNNING,
+        ScrapingTaskStatus.CREATED,
+    ]
+    assert stopped.progress.running == 1
+    assert stopped.progress.created == 1
 
-    assert completed.progress.pending == 0
-    assert completed.progress.completed == 1
-    assert completed.tasks[0].result_available is True
-    assert terminal.status == ScrapingStatus.COMPLETED
-    assert terminal.active_key == f"terminal:{terminal.id}"
 
-
-def test_list_is_owned_sorted_filtered_and_paginated() -> None:
+def test_force_requeues_active_tasks_and_missing_range_is_rejected() -> None:
     repository = InMemoryScrapingRepository()
-    first = repository.create_or_get_active(
-        _scraping(created_by="user-1", key="first")
-    ).scraping
-    second = repository.create_or_get_active(
-        _scraping(created_by="user-1", key="second")
-    ).scraping
-    repository.create_or_get_active(_scraping(created_by="user-2", key="third"))
-    repository.set_status(
-        second.id,
-        second.created_by,
-        ScrapingStatus.FAILED,
-        error="failed",
+    scraping = repository.create_or_merge(_scraping()).scraping
+    queued = repository.queue_tasks(
+        scraping.id,
+        scraping.created_by,
+        chapter_from=1,
+        chapter_to=1,
+        force=False,
+        etag=scraping.etag,
     )
-
-    first_page = repository.list("user-1", 1, None, None)
-    second_page = repository.list(
-        "user-1",
-        1,
-        first_page.continuation_token,
-        None,
+    claimed = repository.claim_task(
+        scraping.id,
+        scraping.created_by,
+        queued.tasks[0].id,
+        etag=queued.scraping.etag,
     )
-    failed_page = repository.list("user-1", 10, None, ScrapingStatus.FAILED)
-    all_page = repository.list(None, 10, None, None)
+    assert claimed is not None
 
-    assert len(first_page.items) == 1
-    assert len(second_page.items) == 1
-    assert {first_page.items[0].id, second_page.items[0].id} == {first.id, second.id}
-    assert [item.id for item in failed_page.items] == [second.id]
-    assert len(all_page.items) == 3
-    assert repository.get(first.id) is not None
+    forced = repository.queue_tasks(
+        scraping.id,
+        scraping.created_by,
+        chapter_from=1,
+        chapter_to=1,
+        force=True,
+        etag=claimed.etag,
+    )
+    assert [task.status for task in forced.tasks] == [ScrapingTaskStatus.QUEUED]
+    assert forced.scraping.tasks[0].attempts == 1
+
+    with pytest.raises(ScrapingChapterRangeError):
+        repository.queue_tasks(
+            scraping.id,
+            scraping.created_by,
+            chapter_from=99,
+            chapter_to=100,
+            force=False,
+            etag=forced.scraping.etag,
+        )
+
+
+def test_list_is_sorted_and_paginated_without_status_filter() -> None:
+    repository = InMemoryScrapingRepository()
+    first = repository.create_or_merge(_scraping(key="one")).scraping
+    second = repository.create_or_merge(_scraping(key="two")).scraping
+
+    page = repository.list(None, 1, None)
+    assert page.items[0].id == second.id
+    assert page.continuation_token == "1"
+    final = repository.list(None, 1, page.continuation_token)
+    assert final.items[0].id == first.id
+    assert final.continuation_token is None
 
 
 def test_delete_is_scoped_to_the_scraping_owner() -> None:
     repository = InMemoryScrapingRepository()
-    scraping = repository.create_or_get_active(_scraping(created_by="user-1")).scraping
+    scraping = repository.create_or_merge(_scraping()).scraping
 
     with pytest.raises(ScrapingNotFoundError):
-        repository.delete(scraping.id, "user-2")
-
-    assert repository.get(scraping.id, "user-1") is not None
-
-    repository.delete(scraping.id, "user-1")
-
-    assert repository.get(scraping.id, "user-1") is None
+        repository.delete(scraping.id, "other-user")
+    repository.delete(scraping.id, scraping.created_by)
+    assert repository.get(scraping.id, scraping.created_by) is None
 
 
-def test_scraping_results_are_isolated_by_scraping_and_task() -> None:
+def test_scraping_results_are_isolated_and_upsert_preserves_created_at() -> None:
     repository = InMemoryScrapingResultRepository()
     first = repository.upsert(_result("scraping-1", "task-1", ["first"]))
-    second = repository.upsert(_result("scraping-2", "task-1", ["second"]))
-    updated = repository.upsert(_result("scraping-1", "task-1", ["updated"]))
-
-    assert first.created_at == updated.created_at
-    assert repository.get("scraping-1", "task-1").content == ["updated"]  # type: ignore[union-attr]
-    assert repository.get("scraping-2", "task-1").content == ["second"]  # type: ignore[union-attr]
-    assert second.scraping_id != updated.scraping_id
-
-
-def test_delete_scraping_results_removes_only_the_requested_partition() -> None:
-    repository = InMemoryScrapingResultRepository()
-    repository.upsert(_result("scraping-1", "task-1", ["first"]))
-    repository.upsert(_result("scraping-1", "task-2", ["second"]))
+    replacement = repository.upsert(
+        _result("scraping-1", "task-1", ["replacement"])
+    )
     repository.upsert(_result("scraping-2", "task-1", ["other"]))
 
-    repository.delete_by_scraping("scraping-1")
+    assert replacement.created_at == first.created_at
+    assert repository.get("scraping-1", "task-1").content == ["replacement"]  # type: ignore[union-attr]
+    assert repository.get("scraping-2", "task-1").content == ["other"]  # type: ignore[union-attr]
 
+    repository.delete_by_scraping("scraping-1")
     assert repository.get("scraping-1", "task-1") is None
-    assert repository.get("scraping-1", "task-2") is None
     assert repository.get("scraping-2", "task-1") is not None
 
 
-def _scraping(
-    *,
-    created_by: str = "user-1",
-    key: str = "default",
-) -> Scraping:
+def _scraping(*, key: str = "test", title: str = "Novel") -> Scraping:
     now = datetime.now(UTC)
-    task = ScrapingTask(
-        id="task-1",
-        source_url="https://www.novel543.com/0603625457/1.html",
-        title="Chapter 1",
-        chapter_number=1,
-        manifest_index=0,
-    )
+    task = _task(1)
     idempotency_key = f"sha256:{key}"
     return Scraping(
-        id=str(uuid4()),
+        id=f"scraping-{key}",
         crawler_id="novel543",
-        source_url="https://www.novel543.com/0603625457/dir",
+        source_url=f"https://www.novel543.com/{key}/dir",
         metadata=ScrapingMetadata(
-            source_novel_id="0603625457",
-            title="Novel",
-            author="Author",
-            category="Fantasy",
-            updated_date="2026-07-23",
+            source_novel_id=key,
+            title=title,
+            author=None,
+            category=None,
+            updated_date=None,
             protagonists=[],
-            description="Description",
+            description=None,
             cover_image_url=None,
             fetched_at=now,
         ),
-        status=ScrapingStatus.QUEUED,
         tasks=[task],
         progress=ScrapingProgress.from_tasks([task]),
-        attempts=0,
-        last_error=None,
         idempotency_key=idempotency_key,
-        active_key=idempotency_key,
-        created_by=created_by,
+        created_by="user-1",
         created_at=now,
         updated_at=now,
     )
 
 
-def _result(scraping_id: str, task_id: str, content: list[str]) -> ScrapingResult:
+def _task(chapter_number: int) -> ScrapingTask:
+    return ScrapingTask(
+        id=f"task-{chapter_number}",
+        source_url=f"https://www.novel543.com/test/{chapter_number}.html",
+        title=f"Chapter {chapter_number}",
+        chapter_number=chapter_number,
+        manifest_index=chapter_number - 1,
+    )
+
+
+def _result(
+    scraping_id: str,
+    task_id: str,
+    content: list[str],
+) -> ScrapingResult:
     now = datetime.now(UTC)
     return ScrapingResult(
         id=task_id,

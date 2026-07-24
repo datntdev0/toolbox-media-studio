@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import type { ScrapingSummaryResponse } from '~~/shared/api-services/srv-core.client'
-import { ScrapingStatus } from '~~/shared/api-services/srv-core.client'
 import {
   formatExactTime,
   formatRelativeTime,
   isActiveScraping,
-  scrapingStatusMeta,
+  scrapingActivityMeta,
   sourceHost
 } from '~/utils/scrapings'
 
@@ -55,6 +54,10 @@ function moveSelection(offset: number) {
 
 function sourceLabel(scraping: ScrapingSummaryResponse) {
   return props.crawlerNames[scraping.crawlerId] || sourceHost(scraping.sourceUrl)
+}
+
+function activityMeta(scraping: ScrapingSummaryResponse) {
+  return scrapingActivityMeta(scraping.progress)
 }
 
 function focusSelected() {
@@ -151,7 +154,7 @@ defineExpose({ focusSelected, focusRow })
         <UEmpty
           icon="lucide:download"
           title="No scrapings yet"
-          description="Create a scraping to download a novel and its chapters."
+          description="Create a reusable chapter manifest, then start the ranges you need."
           :actions="[{
             label: 'New Scraping',
             icon: 'lucide:plus',
@@ -179,7 +182,7 @@ defineExpose({ focusSelected, focusRow })
             type="button"
             role="option"
             :aria-selected="selectedId === scraping.id"
-            :aria-label="`${scraping.title}, ${scrapingStatusMeta[scraping.status].label}, ${scraping.progress.completed} of ${scraping.progress.total} chapters`"
+            :aria-label="`${scraping.title}, ${activityMeta(scraping).label}, ${scraping.progress.completed} of ${scraping.progress.total} chapters`"
             class="flex w-full cursor-pointer gap-3 p-4 pe-12 text-left focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:ps-5"
             @click="select(scraping.id)"
             @keydown.down.prevent="moveSelection(1)"
@@ -210,13 +213,13 @@ defineExpose({ focusSelected, focusRow })
 
               <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
                 <UBadge
-                  :label="scrapingStatusMeta[scraping.status].label"
-                  :icon="scrapingStatusMeta[scraping.status].icon"
-                  :color="scrapingStatusMeta[scraping.status].color"
+                  :label="activityMeta(scraping).label"
+                  :icon="activityMeta(scraping).icon"
+                  :color="activityMeta(scraping).color"
                   variant="subtle"
                   size="sm"
                   :ui="{
-                    leadingIcon: scraping.status === ScrapingStatus.Processing
+                    leadingIcon: activityMeta(scraping).spinning
                       ? 'motion-safe:animate-spin'
                       : undefined
                   }"
@@ -227,7 +230,7 @@ defineExpose({ focusSelected, focusRow })
               </div>
 
               <UProgress
-                v-if="isActiveScraping(scraping.status)"
+                v-if="isActiveScraping(scraping.progress)"
                 :model-value="scraping.progress.completed"
                 :max="Math.max(scraping.progress.total, 1)"
                 size="xs"
