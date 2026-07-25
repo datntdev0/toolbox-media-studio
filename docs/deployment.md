@@ -11,17 +11,17 @@ be deployed via GitHub Actions.
 |---|---|---|
 | App Service Plan | **B1** (or F1 for dev) | Shared by the two web apps below |
 | App Service — `web` | Node | Nuxt SPA/SSR |
-| App Service — `api` | Python, **Always On** | FastAPI (API + APScheduler queue consumers) |
+| App Service — `backend` | Python, **Always On** | FastAPI (API + APScheduler queue consumers) |
 | Cosmos DB | NoSQL, **serverless** | All application state (DB `mediastudio`) |
 | Storage account — `media` | StorageV2, LRS | Blob (binaries) + Azure Files (ffmpeg scratch) + business queues |
 | Key Vault | Standard | Provider API keys, JWT signing key, connection strings |
-| Application Insights | — | Logs/metrics for `api` |
+| Application Insights | — | Logs/metrics for `backend` |
 | FlareSolverr | Container (local/dev now) | Browser-backed fetches for approved crawler metadata URLs |
 
 Notes:
 - **Two web apps, one plan.** An App Service *app* runs a single runtime, so Nuxt (Node) and
-  FastAPI (Python) are two apps sharing one **plan** (the billed unit). The `api` app must have
-  **Always On** enabled so its APScheduler queue consumers keep running.
+  FastAPI (Python) are two apps sharing one **plan** (the billed unit). The `backend` app must have
+  **Always On** enabled so its APScheduler background consumers keep running.
 - **Business queues** live in the `media` storage account. The first queue pair is
   `crawler-jobs` and `crawler-jobs-dead-letter`; future features should add capability-specific
   queues instead of a shared control queue.
@@ -36,28 +36,28 @@ Notes:
 flowchart LR
     subgraph Plan["App Service Plan (B1)"]
         Web["web — Nuxt"]
-        Api["api — FastAPI (Always On)"]
+        Backend["backend — FastAPI (Always On)"]
     end
     subgraph Media["Storage: media"]
         Blob[(Blob)]
         Files[(Files)]
-        Q[(Queues: crawler-jobs)]
+        Q[(Queues)]
     end
     Cosmos[("Cosmos DB<br/>serverless")]
     KV["Key Vault"]
     AI["App Insights"]
 
-    Web --> Api
-    Api --> Cosmos
-    Api --> Blob
-    Api <--> Q
-    Api -. secrets .-> KV
-    Api --> AI
+    Web --> Backend
+    Backend --> Cosmos
+    Backend --> Blob
+    Backend <--> Q
+    Backend -. secrets .-> KV
+    Backend --> AI
 ```
 
 ## Configuration & secrets
 
-- **Identity:** the `api` app uses **managed identity** to read Key Vault and access
+- **Identity:** the `backend` app uses **managed identity** to read Key Vault and access
   Storage/Cosmos (no connection strings in app settings where avoidable).
 - **Secrets in Key Vault:** provider API keys (Anthropic/OpenAI/ElevenLabs/Google/etc.), the JWT
   signing key, and any connection strings. The `aimodels` Cosmos docs store only a Key Vault
@@ -76,9 +76,9 @@ flowchart LR
 
 - **Build:** Nuxt (`nuxt build`) and FastAPI (package + deps).
 - **Deploy:** `az deployment group create` for the IaC under `deploy/` (what-if on PRs), then app deploys —
-  `web` and `api` via App Service deploy.
+  `web` and `backend` via App Service deploy.
 - **Environments:** a `dev` slot on F1 (cheap, cold-start-tolerant) and `prod` on B1.
-- **Migrations:** Cosmos containers are created idempotently on `api` startup (or a one-shot
+- **Migrations:** Cosmos containers are created idempotently on `backend` startup (or a one-shot
   init job) — no schema migrations, but partition keys are fixed at container creation.
 
 ## Scaling & timeout caveats
@@ -124,7 +124,7 @@ before committing a budget.)
 | Key Vault + App Insights | limited free ingest | **~$0–1** |
 | **Infra total** | | **~$0 (F1 dev) to ~$15–18/mo (B1 prod)** |
 
-The `api` app needs **Always On** because its queue consumers run in-process with APScheduler,
+The `backend` app needs **Always On** because its queue consumers run in-process with APScheduler,
 which is why B1 is the realistic production floor. Queue storage itself remains pennies at low
 volume.
 

@@ -48,14 +48,15 @@ flowchart TB
 
 ## Repository layout (`srcs/`)
 
-Building onto the existing scaffold (`srcs/app` Nuxt, `tests/` Playwright):
+The current project structure:
 
 ```
 srcs/
-  app/                # Nuxt (exists) — pages/components/layouts/middleware; calls FastAPI directly
-  api/                # FastAPI: core/ domain/ providers/ routers/ services/ repositories/
-                      #   parsers/ + crawler metadata/jobs endpoints + queue consumers
-  infra/              # (NEW) Bicep + CI/CD — see deployment.md
+  frontend/           # Nuxt — pages/components/layouts/middleware; calls FastAPI directly
+  backend/            # FastAPI: core/ domain/ providers/ routers/ services/ repositories/
+                      #   consumers/ events/ + crawler metadata/jobs endpoints
+deploy/             # Docker Compose for local infrastructure
+tests/              # E2E API tests (Playwright)
 ```
 
 ### FastAPI layering
@@ -67,7 +68,7 @@ flowchart LR
     Routes["routers/<feature>.py"]
     Services["services/<feature>_service.py"]
     Providers["providers/<adapter>_provider.py"]
-    Parsers["parsers/<site>_parser.py"]
+    Parsers["providers/crawler_parser_*.py"]
     Repos["repositories/<entity>_repository.py"]
     CosmosRepos["repositories/cosmosdb/<entity>.py"]
 
@@ -79,11 +80,12 @@ flowchart LR
 
 - **Routers** own HTTP contracts, dependency injection, and status-code mapping.
 - **Services** orchestrate use cases.
-- **Providers** adapt runtime capabilities such as cache behavior and crawler registry
-  validation.
-- **Parsers** normalize source-site HTML into domain metadata.
+- **Providers** adapt runtime capabilities such as cache behavior, crawler registry
+  validation, and HTML parsing (crawler parsers).
 - **Repositories** define persistence contracts; `repositories/cosmosdb/` contains Cosmos DB
   implementations.
+- **Consumers** handle background job processing from Azure Storage Queues.
+- **Events** define event handlers for domain events.
 
 ## Job lifecycle
 
@@ -171,7 +173,7 @@ Cosmos item TTL is not required for this slice.
 ## Connector abstraction (pluggable crawling)
 
 A **Connector** is a source-site adapter implementing a fixed contract, living in
-`srcs/api/app/connectors/impl/<site>.py`, self-registering into a registry:
+`srcs/backend/app/providers/crawler_parser_<site>.py`, self-registering into a registry:
 
 ```python
 class Connector(Protocol):
@@ -196,10 +198,10 @@ Before full background chapter crawling, the API supports a synchronous metadata
 
 The first supported crawler is `novel543`. Its source URL must be the full chapter directory,
 ending in `/dir`; metadata responses contain the complete ordered `chapters` list. URL validation lives in
-`srcs/api/app/providers/crawler_provider.py`; fetching uses FlareSolverr through
-`srcs/api/app/providers/flaresolverr_provider.py`; parsing lives in
-`srcs/api/app/parsers/novel543_parser.py`;
-HTML and parsed metadata are cached through `srcs/api/app/providers/cache_provider.py` and the
+`srcs/backend/app/providers/crawler_provider.py`; fetching uses FlareSolverr through
+`srcs/backend/app/providers/proxy_service_provider.py`; parsing lives in
+`srcs/backend/app/providers/crawler_parser_novel543.py`.
+HTML and parsed metadata are cached through `srcs/backend/app/providers/cache_provider.py` and the
 generic `cache` repository.
 
 Crawler jobs are submitted through `POST /api/crawlers/{id}/jobs`. The endpoint hashes the

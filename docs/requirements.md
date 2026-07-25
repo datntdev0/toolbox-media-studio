@@ -18,11 +18,11 @@ swappable per-project via the AI Models page.
 3. **Translate** content into a desired language using an AI LLM.
 4. **Narrate** — convert text to speech for audiobook-style audio (TTS).
 5. **Illustrate characters, scenes, and items** via an image AI model.
-5. **Illustrate content passages** — per-passage illustration via an image AI model.
+6. **Illustrate content passages** — per-passage illustration via an image AI model.
 7. **Voice characters** — per-character dubbing via a multi-voice TTS model.
 8. **Generate video per scene** via a video AI model.
 9. **Novel Video Project** — a storyboard-driven, end-to-end "novel → animated short drama"
-   pipeline (see [FR-6](#fr-6-novel-video-project)), inspired by
+   pipeline (see [FR-5](#fr-5-novel-video-project)), inspired by
    [Toonflow](https://github.com/HBAI-Ltd/Toonflow-app).
 
 ---
@@ -115,10 +115,10 @@ before any spend.
 
 ## FR-6 — AI Models
 
-- **FR-5.1** Configure and select AI providers/models per family: **LLM, TTS, image, video**.
-- **FR-5.2** Store per-model settings and credentials securely (credentials in a secrets vault;
+- **FR-6.1** Configure and select AI providers/models per family: **LLM, TTS, image, video**.
+- **FR-6.2** Store per-model settings and credentials securely (credentials in a secrets vault;
   never inline).
-- **FR-5.3** Providers/models are **swappable per project** — including switching to cheaper tiers —
+- **FR-6.3** Providers/models are **swappable per project** — including switching to cheaper tiers —
   without code changes.
 
 ## FR-7 — Web UI

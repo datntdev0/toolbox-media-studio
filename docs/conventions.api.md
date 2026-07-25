@@ -93,11 +93,13 @@ Prefer consistent HTTP status mapping across feature routers:
 
 ## Backend Test Layout
 
-FastAPI tests live under `srcs/api/tests` and are grouped by responsibility:
+FastAPI tests live under `srcs/backend/tests` and are grouped by responsibility:
 
 - `tests/routes/` for HTTP route/API behavior.
 - `tests/providers/` for runtime adapters such as cache and crawler providers.
 - `tests/repositories/` for persistence contract and repository behavior.
+- `tests/consumers/` for background job consumer tests.
+- `tests/events/` for event handler tests.
 - Root-level tests are reserved for cross-cutting startup/config/logging tests and shared
   fixtures such as `conftest.py`.
 

@@ -23,6 +23,101 @@ Novel Media Studio is a cloud-native, multi-stage content generation platform th
 - 🧩 **Modular Connectors** — Plugin system for adding new novel source sites
 - ☁️ **Cloud-Native** — Designed for Azure with serverless components (scale-to-zero)
 
+
+## 📁 Project Structure
+
+```
+.
+├── srcs/
+│   ├── backend/          # FastAPI backend (Python)
+│   │   ├── app/
+│   │   │   ├── core/     # Config, logging, security, events, injection
+│   │   │   ├── domain/   # Domain models (users, novels, crawlers, requests, responses)
+│   │   │   ├── providers/# Runtime adapters (cache, crawler parsers, proxy services)
+│   │   │   ├── routers/  # API endpoints (auth, users, novels, crawlers, health)
+│   │   │   ├── services/ # Business logic
+│   │   │   ├── repositories/ # Data access (Cosmos DB)
+│   │   │   ├── consumers/# Background job consumers
+│   │   │   └── events/   # Event handlers
+│   │   ├── tests/        # pytest tests grouped by routes/services/providers/repositories
+│   │   ├── shared/       # Shared utilities and decorators
+│   │   └── pyproject.toml
+│   │
+│   ├── frontend/         # Nuxt frontend (TypeScript)
+│   │   ├── app/          # Application code
+│   │   │   ├── components/ # Vue components
+│   │   │   ├── pages/    # Route pages
+│   │   │   ├── layouts/  # Layout components
+│   │   │   ├── composables/ # Vue composables
+│   │   │   ├── services/ # Business logic
+│   │   │   ├── types/    # TypeScript types
+│   │   │   └── utils/    # Utility functions
+│   │   ├── public/       # Static files
+│   │   ├── shared/       # Shared code and API client
+│   │   └── nuxt.config.ts
+│
+├── tests/                # E2E tests (Playwright)
+│   └── backend/          # API integration tests
+│
+├── docs/                 # Documentation
+│   ├── architecture.md   # System design
+│   ├── requirements.md   # Functional requirements
+│   ├── deployment.md     # Azure deployment guide
+│   └── conventions.api.md # API conventions
+│
+├── scripts/              # Developer helpers
+│   ├── backend.setup.sh
+│   └── backend.start.sh
+│
+└── deploy/               # Deployment configs
+    └── dockercompose.local.infra.yml
+```
+
+## 🔧 Technology Stack
+
+**Backend:**
+- FastAPI + Uvicorn (ASGI)
+- Python 3.12+
+- Azure Cosmos DB (NoSQL, serverless)
+- Azure Storage (Blob + Queues)
+- APScheduler (background jobs)
+- BeautifulSoup4 (HTML parsing)
+
+**Frontend:**
+- Nuxt 4
+- Nuxt UI (125+ components)
+- TypeScript
+- pnpm (package manager)
+
+**Infrastructure:**
+- Azure App Services (B1 plan)
+- Azure Cosmos DB (serverless)
+- Azure Storage (Blob/Queue)
+- Azure Key Vault
+- Docker (local development)
+
+## 📚 Documentation
+
+- [Architecture](docs/architecture.md) — System design, data model, and job lifecycle
+- [Requirements](docs/requirements.md) — Functional requirements and capabilities
+- [Deployment](docs/deployment.md) — Azure infrastructure, CI/CD, and cost estimates
+- [API Conventions](docs/conventions.api.md) — HTTP endpoint conventions and standards
+
+## 🔐 Security
+
+- JWT-based authentication with role-based access control
+- Credentials stored in Azure Key Vault (never inline)
+- Managed identities for Azure resource access
+- CORS configuration for frontend/backend separation
+
+## 🚢 Development Workflow
+
+1. Start local infrastructure with Docker Compose
+2. Run backend API with auto-reload enabled
+3. Run frontend with hot module replacement
+4. Make changes and test
+5. Run test suites before committing
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -72,7 +167,13 @@ starts Uvicorn from `srcs/backend`. You can still run the commands manually if y
 In a new terminal:
 
 ```bash
-cd srcs/app
+scripts/frontend.start.sh
+```
+
+Or manually:
+
+```bash
+cd srcs/frontend
 
 # Install dependencies
 pnpm install
@@ -101,10 +202,7 @@ cd tests
 npx playwright install
 
 # Run tests
-npx playwright test
-
-# View test report
-npx playwright show-report
+npm test
 ```
 
 ### 6. Access the Application
@@ -115,50 +213,4 @@ npx playwright show-report
    - Email: `admin@example.com`
    - Password: `SecurePassword123!`
 
-## 📁 Project Structure
-
-```
-.
-├── srcs/
-│   ├── api/              # FastAPI backend (Python)
-│   │   ├── app/
-│   │   │   ├── core/     # Config, logging, security, startup
-│   │   │   ├── domain/   # Domain models (users, requests, responses)
-│   │   │   ├── providers/# Runtime adapters (cache, crawler registry)
-│   │   │   ├── routers/  # API endpoints (auth, users, novels, crawlers, health)
-│   │   │   ├── services/ # Business logic
-│   │   │   └── repositories/ # Data access (Cosmos DB)
-│   │   ├── tests/        # pytest tests grouped by routes/services/providers/repositories
-│   │   └── pyproject.toml
-│   │
-│   ├── app/              # Nuxt frontend (TypeScript)
-│   │   ├── app/          # Vue components & pages
-│   │   ├── pages/        # Route pages (signin, signup)
-│   │   ├── layouts/      # Layout components
-│   │   ├── components/   # Reusable UI components
-│   │   └── nuxt.config.ts
-│
-├── tests/                # E2E tests (Playwright)
-│   └── api/              # API integration tests
-│
-├── docs/                 # Documentation
-│   ├── architecture.md   # System design
-│   ├── requirements.md   # Functional requirements
-│   ├── deployment.md     # Azure deployment guide
-│   └── conventions.api.md # API conventions
-│
-├── scripts/              # Developer helpers
-│   ├── backend.setup.sh
-│   └── backend.start.sh
-│
-└── deploy/               # Deployment configs
-    └── dockercompose.local.infra.yml
-```
-
-## 📚 Documentation
-
-- [Architecture Overview](docs/architecture.md) — System design and component interaction
-- [Requirements](docs/requirements.md) — Functional requirements and feature roadmap
-- [Deployment Guide](docs/deployment.md) — Azure infrastructure and CI/CD
-- [API Conventions](docs/conventions.api.md) — REST API design standards
 
