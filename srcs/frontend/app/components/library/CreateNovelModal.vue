@@ -27,8 +27,6 @@ const state = reactive<Schema>({
   tags: '',
   notes: ''
 })
-const coverImage = ref<File | null>(null)
-
 function optional(value: string) {
   return value.trim() || null
 }
@@ -45,27 +43,15 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       tags: event.data.tags.split(',').map(tag => tag.trim()).filter(Boolean),
       notes: optional(event.data.notes)
     }
-    validateCoverImage(coverImage.value)
-    const form = new FormData()
-    Object.entries(request).forEach(([key, value]) => form.set(key, Array.isArray(value) ? value.join(',') : value ? String(value) : '__null__'))
-    if (coverImage.value) form.set('coverImage', coverImage.value)
-    const novel = await createNovel(form)
+    const novel = await createNovel(request)
 
     emit('created', novel)
     toast.add({ title: 'Novel created', description: `“${novel.title}” has been added to your library.`, color: 'success' })
     open.value = false
-    coverImage.value = null
   } catch {
     toast.add({ title: 'Unable to create novel', description: 'Please check the library service and try again.', color: 'error' })
   } finally {
     submitting.value = false
-  }
-}
-
-function validateCoverImage(file: File | null) {
-  if (!file) return
-  if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 1024 * 1024) {
-    throw new Error('Cover image must be a JPEG or PNG no larger than 1 MB.')
   }
 }
 </script>
@@ -87,19 +73,6 @@ function validateCoverImage(file: File | null) {
         @submit="onSubmit"
       >
         <div class="flex items-start gap-4">
-          <div class="w-48 shrink-0">
-            <UFormField label="Cover image" name="coverImage">
-              <UFileUpload
-                v-model="coverImage"
-                variant="area"
-                accept="image/jpeg,image/png"
-                label="Choose cover image"
-                description="JPG or PNG, max 1 MB"
-                :preview="true"
-                class="w-48 aspect-[2/3]"
-              />
-            </UFormField>
-          </div>
           <div class="min-w-0 flex-1 space-y-4">
             <UFormField label="Title" name="title" required>
               <UInput

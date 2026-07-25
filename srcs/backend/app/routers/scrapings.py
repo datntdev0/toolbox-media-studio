@@ -38,6 +38,7 @@ from app.events.scraping_handler import (
     build_scraping_event,
     build_scraping_updated_payload,
 )
+from app.providers.blob_storage_provider import BlobStorageError, validate_cover_content
 from app.providers.crawler_provider import (
     CrawlerFetchError,
     CrawlerFetchTimeoutError,
@@ -45,7 +46,6 @@ from app.providers.crawler_provider import (
     UnknownCrawlerError,
     fetch_metadata,
 )
-from app.providers.blob_storage_provider import BlobStorageError, validate_cover_content
 from app.repositories.scraping_repository import (
     ScrapingChapterRangeError,
     ScrapingConflictError,
@@ -173,6 +173,7 @@ def list_scrapings_route(
     repository_scraping: RepositoryScrapingDep,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     continuation_token: Annotated[str | None, Query(alias="continuationToken")] = None,
+    search: Annotated[str | None, Query(min_length=1, max_length=200)] = None,
 ) -> ScrapingListResponse:
     """List Scrapings."""
 
@@ -182,6 +183,7 @@ def list_scrapings_route(
             created_by=None,
             limit=limit,
             continuation_token=continuation_token,
+            search=search,
         )
     except ScrapingContinuationTokenError as exc:
         raise HTTPException(

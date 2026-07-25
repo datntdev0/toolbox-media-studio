@@ -9,7 +9,7 @@ from azure.core import MatchConditions
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 
 from app.core.config.app_config import AppConfig
-from app.domain.novels import Novel, NovelPage, NovelStatus
+from app.domain.novels import Novel, NovelBinding, NovelPage, NovelStatus
 from app.repositories.novel_repository import NovelConflictError, NovelNotFoundError
 
 NOVELS_CONTAINER_NAME = "domain.novels"
@@ -113,6 +113,16 @@ class CosmosNovelRepository:
             "tags": novel.tags,
             "notes": novel.notes,
             "status": novel.status.value,
+            "binding": (
+                {
+                    "scrapingId": novel.binding.scraping_id,
+                    "boundAt": novel.binding.bound_at.isoformat(),
+                    "lastSyncedAt": novel.binding.last_synced_at.isoformat(),
+                }
+                if novel.binding
+                else None
+            ),
+            "chapterCount": novel.chapter_count,
             "createdBy": novel.created_by,
             "createdAt": novel.created_at.isoformat(),
             "updatedBy": novel.updated_by,
@@ -123,6 +133,7 @@ class CosmosNovelRepository:
 
     @staticmethod
     def _deserialize(item: dict[str, Any]) -> Novel:
+        binding = cast(dict[str, Any] | None, item.get("binding"))
         return Novel(
             id=cast(str, item["id"]),
             title=cast(str, item["title"]),
@@ -133,6 +144,18 @@ class CosmosNovelRepository:
             tags=list(cast(list[str], item.get("tags", []))),
             notes=cast(str | None, item.get("notes")),
             status=NovelStatus(cast(str, item["status"])),
+            binding=(
+                NovelBinding(
+                    scraping_id=cast(str, binding["scrapingId"]),
+                    bound_at=datetime.fromisoformat(cast(str, binding["boundAt"])),
+                    last_synced_at=datetime.fromisoformat(
+                        cast(str, binding["lastSyncedAt"])
+                    ),
+                )
+                if binding
+                else None
+            ),
+            chapter_count=cast(int, item.get("chapterCount", 0)),
             created_by=cast(str, item["createdBy"]),
             created_at=datetime.fromisoformat(cast(str, item["createdAt"])),
             updated_by=cast(str, item["updatedBy"]),

@@ -43,6 +43,7 @@ packages = [
     "app.repositories",
     "app.repositories.cosmosdb",
     "app.routers",
+    "app.services",
 ]
 
 [tool.ruff]

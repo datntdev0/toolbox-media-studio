@@ -108,12 +108,24 @@ class CosmosScrapingRepository:
         created_by: str | None,
         limit: int,
         continuation_token: str | None,
+        search: str | None = None,
     ) -> ScrapingPage:
         query = "SELECT * FROM c"
         parameters: list[dict[str, object]] = []
+        conditions: list[str] = []
         if created_by is not None:
-            query += " WHERE c.createdBy = @created_by"
+            conditions.append("c.createdBy = @created_by")
             parameters.append({"name": "@created_by", "value": created_by})
+        normalized_search = (search or "").strip().lower()
+        if normalized_search:
+            conditions.append(
+                "(CONTAINS(LOWER(c.metadata.title), @search) "
+                "OR CONTAINS(LOWER(c.metadata.author), @search) "
+                "OR CONTAINS(LOWER(c.sourceUrl), @search))"
+            )
+            parameters.append({"name": "@search", "value": normalized_search})
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY c.updatedAt DESC"
 
         if created_by is None:

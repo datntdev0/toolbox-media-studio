@@ -376,53 +376,19 @@ export class NovelsClient {
 
     /**
      * Create Novel Route
-     * @param title (optional)
-     * @param description (optional)
-     * @param language (optional)
-     * @param author (optional)
-     * @param tags (optional)
-     * @param notes (optional)
-     * @param coverImage (optional)
      * @return Successful Response
      */
-    create_novel(title: string | undefined, description: Description | undefined, language: Language | undefined, author: Author | undefined, tags: Tags | undefined, notes: Notes | undefined, coverImage: Coverimage | undefined): Promise<NovelResponse> {
+    create_novel(body: NovelCreateRequest): Promise<NovelResponse> {
         let url_ = this.baseUrl + "/api/novels";
         url_ = url_.replace(/[?&]$/, "");
 
-        const content_ = new FormData();
-        if (title === null || title === undefined)
-            throw new globalThis.Error("The parameter 'title' cannot be null.");
-        else
-            content_.append("title", title.toString());
-        if (description === null || description === undefined)
-            throw new globalThis.Error("The parameter 'description' cannot be null.");
-        else
-            content_.append("description", description.toString());
-        if (language === null || language === undefined)
-            throw new globalThis.Error("The parameter 'language' cannot be null.");
-        else
-            content_.append("language", language.toString());
-        if (author === null || author === undefined)
-            throw new globalThis.Error("The parameter 'author' cannot be null.");
-        else
-            content_.append("author", author.toString());
-        if (tags === null || tags === undefined)
-            throw new globalThis.Error("The parameter 'tags' cannot be null.");
-        else
-            content_.append("tags", tags.toString());
-        if (notes === null || notes === undefined)
-            throw new globalThis.Error("The parameter 'notes' cannot be null.");
-        else
-            content_.append("notes", notes.toString());
-        if (coverImage === null || coverImage === undefined)
-            throw new globalThis.Error("The parameter 'coverImage' cannot be null.");
-        else
-            content_.append("coverImage", coverImage.toString());
+        const content_ = JSON.stringify(body);
 
         let options_: RequestInit = {
             body: content_,
             method: "POST",
             headers: {
+                "Content-Type": "application/json",
                 "Accept": "application/json"
             }
         };
@@ -516,7 +482,7 @@ export class NovelsClient {
      * Get Novel Route
      * @return Successful Response
      */
-    get_novel(id: string): Promise<NovelResponse> {
+    get_novel(id: string): Promise<NovelDetailResponse> {
         let url_ = this.baseUrl + "/api/novels/{id}";
         if (id === undefined || id === null)
             throw new globalThis.Error("The parameter 'id' must be defined.");
@@ -535,14 +501,14 @@ export class NovelsClient {
         });
     }
 
-    protected processGet_novel(response: Response): Promise<NovelResponse> {
+    protected processGet_novel(response: Response): Promise<NovelDetailResponse> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
             let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
-            result200 = NovelResponse.fromJS(resultData200);
+            result200 = NovelDetailResponse.fromJS(resultData200);
             return result200;
             });
         } else if (status === 422) {
@@ -557,76 +523,27 @@ export class NovelsClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<NovelResponse>(null as any);
+        return Promise.resolve<NovelDetailResponse>(null as any);
     }
 
     /**
      * Update Novel Route
-     * @param title (optional)
-     * @param description (optional)
-     * @param language (optional)
-     * @param author (optional)
-     * @param tags (optional)
-     * @param notes (optional)
-     * @param status (optional)
-     * @param etag (optional)
-     * @param coverImage (optional)
-     * @param clear_cover_image (optional)
      * @return Successful Response
      */
-    update_novel(id: string, title: Title | undefined, description: Anonymous2 | undefined, language: Anonymous3 | undefined, author: Anonymous4 | undefined, tags: Anonymous5 | undefined, notes: Anonymous6 | undefined, status: Status | undefined, etag: Etag | undefined, coverImage: Anonymous7 | undefined, clear_cover_image: boolean | undefined): Promise<NovelResponse> {
+    update_novel(id: string, body: NovelUpdateRequest): Promise<NovelResponse> {
         let url_ = this.baseUrl + "/api/novels/{id}";
         if (id === undefined || id === null)
             throw new globalThis.Error("The parameter 'id' must be defined.");
         url_ = url_.replace("{id}", encodeURIComponent("" + id));
         url_ = url_.replace(/[?&]$/, "");
 
-        const content_ = new FormData();
-        if (title === null || title === undefined)
-            throw new globalThis.Error("The parameter 'title' cannot be null.");
-        else
-            content_.append("title", title.toString());
-        if (description === null || description === undefined)
-            throw new globalThis.Error("The parameter 'description' cannot be null.");
-        else
-            content_.append("description", description.toString());
-        if (language === null || language === undefined)
-            throw new globalThis.Error("The parameter 'language' cannot be null.");
-        else
-            content_.append("language", language.toString());
-        if (author === null || author === undefined)
-            throw new globalThis.Error("The parameter 'author' cannot be null.");
-        else
-            content_.append("author", author.toString());
-        if (tags === null || tags === undefined)
-            throw new globalThis.Error("The parameter 'tags' cannot be null.");
-        else
-            content_.append("tags", tags.toString());
-        if (notes === null || notes === undefined)
-            throw new globalThis.Error("The parameter 'notes' cannot be null.");
-        else
-            content_.append("notes", notes.toString());
-        if (status === null || status === undefined)
-            throw new globalThis.Error("The parameter 'status' cannot be null.");
-        else
-            content_.append("status", status.toString());
-        if (etag === null || etag === undefined)
-            throw new globalThis.Error("The parameter 'etag' cannot be null.");
-        else
-            content_.append("etag", etag.toString());
-        if (coverImage === null || coverImage === undefined)
-            throw new globalThis.Error("The parameter 'coverImage' cannot be null.");
-        else
-            content_.append("coverImage", coverImage.toString());
-        if (clear_cover_image === null || clear_cover_image === undefined)
-            throw new globalThis.Error("The parameter 'clear_cover_image' cannot be null.");
-        else
-            content_.append("clear_cover_image", clear_cover_image.toString());
+        const content_ = JSON.stringify(body);
 
         let options_: RequestInit = {
             body: content_,
             method: "PUT",
             headers: {
+                "Content-Type": "application/json",
                 "Accept": "application/json"
             }
         };
@@ -703,6 +620,212 @@ export class NovelsClient {
             });
         }
         return Promise.resolve<void>(null as any);
+    }
+
+    /**
+     * Bind Novel Route
+     * @return Successful Response
+     */
+    bind_novel(id: string, body: NovelBindRequest): Promise<NovelSyncResponse> {
+        let url_ = this.baseUrl + "/api/novels/{id}/bind";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(body);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processBind_novel(_response);
+        });
+    }
+
+    protected processBind_novel(response: Response): Promise<NovelSyncResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = NovelSyncResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<NovelSyncResponse>(null as any);
+    }
+
+    /**
+     * Sync Novel Route
+     * @return Successful Response
+     */
+    sync_novel(id: string): Promise<NovelSyncResponse> {
+        let url_ = this.baseUrl + "/api/novels/{id}/sync";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "PATCH",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processSync_novel(_response);
+        });
+    }
+
+    protected processSync_novel(response: Response): Promise<NovelSyncResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = NovelSyncResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<NovelSyncResponse>(null as any);
+    }
+
+    /**
+     * Get Novel Chapter Route
+     * @return Successful Response
+     */
+    get_novel_chapter(id: string, chapterId: string): Promise<NovelChapterContentResponse> {
+        let url_ = this.baseUrl + "/api/novels/{id}/chapters/{chapterId}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (chapterId === undefined || chapterId === null)
+            throw new globalThis.Error("The parameter 'chapterId' must be defined.");
+        url_ = url_.replace("{chapterId}", encodeURIComponent("" + chapterId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGet_novel_chapter(_response);
+        });
+    }
+
+    protected processGet_novel_chapter(response: Response): Promise<NovelChapterContentResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = NovelChapterContentResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<NovelChapterContentResponse>(null as any);
+    }
+
+    /**
+     * Update Novel Chapter Route
+     * @return Successful Response
+     */
+    update_novel_chapter(id: string, chapterId: string, body: NovelChapterUpdateRequest): Promise<NovelChapterContentResponse> {
+        let url_ = this.baseUrl + "/api/novels/{id}/chapters/{chapterId}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (chapterId === undefined || chapterId === null)
+            throw new globalThis.Error("The parameter 'chapterId' must be defined.");
+        url_ = url_.replace("{chapterId}", encodeURIComponent("" + chapterId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(body);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processUpdate_novel_chapter(_response);
+        });
+    }
+
+    protected processUpdate_novel_chapter(response: Response): Promise<NovelChapterContentResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = NovelChapterContentResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<NovelChapterContentResponse>(null as any);
     }
 }
 
@@ -932,9 +1055,10 @@ export class ScrapingsClient {
      * List Scrapings Route
      * @param limit (optional)
      * @param continuationToken (optional)
+     * @param search (optional)
      * @return Successful Response
      */
-    list_scrapings(limit: number | undefined, continuationToken: Anonymous8 | undefined): Promise<ScrapingListResponse> {
+    list_scrapings(limit: number | undefined, continuationToken: Anonymous2 | undefined, search: Search | undefined): Promise<ScrapingListResponse> {
         let url_ = this.baseUrl + "/api/scrapings?";
         if (limit === null)
             throw new globalThis.Error("The parameter 'limit' cannot be null.");
@@ -944,6 +1068,10 @@ export class ScrapingsClient {
             throw new globalThis.Error("The parameter 'continuationToken' cannot be null.");
         else if (continuationToken !== undefined)
             url_ += "continuationToken=" + encodeURIComponent("" + continuationToken) + "&";
+        if (search === null)
+            throw new globalThis.Error("The parameter 'search' cannot be null.");
+        else if (search !== undefined)
+            url_ += "search=" + encodeURIComponent("" + search) + "&";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -1143,7 +1271,7 @@ export class ScrapingsClient {
      * @param clearCoverImage (optional)
      * @return Successful Response
      */
-    update_scraping(id: string, title: string | undefined, author: Anonymous9 | undefined, category: Category | undefined, updatedDate: Updateddate | undefined, protagonists: Protagonists | undefined, description: Anonymous10 | undefined, coverImage: Anonymous11 | undefined, clearCoverImage: boolean | undefined): Promise<ScrapingDetailResponse> {
+    update_scraping(id: string, title: string | undefined, author: Author | undefined, category: Category | undefined, updatedDate: Updateddate | undefined, protagonists: Protagonists | undefined, description: Description | undefined, coverImage: Coverimage | undefined, clearCoverImage: boolean | undefined): Promise<ScrapingDetailResponse> {
         let url_ = this.baseUrl + "/api/scrapings/{id}";
         if (id === undefined || id === null)
             throw new globalThis.Error("The parameter 'id' must be defined.");
@@ -1318,173 +1446,14 @@ export class ScrapingsClient {
     }
 }
 
-export class Body_create_novel implements IBody_create_novel {
-    title!: string;
-    description?: Description;
-    language?: Language;
-    author?: Author;
-    tags?: Tags;
-    notes?: Notes;
-    coverImage?: Coverimage;
-
-    [key: string]: any;
-
-    constructor(data?: IBody_create_novel) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-            this.title = _data["title"];
-            this.description = _data["description"];
-            this.language = _data["language"];
-            this.author = _data["author"];
-            this.tags = _data["tags"];
-            this.notes = _data["notes"];
-            this.coverImage = _data["coverImage"];
-        }
-    }
-
-    static fromJS(data: any): Body_create_novel {
-        data = typeof data === 'object' ? data : {};
-        let result = new Body_create_novel();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        data["title"] = this.title;
-        data["description"] = this.description;
-        data["language"] = this.language;
-        data["author"] = this.author;
-        data["tags"] = this.tags;
-        data["notes"] = this.notes;
-        data["coverImage"] = this.coverImage;
-        return data;
-    }
-}
-
-export interface IBody_create_novel {
-    title: string;
-    description?: Description;
-    language?: Language;
-    author?: Author;
-    tags?: Tags;
-    notes?: Notes;
-    coverImage?: Coverimage;
-
-    [key: string]: any;
-}
-
-export class Body_update_novel implements IBody_update_novel {
-    title?: Title;
-    description?: Anonymous2;
-    language?: Anonymous3;
-    author?: Anonymous4;
-    tags?: Anonymous5;
-    notes?: Anonymous6;
-    status?: Status;
-    etag?: Etag;
-    coverImage?: Anonymous7;
-    clear_cover_image?: boolean;
-
-    [key: string]: any;
-
-    constructor(data?: IBody_update_novel) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-        if (!data) {
-            this.clear_cover_image = false;
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-            this.title = _data["title"];
-            this.description = _data["description"];
-            this.language = _data["language"];
-            this.author = _data["author"];
-            this.tags = _data["tags"];
-            this.notes = _data["notes"];
-            this.status = _data["status"];
-            this.etag = _data["etag"];
-            this.coverImage = _data["coverImage"];
-            this.clear_cover_image = _data["clear_cover_image"] !== undefined ? _data["clear_cover_image"] : false;
-        }
-    }
-
-    static fromJS(data: any): Body_update_novel {
-        data = typeof data === 'object' ? data : {};
-        let result = new Body_update_novel();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        data["title"] = this.title;
-        data["description"] = this.description;
-        data["language"] = this.language;
-        data["author"] = this.author;
-        data["tags"] = this.tags;
-        data["notes"] = this.notes;
-        data["status"] = this.status;
-        data["etag"] = this.etag;
-        data["coverImage"] = this.coverImage;
-        data["clear_cover_image"] = this.clear_cover_image;
-        return data;
-    }
-}
-
-export interface IBody_update_novel {
-    title?: Title;
-    description?: Anonymous2;
-    language?: Anonymous3;
-    author?: Anonymous4;
-    tags?: Anonymous5;
-    notes?: Anonymous6;
-    status?: Status;
-    etag?: Etag;
-    coverImage?: Anonymous7;
-    clear_cover_image?: boolean;
-
-    [key: string]: any;
-}
-
 export class Body_update_scraping implements IBody_update_scraping {
     title!: string;
-    author?: Anonymous9;
+    author?: Author;
     category?: Category;
     updatedDate?: Updateddate;
     protagonists?: Protagonists;
-    description?: Anonymous10;
-    coverImage?: Anonymous11;
+    description?: Description;
+    coverImage?: Coverimage;
     clearCoverImage?: boolean;
 
     [key: string]: any;
@@ -1545,12 +1514,12 @@ export class Body_update_scraping implements IBody_update_scraping {
 
 export interface IBody_update_scraping {
     title: string;
-    author?: Anonymous9;
+    author?: Author;
     category?: Category;
     updatedDate?: Updateddate;
     protagonists?: Protagonists;
-    description?: Anonymous10;
-    coverImage?: Anonymous11;
+    description?: Description;
+    coverImage?: Coverimage;
     clearCoverImage?: boolean;
 
     [key: string]: any;
@@ -2065,6 +2034,528 @@ export interface ILoginRequest {
     [key: string]: any;
 }
 
+/** Scraping selection accepted by the bind endpoint. */
+export class NovelBindRequest implements INovelBindRequest {
+    scrapingId!: string;
+
+    constructor(data?: INovelBindRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.scrapingId = _data["scrapingId"];
+        }
+    }
+
+    static fromJS(data: any): NovelBindRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new NovelBindRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["scrapingId"] = this.scrapingId;
+        return data;
+    }
+}
+
+/** Scraping selection accepted by the bind endpoint. */
+export interface INovelBindRequest {
+    scrapingId: string;
+}
+
+/** Novel-specific relationship to a scraping source. */
+export class NovelBindingResponse implements INovelBindingResponse {
+    scrapingId!: string;
+    boundAt!: Date;
+    lastSyncedAt!: Date;
+
+    [key: string]: any;
+
+    constructor(data?: INovelBindingResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.scrapingId = _data["scrapingId"];
+            this.boundAt = _data["boundAt"] ? new Date(_data["boundAt"].toString()) : undefined as any;
+            this.lastSyncedAt = _data["lastSyncedAt"] ? new Date(_data["lastSyncedAt"].toString()) : undefined as any;
+        }
+    }
+
+    static fromJS(data: any): NovelBindingResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new NovelBindingResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["scrapingId"] = this.scrapingId;
+        data["boundAt"] = this.boundAt ? this.boundAt.toISOString() : undefined as any;
+        data["lastSyncedAt"] = this.lastSyncedAt ? this.lastSyncedAt.toISOString() : undefined as any;
+        return data;
+    }
+}
+
+/** Novel-specific relationship to a scraping source. */
+export interface INovelBindingResponse {
+    scrapingId: string;
+    boundAt: Date;
+    lastSyncedAt: Date;
+
+    [key: string]: any;
+}
+
+/** One chapter with content represented as readable paragraphs. */
+export class NovelChapterContentResponse implements INovelChapterContentResponse {
+    id!: string;
+    title!: string;
+    chapterNumber?: ChapterNumber3;
+    manifestIndex!: number;
+    contentAvailable!: boolean;
+    manuallyEdited!: boolean;
+    sourceUpdated!: boolean;
+    sourceRemoved!: boolean;
+    updatedAt!: Date;
+    etag?: Etag;
+    content?: string[];
+
+    [key: string]: any;
+
+    constructor(data?: INovelChapterContentResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.id = _data["id"];
+            this.title = _data["title"];
+            this.chapterNumber = _data["chapterNumber"];
+            this.manifestIndex = _data["manifestIndex"];
+            this.contentAvailable = _data["contentAvailable"];
+            this.manuallyEdited = _data["manuallyEdited"];
+            this.sourceUpdated = _data["sourceUpdated"];
+            this.sourceRemoved = _data["sourceRemoved"];
+            this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
+            this.etag = _data["etag"];
+            if (Array.isArray(_data["content"])) {
+                this.content = [] as any;
+                for (let item of _data["content"])
+                    this.content!.push(item);
+            }
+        }
+    }
+
+    static fromJS(data: any): NovelChapterContentResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new NovelChapterContentResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["id"] = this.id;
+        data["title"] = this.title;
+        data["chapterNumber"] = this.chapterNumber;
+        data["manifestIndex"] = this.manifestIndex;
+        data["contentAvailable"] = this.contentAvailable;
+        data["manuallyEdited"] = this.manuallyEdited;
+        data["sourceUpdated"] = this.sourceUpdated;
+        data["sourceRemoved"] = this.sourceRemoved;
+        data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
+        data["etag"] = this.etag;
+        if (Array.isArray(this.content)) {
+            data["content"] = [];
+            for (let item of this.content)
+                data["content"].push(item);
+        }
+        return data;
+    }
+}
+
+/** One chapter with content represented as readable paragraphs. */
+export interface INovelChapterContentResponse {
+    id: string;
+    title: string;
+    chapterNumber?: ChapterNumber3;
+    manifestIndex: number;
+    contentAvailable: boolean;
+    manuallyEdited: boolean;
+    sourceUpdated: boolean;
+    sourceRemoved: boolean;
+    updatedAt: Date;
+    etag?: Etag;
+    content?: string[];
+
+    [key: string]: any;
+}
+
+/** Chapter metadata included in a novel detail response. */
+export class NovelChapterSummaryResponse implements INovelChapterSummaryResponse {
+    id!: string;
+    title!: string;
+    chapterNumber?: ChapterNumber4;
+    manifestIndex!: number;
+    contentAvailable!: boolean;
+    manuallyEdited!: boolean;
+    sourceUpdated!: boolean;
+    sourceRemoved!: boolean;
+    updatedAt!: Date;
+    etag?: Etag2;
+
+    [key: string]: any;
+
+    constructor(data?: INovelChapterSummaryResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.id = _data["id"];
+            this.title = _data["title"];
+            this.chapterNumber = _data["chapterNumber"];
+            this.manifestIndex = _data["manifestIndex"];
+            this.contentAvailable = _data["contentAvailable"];
+            this.manuallyEdited = _data["manuallyEdited"];
+            this.sourceUpdated = _data["sourceUpdated"];
+            this.sourceRemoved = _data["sourceRemoved"];
+            this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
+            this.etag = _data["etag"];
+        }
+    }
+
+    static fromJS(data: any): NovelChapterSummaryResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new NovelChapterSummaryResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["id"] = this.id;
+        data["title"] = this.title;
+        data["chapterNumber"] = this.chapterNumber;
+        data["manifestIndex"] = this.manifestIndex;
+        data["contentAvailable"] = this.contentAvailable;
+        data["manuallyEdited"] = this.manuallyEdited;
+        data["sourceUpdated"] = this.sourceUpdated;
+        data["sourceRemoved"] = this.sourceRemoved;
+        data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
+        data["etag"] = this.etag;
+        return data;
+    }
+}
+
+/** Chapter metadata included in a novel detail response. */
+export interface INovelChapterSummaryResponse {
+    id: string;
+    title: string;
+    chapterNumber?: ChapterNumber4;
+    manifestIndex: number;
+    contentAvailable: boolean;
+    manuallyEdited: boolean;
+    sourceUpdated: boolean;
+    sourceRemoved: boolean;
+    updatedAt: Date;
+    etag?: Etag2;
+
+    [key: string]: any;
+}
+
+/** Editable chapter content with optimistic concurrency. */
+export class NovelChapterUpdateRequest implements INovelChapterUpdateRequest {
+    content!: string;
+    etag!: string;
+
+    constructor(data?: INovelChapterUpdateRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.content = _data["content"];
+            this.etag = _data["etag"];
+        }
+    }
+
+    static fromJS(data: any): NovelChapterUpdateRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new NovelChapterUpdateRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["content"] = this.content;
+        data["etag"] = this.etag;
+        return data;
+    }
+}
+
+/** Editable chapter content with optimistic concurrency. */
+export interface INovelChapterUpdateRequest {
+    content: string;
+    etag: string;
+}
+
+/** Payload for creating a novel. */
+export class NovelCreateRequest implements INovelCreateRequest {
+    title!: string;
+    description?: Description3;
+    coverImageUrl?: CoverImageUrl3;
+    language?: Language;
+    author?: Author3;
+    tags?: Tags;
+    notes?: Notes;
+
+    [key: string]: any;
+
+    constructor(data?: INovelCreateRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.title = _data["title"];
+            this.description = _data["description"];
+            this.coverImageUrl = _data["coverImageUrl"];
+            this.language = _data["language"];
+            this.author = _data["author"];
+            this.tags = _data["tags"];
+            this.notes = _data["notes"];
+        }
+    }
+
+    static fromJS(data: any): NovelCreateRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new NovelCreateRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["title"] = this.title;
+        data["description"] = this.description;
+        data["coverImageUrl"] = this.coverImageUrl;
+        data["language"] = this.language;
+        data["author"] = this.author;
+        data["tags"] = this.tags;
+        data["notes"] = this.notes;
+        return data;
+    }
+}
+
+/** Payload for creating a novel. */
+export interface INovelCreateRequest {
+    title: string;
+    description?: Description3;
+    coverImageUrl?: CoverImageUrl3;
+    language?: Language;
+    author?: Author3;
+    tags?: Tags;
+    notes?: Notes;
+
+    [key: string]: any;
+}
+
+/** Novel information with its ordered chapter manifest. */
+export class NovelDetailResponse implements INovelDetailResponse {
+    id!: string;
+    title!: string;
+    description?: Description4;
+    coverImageUrl?: CoverImageUrl4;
+    language?: Language2;
+    author?: Author4;
+    tags!: string[];
+    notes?: Notes2;
+    status!: NovelStatus;
+    chapterCount?: number;
+    binding?: Binding;
+    createdAt!: Date;
+    updatedAt!: Date;
+    etag?: Etag3;
+    chapters?: NovelChapterSummaryResponse[];
+
+    [key: string]: any;
+
+    constructor(data?: INovelDetailResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+        if (!data) {
+            this.tags = [];
+            this.chapterCount = 0;
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.id = _data["id"];
+            this.title = _data["title"];
+            this.description = _data["description"];
+            this.coverImageUrl = _data["coverImageUrl"];
+            this.language = _data["language"];
+            this.author = _data["author"];
+            if (Array.isArray(_data["tags"])) {
+                this.tags = [] as any;
+                for (let item of _data["tags"])
+                    this.tags!.push(item);
+            }
+            this.notes = _data["notes"];
+            this.status = _data["status"];
+            this.chapterCount = _data["chapterCount"] !== undefined ? _data["chapterCount"] : 0;
+            this.binding = _data["binding"];
+            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
+            this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
+            this.etag = _data["etag"];
+            if (Array.isArray(_data["chapters"])) {
+                this.chapters = [] as any;
+                for (let item of _data["chapters"])
+                    this.chapters!.push(NovelChapterSummaryResponse.fromJS(item));
+            }
+        }
+    }
+
+    static fromJS(data: any): NovelDetailResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new NovelDetailResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["id"] = this.id;
+        data["title"] = this.title;
+        data["description"] = this.description;
+        data["coverImageUrl"] = this.coverImageUrl;
+        data["language"] = this.language;
+        data["author"] = this.author;
+        if (Array.isArray(this.tags)) {
+            data["tags"] = [];
+            for (let item of this.tags)
+                data["tags"].push(item);
+        }
+        data["notes"] = this.notes;
+        data["status"] = this.status;
+        data["chapterCount"] = this.chapterCount;
+        data["binding"] = this.binding;
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
+        data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
+        data["etag"] = this.etag;
+        if (Array.isArray(this.chapters)) {
+            data["chapters"] = [];
+            for (let item of this.chapters)
+                data["chapters"].push(item ? item.toJSON() : undefined as any);
+        }
+        return data;
+    }
+}
+
+/** Novel information with its ordered chapter manifest. */
+export interface INovelDetailResponse {
+    id: string;
+    title: string;
+    description?: Description4;
+    coverImageUrl?: CoverImageUrl4;
+    language?: Language2;
+    author?: Author4;
+    tags: string[];
+    notes?: Notes2;
+    status: NovelStatus;
+    chapterCount?: number;
+    binding?: Binding;
+    createdAt: Date;
+    updatedAt: Date;
+    etag?: Etag3;
+    chapters?: NovelChapterSummaryResponse[];
+
+    [key: string]: any;
+}
+
 /** Paged response for listing novels. */
 export class NovelListResponse implements INovelListResponse {
     items!: NovelResponse[];
@@ -2134,16 +2625,18 @@ export interface INovelListResponse {
 export class NovelResponse implements INovelResponse {
     id!: string;
     title!: string;
-    description?: Description3;
-    coverImageUrl?: CoverImageUrl2;
-    language?: Language2;
-    author?: Author3;
+    description?: Description5;
+    coverImageUrl?: CoverImageUrl5;
+    language?: Language3;
+    author?: Author5;
     tags!: string[];
-    notes?: Notes2;
+    notes?: Notes3;
     status!: NovelStatus;
+    chapterCount?: number;
+    binding?: Binding2;
     createdAt!: Date;
     updatedAt!: Date;
-    etag?: Etag2;
+    etag?: Etag4;
 
     [key: string]: any;
 
@@ -2156,6 +2649,7 @@ export class NovelResponse implements INovelResponse {
         }
         if (!data) {
             this.tags = [];
+            this.chapterCount = 0;
         }
     }
 
@@ -2178,6 +2672,8 @@ export class NovelResponse implements INovelResponse {
             }
             this.notes = _data["notes"];
             this.status = _data["status"];
+            this.chapterCount = _data["chapterCount"] !== undefined ? _data["chapterCount"] : 0;
+            this.binding = _data["binding"];
             this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
             this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
             this.etag = _data["etag"];
@@ -2210,6 +2706,8 @@ export class NovelResponse implements INovelResponse {
         }
         data["notes"] = this.notes;
         data["status"] = this.status;
+        data["chapterCount"] = this.chapterCount;
+        data["binding"] = this.binding;
         data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
         data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
         data["etag"] = this.etag;
@@ -2221,16 +2719,18 @@ export class NovelResponse implements INovelResponse {
 export interface INovelResponse {
     id: string;
     title: string;
-    description?: Description3;
-    coverImageUrl?: CoverImageUrl2;
-    language?: Language2;
-    author?: Author3;
+    description?: Description5;
+    coverImageUrl?: CoverImageUrl5;
+    language?: Language3;
+    author?: Author5;
     tags: string[];
-    notes?: Notes2;
+    notes?: Notes3;
     status: NovelStatus;
+    chapterCount?: number;
+    binding?: Binding2;
     createdAt: Date;
     updatedAt: Date;
-    etag?: Etag2;
+    etag?: Etag4;
 
     [key: string]: any;
 }
@@ -2241,6 +2741,208 @@ export enum NovelStatus {
     Active = "active",
     Archived = "archived",
     Deleted = "deleted",
+}
+
+/** Counters describing the result of binding or synchronizing. */
+export class NovelSyncChangesResponse implements INovelSyncChangesResponse {
+    added!: number;
+    refreshed!: number;
+    preserved!: number;
+    removed!: number;
+
+    [key: string]: any;
+
+    constructor(data?: INovelSyncChangesResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.added = _data["added"];
+            this.refreshed = _data["refreshed"];
+            this.preserved = _data["preserved"];
+            this.removed = _data["removed"];
+        }
+    }
+
+    static fromJS(data: any): NovelSyncChangesResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new NovelSyncChangesResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["added"] = this.added;
+        data["refreshed"] = this.refreshed;
+        data["preserved"] = this.preserved;
+        data["removed"] = this.removed;
+        return data;
+    }
+}
+
+/** Counters describing the result of binding or synchronizing. */
+export interface INovelSyncChangesResponse {
+    added: number;
+    refreshed: number;
+    preserved: number;
+    removed: number;
+
+    [key: string]: any;
+}
+
+/** Updated novel and chapter state after bind or sync. */
+export class NovelSyncResponse implements INovelSyncResponse {
+    novel!: NovelDetailResponse;
+    changes!: NovelSyncChangesResponse;
+
+    [key: string]: any;
+
+    constructor(data?: INovelSyncResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+        if (!data) {
+            this.novel = new NovelDetailResponse();
+            this.changes = new NovelSyncChangesResponse();
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.novel = _data["novel"] ? NovelDetailResponse.fromJS(_data["novel"]) : new NovelDetailResponse();
+            this.changes = _data["changes"] ? NovelSyncChangesResponse.fromJS(_data["changes"]) : new NovelSyncChangesResponse();
+        }
+    }
+
+    static fromJS(data: any): NovelSyncResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new NovelSyncResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["novel"] = this.novel ? this.novel.toJSON() : undefined as any;
+        data["changes"] = this.changes ? this.changes.toJSON() : undefined as any;
+        return data;
+    }
+}
+
+/** Updated novel and chapter state after bind or sync. */
+export interface INovelSyncResponse {
+    novel: NovelDetailResponse;
+    changes: NovelSyncChangesResponse;
+
+    [key: string]: any;
+}
+
+/** Payload for updating a novel while allowing nullable fields to be cleared. */
+export class NovelUpdateRequest implements INovelUpdateRequest {
+    title?: Title;
+    description?: Description6;
+    coverImageUrl?: CoverImageUrl6;
+    language?: Language4;
+    author?: Author6;
+    tags?: Tags2;
+    notes?: Notes4;
+    status?: Status;
+    etag?: Etag5;
+
+    [key: string]: any;
+
+    constructor(data?: INovelUpdateRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.title = _data["title"];
+            this.description = _data["description"];
+            this.coverImageUrl = _data["coverImageUrl"];
+            this.language = _data["language"];
+            this.author = _data["author"];
+            this.tags = _data["tags"];
+            this.notes = _data["notes"];
+            this.status = _data["status"];
+            this.etag = _data["etag"];
+        }
+    }
+
+    static fromJS(data: any): NovelUpdateRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new NovelUpdateRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["title"] = this.title;
+        data["description"] = this.description;
+        data["coverImageUrl"] = this.coverImageUrl;
+        data["language"] = this.language;
+        data["author"] = this.author;
+        data["tags"] = this.tags;
+        data["notes"] = this.notes;
+        data["status"] = this.status;
+        data["etag"] = this.etag;
+        return data;
+    }
+}
+
+/** Payload for updating a novel while allowing nullable fields to be cleared. */
+export interface INovelUpdateRequest {
+    title?: Title;
+    description?: Description6;
+    coverImageUrl?: CoverImageUrl6;
+    language?: Language4;
+    author?: Author6;
+    tags?: Tags2;
+    notes?: Notes4;
+    status?: Status;
+    etag?: Etag5;
+
+    [key: string]: any;
 }
 
 /** Request accepted by POST /api/scrapings. */
@@ -2291,7 +2993,7 @@ export class ScrapingCreateResponse implements IScrapingCreateResponse {
     crawlerId!: string;
     sourceUrl!: string;
     title!: string;
-    coverImageUrl?: CoverImageUrl3;
+    coverImageUrl?: CoverImageUrl7;
     progress!: ScrapingProgressResponse;
     createdAt!: Date;
     updatedAt!: Date;
@@ -2361,7 +3063,7 @@ export interface IScrapingCreateResponse {
     crawlerId: string;
     sourceUrl: string;
     title: string;
-    coverImageUrl?: CoverImageUrl3;
+    coverImageUrl?: CoverImageUrl7;
     progress: ScrapingProgressResponse;
     createdAt: Date;
     updatedAt: Date;
@@ -2526,12 +3228,12 @@ export interface IScrapingListResponse {
 export class ScrapingMetadataResponse implements IScrapingMetadataResponse {
     sourceNovelId!: string;
     title!: string;
-    author?: Author4;
+    author?: Author7;
     category?: Category3;
     updatedDate?: UpdatedDate2;
     protagonists?: string[];
-    description?: Description4;
-    coverImageUrl?: CoverImageUrl4;
+    description?: Description7;
+    coverImageUrl?: CoverImageUrl8;
     fetchedAt!: Date;
 
     [key: string]: any;
@@ -2601,12 +3303,12 @@ export class ScrapingMetadataResponse implements IScrapingMetadataResponse {
 export interface IScrapingMetadataResponse {
     sourceNovelId: string;
     title: string;
-    author?: Author4;
+    author?: Author7;
     category?: Category3;
     updatedDate?: UpdatedDate2;
     protagonists?: string[];
-    description?: Description4;
-    coverImageUrl?: CoverImageUrl4;
+    description?: Description7;
+    coverImageUrl?: CoverImageUrl8;
     fetchedAt: Date;
 
     [key: string]: any;
@@ -2687,7 +3389,7 @@ export class ScrapingResultResponse implements IScrapingResultResponse {
     scrapingId!: string;
     taskId!: string;
     title!: string;
-    chapterNumber?: ChapterNumber3;
+    chapterNumber?: ChapterNumber5;
     content?: string[];
     createdAt!: Date;
 
@@ -2753,7 +3455,7 @@ export interface IScrapingResultResponse {
     scrapingId: string;
     taskId: string;
     title: string;
-    chapterNumber?: ChapterNumber3;
+    chapterNumber?: ChapterNumber5;
     content?: string[];
     createdAt: Date;
 
@@ -2820,7 +3522,7 @@ export class ScrapingSummaryResponse implements IScrapingSummaryResponse {
     crawlerId!: string;
     sourceUrl!: string;
     title!: string;
-    coverImageUrl?: CoverImageUrl5;
+    coverImageUrl?: CoverImageUrl9;
     progress!: ScrapingProgressResponse;
     createdAt!: Date;
     updatedAt!: Date;
@@ -2887,7 +3589,7 @@ export interface IScrapingSummaryResponse {
     crawlerId: string;
     sourceUrl: string;
     title: string;
-    coverImageUrl?: CoverImageUrl5;
+    coverImageUrl?: CoverImageUrl9;
     progress: ScrapingProgressResponse;
     createdAt: Date;
     updatedAt: Date;
@@ -2899,7 +3601,7 @@ export interface IScrapingSummaryResponse {
 export class ScrapingTaskResponse implements IScrapingTaskResponse {
     id!: string;
     title!: string;
-    chapterNumber?: ChapterNumber4;
+    chapterNumber?: ChapterNumber6;
     manifestIndex!: number;
     status!: ScrapingTaskStatus;
     attempts!: number;
@@ -2966,7 +3668,7 @@ export class ScrapingTaskResponse implements IScrapingTaskResponse {
 export interface IScrapingTaskResponse {
     id: string;
     title: string;
-    chapterNumber?: ChapterNumber4;
+    chapterNumber?: ChapterNumber6;
     manifestIndex: number;
     status: ScrapingTaskStatus;
     attempts: number;
@@ -3187,7 +3889,7 @@ export class UserResponse implements IUserResponse {
     status!: UserStatus;
     createdAt!: Date;
     updatedAt!: Date;
-    etag?: Etag3;
+    etag?: Etag6;
 
     [key: string]: any;
 
@@ -3251,7 +3953,7 @@ export interface IUserResponse {
     status: UserStatus;
     createdAt: Date;
     updatedAt: Date;
-    etag?: Etag3;
+    etag?: Etag6;
 
     [key: string]: any;
 }
@@ -3275,7 +3977,7 @@ export class UserUpdateRequest implements IUserUpdateRequest {
     displayName?: DisplayName3;
     role?: Role;
     status?: Status2;
-    etag?: Etag4;
+    etag?: Etag7;
 
     [key: string]: any;
 
@@ -3330,7 +4032,7 @@ export interface IUserUpdateRequest {
     displayName?: DisplayName3;
     role?: Role;
     status?: Status2;
-    etag?: Etag4;
+    etag?: Etag7;
 
     [key: string]: any;
 }
@@ -3454,270 +4156,6 @@ export interface IContinuationtoken {
     [key: string]: any;
 }
 
-export class Description implements IDescription {
-
-    [key: string]: any;
-
-    constructor(data?: IDescription) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Description {
-        data = typeof data === 'object' ? data : {};
-        let result = new Description();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IDescription {
-
-    [key: string]: any;
-}
-
-export class Language implements ILanguage {
-
-    [key: string]: any;
-
-    constructor(data?: ILanguage) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Language {
-        data = typeof data === 'object' ? data : {};
-        let result = new Language();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface ILanguage {
-
-    [key: string]: any;
-}
-
-export class Author implements IAuthor {
-
-    [key: string]: any;
-
-    constructor(data?: IAuthor) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Author {
-        data = typeof data === 'object' ? data : {};
-        let result = new Author();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IAuthor {
-
-    [key: string]: any;
-}
-
-export class Tags implements ITags {
-
-    [key: string]: any;
-
-    constructor(data?: ITags) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Tags {
-        data = typeof data === 'object' ? data : {};
-        let result = new Tags();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface ITags {
-
-    [key: string]: any;
-}
-
-export class Notes implements INotes {
-
-    [key: string]: any;
-
-    constructor(data?: INotes) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Notes {
-        data = typeof data === 'object' ? data : {};
-        let result = new Notes();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface INotes {
-
-    [key: string]: any;
-}
-
-export class Coverimage implements ICoverimage {
-
-    [key: string]: any;
-
-    constructor(data?: ICoverimage) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Coverimage {
-        data = typeof data === 'object' ? data : {};
-        let result = new Coverimage();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface ICoverimage {
-
-    [key: string]: any;
-}
-
 export class Anonymous implements IAnonymous {
 
     [key: string]: any;
@@ -3758,50 +4196,6 @@ export class Anonymous implements IAnonymous {
 }
 
 export interface IAnonymous {
-
-    [key: string]: any;
-}
-
-export class Title implements ITitle {
-
-    [key: string]: any;
-
-    constructor(data?: ITitle) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Title {
-        data = typeof data === 'object' ? data : {};
-        let result = new Title();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface ITitle {
 
     [key: string]: any;
 }
@@ -3850,11 +4244,11 @@ export interface IAnonymous2 {
     [key: string]: any;
 }
 
-export class Anonymous3 implements IAnonymous3 {
+export class Search implements ISearch {
 
     [key: string]: any;
 
-    constructor(data?: IAnonymous3) {
+    constructor(data?: ISearch) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -3872,9 +4266,9 @@ export class Anonymous3 implements IAnonymous3 {
         }
     }
 
-    static fromJS(data: any): Anonymous3 {
+    static fromJS(data: any): Search {
         data = typeof data === 'object' ? data : {};
-        let result = new Anonymous3();
+        let result = new Search();
         result.init(data);
         return result;
     }
@@ -3889,16 +4283,16 @@ export class Anonymous3 implements IAnonymous3 {
     }
 }
 
-export interface IAnonymous3 {
+export interface ISearch {
 
     [key: string]: any;
 }
 
-export class Anonymous4 implements IAnonymous4 {
+export class Author implements IAuthor {
 
     [key: string]: any;
 
-    constructor(data?: IAnonymous4) {
+    constructor(data?: IAuthor) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -3916,9 +4310,9 @@ export class Anonymous4 implements IAnonymous4 {
         }
     }
 
-    static fromJS(data: any): Anonymous4 {
+    static fromJS(data: any): Author {
         data = typeof data === 'object' ? data : {};
-        let result = new Anonymous4();
+        let result = new Author();
         result.init(data);
         return result;
     }
@@ -3933,315 +4327,7 @@ export class Anonymous4 implements IAnonymous4 {
     }
 }
 
-export interface IAnonymous4 {
-
-    [key: string]: any;
-}
-
-export class Anonymous5 implements IAnonymous5 {
-
-    [key: string]: any;
-
-    constructor(data?: IAnonymous5) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Anonymous5 {
-        data = typeof data === 'object' ? data : {};
-        let result = new Anonymous5();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IAnonymous5 {
-
-    [key: string]: any;
-}
-
-export class Anonymous6 implements IAnonymous6 {
-
-    [key: string]: any;
-
-    constructor(data?: IAnonymous6) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Anonymous6 {
-        data = typeof data === 'object' ? data : {};
-        let result = new Anonymous6();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IAnonymous6 {
-
-    [key: string]: any;
-}
-
-export class Status implements IStatus {
-
-    [key: string]: any;
-
-    constructor(data?: IStatus) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Status {
-        data = typeof data === 'object' ? data : {};
-        let result = new Status();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IStatus {
-
-    [key: string]: any;
-}
-
-export class Etag implements IEtag {
-
-    [key: string]: any;
-
-    constructor(data?: IEtag) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Etag {
-        data = typeof data === 'object' ? data : {};
-        let result = new Etag();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IEtag {
-
-    [key: string]: any;
-}
-
-export class Anonymous7 implements IAnonymous7 {
-
-    [key: string]: any;
-
-    constructor(data?: IAnonymous7) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Anonymous7 {
-        data = typeof data === 'object' ? data : {};
-        let result = new Anonymous7();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IAnonymous7 {
-
-    [key: string]: any;
-}
-
-export class Anonymous8 implements IAnonymous8 {
-
-    [key: string]: any;
-
-    constructor(data?: IAnonymous8) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Anonymous8 {
-        data = typeof data === 'object' ? data : {};
-        let result = new Anonymous8();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IAnonymous8 {
-
-    [key: string]: any;
-}
-
-export class Anonymous9 implements IAnonymous9 {
-
-    [key: string]: any;
-
-    constructor(data?: IAnonymous9) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Anonymous9 {
-        data = typeof data === 'object' ? data : {};
-        let result = new Anonymous9();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IAnonymous9 {
+export interface IAuthor {
 
     [key: string]: any;
 }
@@ -4378,11 +4464,11 @@ export interface IProtagonists {
     [key: string]: any;
 }
 
-export class Anonymous10 implements IAnonymous10 {
+export class Description implements IDescription {
 
     [key: string]: any;
 
-    constructor(data?: IAnonymous10) {
+    constructor(data?: IDescription) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -4400,9 +4486,9 @@ export class Anonymous10 implements IAnonymous10 {
         }
     }
 
-    static fromJS(data: any): Anonymous10 {
+    static fromJS(data: any): Description {
         data = typeof data === 'object' ? data : {};
-        let result = new Anonymous10();
+        let result = new Description();
         result.init(data);
         return result;
     }
@@ -4417,16 +4503,16 @@ export class Anonymous10 implements IAnonymous10 {
     }
 }
 
-export interface IAnonymous10 {
+export interface IDescription {
 
     [key: string]: any;
 }
 
-export class Anonymous11 implements IAnonymous11 {
+export class Coverimage implements ICoverimage {
 
     [key: string]: any;
 
-    constructor(data?: IAnonymous11) {
+    constructor(data?: ICoverimage) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -4444,9 +4530,9 @@ export class Anonymous11 implements IAnonymous11 {
         }
     }
 
-    static fromJS(data: any): Anonymous11 {
+    static fromJS(data: any): Coverimage {
         data = typeof data === 'object' ? data : {};
-        let result = new Anonymous11();
+        let result = new Coverimage();
         result.init(data);
         return result;
     }
@@ -4461,7 +4547,7 @@ export class Anonymous11 implements IAnonymous11 {
     }
 }
 
-export interface IAnonymous11 {
+export interface ICoverimage {
 
     [key: string]: any;
 }
@@ -4774,94 +4860,6 @@ export interface ICoverImageUrl {
     [key: string]: any;
 }
 
-export class ContinuationToken implements IContinuationToken {
-
-    [key: string]: any;
-
-    constructor(data?: IContinuationToken) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): ContinuationToken {
-        data = typeof data === 'object' ? data : {};
-        let result = new ContinuationToken();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IContinuationToken {
-
-    [key: string]: any;
-}
-
-export class Description3 implements IDescription3 {
-
-    [key: string]: any;
-
-    constructor(data?: IDescription3) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Description3 {
-        data = typeof data === 'object' ? data : {};
-        let result = new Description3();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IDescription3 {
-
-    [key: string]: any;
-}
-
 export class CoverImageUrl2 implements ICoverImageUrl2 {
 
     [key: string]: any;
@@ -4906,11 +4904,11 @@ export interface ICoverImageUrl2 {
     [key: string]: any;
 }
 
-export class Language2 implements ILanguage2 {
+export class ChapterNumber3 implements IChapterNumber3 {
 
     [key: string]: any;
 
-    constructor(data?: ILanguage2) {
+    constructor(data?: IChapterNumber3) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -4928,9 +4926,9 @@ export class Language2 implements ILanguage2 {
         }
     }
 
-    static fromJS(data: any): Language2 {
+    static fromJS(data: any): ChapterNumber3 {
         data = typeof data === 'object' ? data : {};
-        let result = new Language2();
+        let result = new ChapterNumber3();
         result.init(data);
         return result;
     }
@@ -4945,16 +4943,16 @@ export class Language2 implements ILanguage2 {
     }
 }
 
-export interface ILanguage2 {
+export interface IChapterNumber3 {
 
     [key: string]: any;
 }
 
-export class Author3 implements IAuthor3 {
+export class Etag implements IEtag {
 
     [key: string]: any;
 
-    constructor(data?: IAuthor3) {
+    constructor(data?: IEtag) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -4972,9 +4970,9 @@ export class Author3 implements IAuthor3 {
         }
     }
 
-    static fromJS(data: any): Author3 {
+    static fromJS(data: any): Etag {
         data = typeof data === 'object' ? data : {};
-        let result = new Author3();
+        let result = new Etag();
         result.init(data);
         return result;
     }
@@ -4989,16 +4987,16 @@ export class Author3 implements IAuthor3 {
     }
 }
 
-export interface IAuthor3 {
+export interface IEtag {
 
     [key: string]: any;
 }
 
-export class Notes2 implements INotes2 {
+export class ChapterNumber4 implements IChapterNumber4 {
 
     [key: string]: any;
 
-    constructor(data?: INotes2) {
+    constructor(data?: IChapterNumber4) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5016,9 +5014,9 @@ export class Notes2 implements INotes2 {
         }
     }
 
-    static fromJS(data: any): Notes2 {
+    static fromJS(data: any): ChapterNumber4 {
         data = typeof data === 'object' ? data : {};
-        let result = new Notes2();
+        let result = new ChapterNumber4();
         result.init(data);
         return result;
     }
@@ -5033,7 +5031,7 @@ export class Notes2 implements INotes2 {
     }
 }
 
-export interface INotes2 {
+export interface IChapterNumber4 {
 
     [key: string]: any;
 }
@@ -5082,6 +5080,50 @@ export interface IEtag2 {
     [key: string]: any;
 }
 
+export class Description3 implements IDescription3 {
+
+    [key: string]: any;
+
+    constructor(data?: IDescription3) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Description3 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Description3();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IDescription3 {
+
+    [key: string]: any;
+}
+
 export class CoverImageUrl3 implements ICoverImageUrl3 {
 
     [key: string]: any;
@@ -5126,11 +5168,11 @@ export interface ICoverImageUrl3 {
     [key: string]: any;
 }
 
-export class ContinuationToken2 implements IContinuationToken2 {
+export class Language implements ILanguage {
 
     [key: string]: any;
 
-    constructor(data?: IContinuationToken2) {
+    constructor(data?: ILanguage) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5148,9 +5190,9 @@ export class ContinuationToken2 implements IContinuationToken2 {
         }
     }
 
-    static fromJS(data: any): ContinuationToken2 {
+    static fromJS(data: any): Language {
         data = typeof data === 'object' ? data : {};
-        let result = new ContinuationToken2();
+        let result = new Language();
         result.init(data);
         return result;
     }
@@ -5165,16 +5207,16 @@ export class ContinuationToken2 implements IContinuationToken2 {
     }
 }
 
-export interface IContinuationToken2 {
+export interface ILanguage {
 
     [key: string]: any;
 }
 
-export class Author4 implements IAuthor4 {
+export class Author3 implements IAuthor3 {
 
     [key: string]: any;
 
-    constructor(data?: IAuthor4) {
+    constructor(data?: IAuthor3) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5192,9 +5234,9 @@ export class Author4 implements IAuthor4 {
         }
     }
 
-    static fromJS(data: any): Author4 {
+    static fromJS(data: any): Author3 {
         data = typeof data === 'object' ? data : {};
-        let result = new Author4();
+        let result = new Author3();
         result.init(data);
         return result;
     }
@@ -5209,16 +5251,16 @@ export class Author4 implements IAuthor4 {
     }
 }
 
-export interface IAuthor4 {
+export interface IAuthor3 {
 
     [key: string]: any;
 }
 
-export class Category3 implements ICategory3 {
+export class Tags implements ITags {
 
     [key: string]: any;
 
-    constructor(data?: ICategory3) {
+    constructor(data?: ITags) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5236,9 +5278,9 @@ export class Category3 implements ICategory3 {
         }
     }
 
-    static fromJS(data: any): Category3 {
+    static fromJS(data: any): Tags {
         data = typeof data === 'object' ? data : {};
-        let result = new Category3();
+        let result = new Tags();
         result.init(data);
         return result;
     }
@@ -5253,16 +5295,16 @@ export class Category3 implements ICategory3 {
     }
 }
 
-export interface ICategory3 {
+export interface ITags {
 
     [key: string]: any;
 }
 
-export class UpdatedDate2 implements IUpdatedDate2 {
+export class Notes implements INotes {
 
     [key: string]: any;
 
-    constructor(data?: IUpdatedDate2) {
+    constructor(data?: INotes) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5280,9 +5322,9 @@ export class UpdatedDate2 implements IUpdatedDate2 {
         }
     }
 
-    static fromJS(data: any): UpdatedDate2 {
+    static fromJS(data: any): Notes {
         data = typeof data === 'object' ? data : {};
-        let result = new UpdatedDate2();
+        let result = new Notes();
         result.init(data);
         return result;
     }
@@ -5297,7 +5339,7 @@ export class UpdatedDate2 implements IUpdatedDate2 {
     }
 }
 
-export interface IUpdatedDate2 {
+export interface INotes {
 
     [key: string]: any;
 }
@@ -5390,11 +5432,11 @@ export interface ICoverImageUrl4 {
     [key: string]: any;
 }
 
-export class ChapterNumber3 implements IChapterNumber3 {
+export class Language2 implements ILanguage2 {
 
     [key: string]: any;
 
-    constructor(data?: IChapterNumber3) {
+    constructor(data?: ILanguage2) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5412,9 +5454,9 @@ export class ChapterNumber3 implements IChapterNumber3 {
         }
     }
 
-    static fromJS(data: any): ChapterNumber3 {
+    static fromJS(data: any): Language2 {
         data = typeof data === 'object' ? data : {};
-        let result = new ChapterNumber3();
+        let result = new Language2();
         result.init(data);
         return result;
     }
@@ -5429,7 +5471,271 @@ export class ChapterNumber3 implements IChapterNumber3 {
     }
 }
 
-export interface IChapterNumber3 {
+export interface ILanguage2 {
+
+    [key: string]: any;
+}
+
+export class Author4 implements IAuthor4 {
+
+    [key: string]: any;
+
+    constructor(data?: IAuthor4) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Author4 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Author4();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAuthor4 {
+
+    [key: string]: any;
+}
+
+export class Notes2 implements INotes2 {
+
+    [key: string]: any;
+
+    constructor(data?: INotes2) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Notes2 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Notes2();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface INotes2 {
+
+    [key: string]: any;
+}
+
+export class Binding implements IBinding {
+
+    [key: string]: any;
+
+    constructor(data?: IBinding) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Binding {
+        data = typeof data === 'object' ? data : {};
+        let result = new Binding();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IBinding {
+
+    [key: string]: any;
+}
+
+export class Etag3 implements IEtag3 {
+
+    [key: string]: any;
+
+    constructor(data?: IEtag3) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Etag3 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Etag3();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IEtag3 {
+
+    [key: string]: any;
+}
+
+export class ContinuationToken implements IContinuationToken {
+
+    [key: string]: any;
+
+    constructor(data?: IContinuationToken) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): ContinuationToken {
+        data = typeof data === 'object' ? data : {};
+        let result = new ContinuationToken();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IContinuationToken {
+
+    [key: string]: any;
+}
+
+export class Description5 implements IDescription5 {
+
+    [key: string]: any;
+
+    constructor(data?: IDescription5) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Description5 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Description5();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IDescription5 {
 
     [key: string]: any;
 }
@@ -5478,11 +5784,11 @@ export interface ICoverImageUrl5 {
     [key: string]: any;
 }
 
-export class ChapterNumber4 implements IChapterNumber4 {
+export class Language3 implements ILanguage3 {
 
     [key: string]: any;
 
-    constructor(data?: IChapterNumber4) {
+    constructor(data?: ILanguage3) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5500,9 +5806,9 @@ export class ChapterNumber4 implements IChapterNumber4 {
         }
     }
 
-    static fromJS(data: any): ChapterNumber4 {
+    static fromJS(data: any): Language3 {
         data = typeof data === 'object' ? data : {};
-        let result = new ChapterNumber4();
+        let result = new Language3();
         result.init(data);
         return result;
     }
@@ -5517,7 +5823,1019 @@ export class ChapterNumber4 implements IChapterNumber4 {
     }
 }
 
-export interface IChapterNumber4 {
+export interface ILanguage3 {
+
+    [key: string]: any;
+}
+
+export class Author5 implements IAuthor5 {
+
+    [key: string]: any;
+
+    constructor(data?: IAuthor5) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Author5 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Author5();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAuthor5 {
+
+    [key: string]: any;
+}
+
+export class Notes3 implements INotes3 {
+
+    [key: string]: any;
+
+    constructor(data?: INotes3) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Notes3 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Notes3();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface INotes3 {
+
+    [key: string]: any;
+}
+
+export class Binding2 implements IBinding2 {
+
+    [key: string]: any;
+
+    constructor(data?: IBinding2) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Binding2 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Binding2();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IBinding2 {
+
+    [key: string]: any;
+}
+
+export class Etag4 implements IEtag4 {
+
+    [key: string]: any;
+
+    constructor(data?: IEtag4) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Etag4 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Etag4();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IEtag4 {
+
+    [key: string]: any;
+}
+
+export class Title implements ITitle {
+
+    [key: string]: any;
+
+    constructor(data?: ITitle) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Title {
+        data = typeof data === 'object' ? data : {};
+        let result = new Title();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ITitle {
+
+    [key: string]: any;
+}
+
+export class Description6 implements IDescription6 {
+
+    [key: string]: any;
+
+    constructor(data?: IDescription6) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Description6 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Description6();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IDescription6 {
+
+    [key: string]: any;
+}
+
+export class CoverImageUrl6 implements ICoverImageUrl6 {
+
+    [key: string]: any;
+
+    constructor(data?: ICoverImageUrl6) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): CoverImageUrl6 {
+        data = typeof data === 'object' ? data : {};
+        let result = new CoverImageUrl6();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ICoverImageUrl6 {
+
+    [key: string]: any;
+}
+
+export class Language4 implements ILanguage4 {
+
+    [key: string]: any;
+
+    constructor(data?: ILanguage4) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Language4 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Language4();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ILanguage4 {
+
+    [key: string]: any;
+}
+
+export class Author6 implements IAuthor6 {
+
+    [key: string]: any;
+
+    constructor(data?: IAuthor6) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Author6 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Author6();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAuthor6 {
+
+    [key: string]: any;
+}
+
+export class Tags2 implements ITags2 {
+
+    [key: string]: any;
+
+    constructor(data?: ITags2) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Tags2 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Tags2();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ITags2 {
+
+    [key: string]: any;
+}
+
+export class Notes4 implements INotes4 {
+
+    [key: string]: any;
+
+    constructor(data?: INotes4) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Notes4 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Notes4();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface INotes4 {
+
+    [key: string]: any;
+}
+
+export class Status implements IStatus {
+
+    [key: string]: any;
+
+    constructor(data?: IStatus) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Status {
+        data = typeof data === 'object' ? data : {};
+        let result = new Status();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IStatus {
+
+    [key: string]: any;
+}
+
+export class Etag5 implements IEtag5 {
+
+    [key: string]: any;
+
+    constructor(data?: IEtag5) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Etag5 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Etag5();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IEtag5 {
+
+    [key: string]: any;
+}
+
+export class CoverImageUrl7 implements ICoverImageUrl7 {
+
+    [key: string]: any;
+
+    constructor(data?: ICoverImageUrl7) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): CoverImageUrl7 {
+        data = typeof data === 'object' ? data : {};
+        let result = new CoverImageUrl7();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ICoverImageUrl7 {
+
+    [key: string]: any;
+}
+
+export class ContinuationToken2 implements IContinuationToken2 {
+
+    [key: string]: any;
+
+    constructor(data?: IContinuationToken2) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): ContinuationToken2 {
+        data = typeof data === 'object' ? data : {};
+        let result = new ContinuationToken2();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IContinuationToken2 {
+
+    [key: string]: any;
+}
+
+export class Author7 implements IAuthor7 {
+
+    [key: string]: any;
+
+    constructor(data?: IAuthor7) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Author7 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Author7();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAuthor7 {
+
+    [key: string]: any;
+}
+
+export class Category3 implements ICategory3 {
+
+    [key: string]: any;
+
+    constructor(data?: ICategory3) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Category3 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Category3();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ICategory3 {
+
+    [key: string]: any;
+}
+
+export class UpdatedDate2 implements IUpdatedDate2 {
+
+    [key: string]: any;
+
+    constructor(data?: IUpdatedDate2) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): UpdatedDate2 {
+        data = typeof data === 'object' ? data : {};
+        let result = new UpdatedDate2();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IUpdatedDate2 {
+
+    [key: string]: any;
+}
+
+export class Description7 implements IDescription7 {
+
+    [key: string]: any;
+
+    constructor(data?: IDescription7) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Description7 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Description7();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IDescription7 {
+
+    [key: string]: any;
+}
+
+export class CoverImageUrl8 implements ICoverImageUrl8 {
+
+    [key: string]: any;
+
+    constructor(data?: ICoverImageUrl8) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): CoverImageUrl8 {
+        data = typeof data === 'object' ? data : {};
+        let result = new CoverImageUrl8();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ICoverImageUrl8 {
+
+    [key: string]: any;
+}
+
+export class ChapterNumber5 implements IChapterNumber5 {
+
+    [key: string]: any;
+
+    constructor(data?: IChapterNumber5) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): ChapterNumber5 {
+        data = typeof data === 'object' ? data : {};
+        let result = new ChapterNumber5();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IChapterNumber5 {
+
+    [key: string]: any;
+}
+
+export class CoverImageUrl9 implements ICoverImageUrl9 {
+
+    [key: string]: any;
+
+    constructor(data?: ICoverImageUrl9) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): CoverImageUrl9 {
+        data = typeof data === 'object' ? data : {};
+        let result = new CoverImageUrl9();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ICoverImageUrl9 {
+
+    [key: string]: any;
+}
+
+export class ChapterNumber6 implements IChapterNumber6 {
+
+    [key: string]: any;
+
+    constructor(data?: IChapterNumber6) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): ChapterNumber6 {
+        data = typeof data === 'object' ? data : {};
+        let result = new ChapterNumber6();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IChapterNumber6 {
 
     [key: string]: any;
 }
@@ -5742,11 +7060,11 @@ export interface IDisplayName2 {
     [key: string]: any;
 }
 
-export class Etag3 implements IEtag3 {
+export class Etag6 implements IEtag6 {
 
     [key: string]: any;
 
-    constructor(data?: IEtag3) {
+    constructor(data?: IEtag6) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5764,9 +7082,9 @@ export class Etag3 implements IEtag3 {
         }
     }
 
-    static fromJS(data: any): Etag3 {
+    static fromJS(data: any): Etag6 {
         data = typeof data === 'object' ? data : {};
-        let result = new Etag3();
+        let result = new Etag6();
         result.init(data);
         return result;
     }
@@ -5781,7 +7099,7 @@ export class Etag3 implements IEtag3 {
     }
 }
 
-export interface IEtag3 {
+export interface IEtag6 {
 
     [key: string]: any;
 }
@@ -5962,11 +7280,11 @@ export interface IStatus2 {
     [key: string]: any;
 }
 
-export class Etag4 implements IEtag4 {
+export class Etag7 implements IEtag7 {
 
     [key: string]: any;
 
-    constructor(data?: IEtag4) {
+    constructor(data?: IEtag7) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5984,9 +7302,9 @@ export class Etag4 implements IEtag4 {
         }
     }
 
-    static fromJS(data: any): Etag4 {
+    static fromJS(data: any): Etag7 {
         data = typeof data === 'object' ? data : {};
-        let result = new Etag4();
+        let result = new Etag7();
         result.init(data);
         return result;
     }
@@ -6001,7 +7319,7 @@ export class Etag4 implements IEtag4 {
     }
 }
 
-export interface IEtag4 {
+export interface IEtag7 {
 
     [key: string]: any;
 }

@@ -265,6 +265,18 @@ async function deleteNovel(novel: NovelResponse) {
                 />
                 <span v-if="display(novel.author, '')">{{ display(novel.author, '') }}</span>
                 <span v-if="display(novel.language, '')">{{ display(novel.language, '') }}</span>
+                <UBadge
+                  :label="`${Number(novel.chapterCount || 0)} ${Number(novel.chapterCount || 0) === 1 ? 'chapter' : 'chapters'}`"
+                  icon="lucide:list"
+                  color="neutral"
+                  variant="subtle"
+                />
+                <UBadge
+                  :label="novel.binding ? 'Bound' : 'Unbound'"
+                  :icon="novel.binding ? 'lucide:link' : 'lucide:link-2-off'"
+                  :color="novel.binding ? 'primary' : 'neutral'"
+                  variant="subtle"
+                />
                 <span v-if="novel.updatedAt">Updated {{ formatDate(novel.updatedAt) }}</span>
               </div>
             </template>

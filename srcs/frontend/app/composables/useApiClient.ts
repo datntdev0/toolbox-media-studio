@@ -36,13 +36,21 @@ export function useApiClient() {
     novels: new NovelsClient(baseUrl, http),
     crawlers: new CrawlersClient(baseUrl, http),
     scrapings: new ScrapingsClient(baseUrl, http),
-    async createNovel(form: FormData) {
-      const response = await http.fetch(`${baseUrl}/api/novels`, { method: 'POST', body: form, headers: { Accept: 'application/json' } })
+    async createNovel(body: Record<string, unknown>) {
+      const response = await http.fetch(`${baseUrl}/api/novels`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+      })
       if (!response.ok) throw new Error('Unable to create novel')
       return NovelResponse.fromJS(await response.json())
     },
-    async updateNovel(id: string, form: FormData) {
-      const response = await http.fetch(`${baseUrl}/api/novels/${encodeURIComponent(id)}`, { method: 'PUT', body: form, headers: { Accept: 'application/json' } })
+    async updateNovel(id: string, body: Record<string, unknown>) {
+      const response = await http.fetch(`${baseUrl}/api/novels/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+      })
       if (!response.ok) throw new Error('Unable to update novel')
       return NovelResponse.fromJS(await response.json())
     },

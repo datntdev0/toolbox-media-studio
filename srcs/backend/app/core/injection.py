@@ -14,6 +14,9 @@ from app.events.scraping_handler import ScrapingQueueListener
 from app.providers.blob_storage_provider import PublicBlobProvider, build_public_blob_provider
 from app.providers.cache_provider import CacheProvider, build_cosmos_cache_provider
 from app.providers.proxy_service_provider import ProxyProvider, build_proxy_provider
+from app.repositories.cosmosdb.cosmos_novel_chapter_repository import (
+    build_cosmos_novel_chapter_repository,
+)
 from app.repositories.cosmosdb.cosmos_novel_repository import build_cosmos_novel_repository
 from app.repositories.cosmosdb.cosmos_scraping_repository import (
     build_cosmos_scraping_repository,
@@ -22,10 +25,12 @@ from app.repositories.cosmosdb.cosmos_scraping_result_repository import (
     build_cosmos_scraping_result_repository,
 )
 from app.repositories.cosmosdb.cosmos_user_repository import build_cosmos_user_repository
+from app.repositories.novel_chapter_repository import NovelChapterRepository
 from app.repositories.novel_repository import NovelRepository
 from app.repositories.scraping_repository import ScrapingRepository
 from app.repositories.scraping_result_repository import ScrapingResultRepository
 from app.repositories.user_repository import UserRepository
+from app.services.novel_binding_service import NovelBindingService
 
 log_manager = LogManager() # Singleton instance of Logger
 config = AppConfig() # Singleton instance of AppConfig
@@ -35,6 +40,9 @@ repository_user = build_cosmos_user_repository(config)
 repository_novel = build_cosmos_novel_repository(config)
 repository_scraping = build_cosmos_scraping_repository(config)
 repository_scraping_result = build_cosmos_scraping_result_repository(config)
+# Lazily constructed so existing API/test setups that do not use novel chapters
+# do not require the new Cosmos container.
+repository_novel_chapter: NovelChapterRepository | None = None
 
 # Provider instances can be registered
 provider_proxy = build_proxy_provider(config)
@@ -68,6 +76,32 @@ RepositoryScrapingDep = Annotated[
 RepositoryScrapingResultDep = Annotated[
     ScrapingResultRepository,
     Depends(lambda: repository_scraping_result),
+]
+
+
+def _get_novel_chapter_repository() -> NovelChapterRepository:
+    global repository_novel_chapter
+    if repository_novel_chapter is None:
+        repository_novel_chapter = build_cosmos_novel_chapter_repository(config)
+    return repository_novel_chapter
+
+
+def _get_novel_binding_service() -> NovelBindingService:
+    return NovelBindingService(
+        repository_novel,
+        repository_scraping,
+        repository_scraping_result,
+        _get_novel_chapter_repository(),
+    )
+
+
+RepositoryNovelChapterDep = Annotated[
+    NovelChapterRepository,
+    Depends(_get_novel_chapter_repository),
+]
+ServiceNovelBindingDep = Annotated[
+    NovelBindingService,
+    Depends(_get_novel_binding_service),
 ]
 
 ProviderCacheDep = Annotated[CacheProvider, Depends(lambda: provider_cache)]

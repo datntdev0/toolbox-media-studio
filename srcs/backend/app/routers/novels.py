@@ -3,15 +3,29 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Body, HTTPException, Path, Query, Response, status
 
-from app.core.injection import ProviderPublicBlobDep, RepositoryNovelDep
+from app.core.injection import RepositoryNovelDep, ServiceNovelBindingDep
 from app.core.security.authorization import SessionUser
-from app.domain.novels import NovelStatus
-from app.domain.requests import NovelCreateRequest, to_novel_entity
-from app.domain.responses import NovelListResponse, NovelResponse, to_novel_response
-from app.providers.blob_storage_provider import BlobStorageError, validate_cover_content
+from app.domain.novels import NovelBindRequest, NovelChapterUpdateRequest
+from app.domain.requests import NovelCreateRequest, NovelUpdateRequest, to_novel_entity
+from app.domain.responses import (
+    NovelChapterContentResponse,
+    NovelDetailResponse,
+    NovelListResponse,
+    NovelResponse,
+    NovelSyncResponse,
+    to_novel_chapter_summary,
+    to_novel_detail_response,
+    to_novel_response,
+    to_novel_sync_response,
+)
 from app.repositories.novel_repository import NovelConflictError
+from app.services.novel_binding_service import (
+    NovelBindingConcurrencyError,
+    NovelBindingConflictError,
+    NovelBindingNotFoundError,
+)
 
 router = APIRouter(prefix="/api/novels", tags=["novels"])
 
@@ -25,28 +39,9 @@ router = APIRouter(prefix="/api/novels", tags=["novels"])
 def create_novel_route(
     session_user: SessionUser,
     repository_novel: RepositoryNovelDep,
-    provider_public_blob: ProviderPublicBlobDep,
-    title: Annotated[str, Form(min_length=1)],
-    description: Annotated[str | None, Form()] = None,
-    language: Annotated[str | None, Form()] = None,
-    author: Annotated[str | None, Form()] = None,
-    tags: Annotated[str | None, Form()] = None,
-    notes: Annotated[str | None, Form()] = None,
-    cover_image: Annotated[UploadFile | None, File(alias="coverImage")] = None,
+    body: Annotated[NovelCreateRequest, Body(...)],
 ) -> NovelResponse:
-    body = NovelCreateRequest(
-        title=title,
-        description=_nullable_text(description),
-        language=_nullable_text(language),
-        author=_nullable_text(author),
-        tags=_parse_tags(tags),
-        notes=_nullable_text(notes),
-    )
     novel_entity = to_novel_entity(body, session_user.id)
-    if cover_image is not None:
-        novel_entity.cover_image_url = _upload_cover(
-            provider_public_blob, novel_entity.id, cover_image
-        )
     novel_return = repository_novel.create(novel_entity)
     return to_novel_response(novel_return)
 
@@ -69,83 +64,188 @@ def list_novels_route(
     )
 
 
-@router.get("/{id}", response_model=NovelResponse, operation_id="get_novel")
+@router.get("/{id}", response_model=NovelDetailResponse, operation_id="get_novel")
 def get_novel_route(
     session_user: SessionUser,
     repository_novel: RepositoryNovelDep,
+    binding_service: ServiceNovelBindingDep,
     id: str,
-) -> NovelResponse:
+) -> NovelDetailResponse:
     novel_return = repository_novel.get_by_id(id=id)
     if novel_return is None or novel_return.created_by != session_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Novel not found")
-    return to_novel_response(novel_return)
+    try:
+        novel_return, chapters = binding_service.get_detail(id)
+    except NovelBindingNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    return to_novel_detail_response(novel_return, chapters)
+
+
+@router.patch(
+    "/{id}/bind",
+    response_model=NovelSyncResponse,
+    operation_id="bind_novel",
+)
+def bind_novel_route(
+    session_user: SessionUser,
+    binding_service: ServiceNovelBindingDep,
+    id: str,
+    body: Annotated[NovelBindRequest, Body(...)],
+) -> NovelSyncResponse:
+    """Bind any scraping to an empty novel and clone its current chapters."""
+
+    try:
+        result = binding_service.bind(
+            id,
+            body.scraping_id,
+            updated_by=session_user.id,
+        )
+    except NovelBindingNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except NovelBindingConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except NovelBindingConcurrencyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail=str(exc),
+        ) from exc
+    return to_novel_sync_response(result)
+
+
+@router.patch(
+    "/{id}/sync",
+    response_model=NovelSyncResponse,
+    operation_id="sync_novel",
+)
+def sync_novel_route(
+    session_user: SessionUser,
+    binding_service: ServiceNovelBindingDep,
+    id: str,
+) -> NovelSyncResponse:
+    """Merge the latest bound scraping manifest and available content."""
+
+    try:
+        result = binding_service.sync(id, updated_by=session_user.id)
+    except NovelBindingNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except NovelBindingConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except NovelBindingConcurrencyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail=str(exc),
+        ) from exc
+    return to_novel_sync_response(result)
+
+
+@router.get(
+    "/{id}/chapters/{chapterId}",
+    response_model=NovelChapterContentResponse,
+    operation_id="get_novel_chapter",
+)
+def get_novel_chapter_route(
+    session_user: SessionUser,
+    binding_service: ServiceNovelBindingDep,
+    id: str,
+    chapter_id: Annotated[str, Path(alias="chapterId")],
+) -> NovelChapterContentResponse:
+    """Return a cloned chapter without applying an ownership constraint."""
+
+    del session_user
+    try:
+        chapter, content = binding_service.get_chapter_content(id, chapter_id)
+    except NovelBindingNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    return NovelChapterContentResponse(
+        **to_novel_chapter_summary(chapter).model_dump(),
+        content=content,
+    )
+
+
+@router.patch(
+    "/{id}/chapters/{chapterId}",
+    response_model=NovelChapterContentResponse,
+    operation_id="update_novel_chapter",
+)
+def update_novel_chapter_route(
+    session_user: SessionUser,
+    binding_service: ServiceNovelBindingDep,
+    id: str,
+    chapter_id: Annotated[str, Path(alias="chapterId")],
+    body: Annotated[NovelChapterUpdateRequest, Body(...)],
+) -> NovelChapterContentResponse:
+    """Replace cloned content without applying an ownership constraint."""
+
+    try:
+        chapter, content = binding_service.update_chapter_content(
+            id,
+            chapter_id,
+            body.content,
+            etag=body.etag,
+            updated_by=session_user.id,
+        )
+    except NovelBindingNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except NovelBindingConcurrencyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail=str(exc),
+        ) from exc
+    return NovelChapterContentResponse(
+        **to_novel_chapter_summary(chapter).model_dump(),
+        content=content,
+    )
 
 
 @router.put("/{id}", response_model=NovelResponse, operation_id="update_novel")
 def update_novel_route(
     session_user: SessionUser,
     repository_novel: RepositoryNovelDep,
-    provider_public_blob: ProviderPublicBlobDep,
     id: str,
-    title: Annotated[str | None, Form(min_length=1)] = None,
-    description: Annotated[str | None, Form()] = None,
-    language: Annotated[str | None, Form()] = None,
-    author: Annotated[str | None, Form()] = None,
-    tags: Annotated[str | None, Form()] = None,
-    notes: Annotated[str | None, Form()] = None,
-    status_value: Annotated[NovelStatus | None, Form(alias="status")] = None,
-    etag: Annotated[str | None, Form()] = None,
-    cover_image: Annotated[UploadFile | None, File(alias="coverImage")] = None,
-    clear_cover_image: Annotated[bool, Form()] = False,
+    body: Annotated[NovelUpdateRequest, Body(...)],
 ) -> NovelResponse:
     novel_existing = repository_novel.get_by_id(id=id)
     if novel_existing is None or novel_existing.created_by != session_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Novel not found")
 
-    supplied = {
-        "title": title,
-        "description": description,
-        "language": language,
-        "author": author,
-        "tags": tags,
-        "notes": notes,
-        "status": status_value,
-    }
-    if title is not None:
-        novel_existing.title = title
-    if description is not None:
-        novel_existing.description = _nullable_text(description)
-    if language is not None:
-        novel_existing.language = _nullable_text(language)
-    if author is not None:
-        novel_existing.author = _nullable_text(author)
-    if tags is not None:
-        novel_existing.tags = _parse_tags(tags)
-    if notes is not None:
-        novel_existing.notes = _nullable_text(notes)
-    if status_value is not None:
-        novel_existing.status = status_value
-    if cover_image is not None:
-        novel_existing.cover_image_url = _upload_cover(
-            provider_public_blob, novel_existing.id, cover_image
-        )
-    elif clear_cover_image:
-        novel_existing.cover_image_url = None
-
-    if (
-        not any(value is not None for value in supplied.values())
-        and cover_image is None
-        and not clear_cover_image
-    ):
+    supplied = body.model_fields_set - {"etag"}
+    if not supplied:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="At least one property is required",
         )
 
+    for field in supplied:
+        value = getattr(body, field)
+        if field == "tags":
+            value = list(value or [])
+        setattr(novel_existing, field, value)
+
     novel_existing.updated_at = datetime.now(UTC)
     novel_existing.updated_by = session_user.id
     try:
-        novel_return = repository_novel.update(novel_existing, etag)
+        novel_return = repository_novel.update(novel_existing, body.etag)
     except NovelConflictError as exc:
         raise HTTPException(
             status_code=status.HTTP_412_PRECONDITION_FAILED,
@@ -171,27 +271,3 @@ def delete_novel_route(
             detail="Novel has changed",
         ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-def _upload_cover(provider: ProviderPublicBlobDep, novel_id: str, cover_image: UploadFile) -> str:
-    try:
-        content = cover_image.file.read(1024 * 1024 + 1)
-        content_type = validate_cover_content(content, cover_image.content_type or "")
-        return provider.upload_cover(novel_id, content, content_type)
-    except BlobStorageError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
-
-
-def _nullable_text(value: str | None) -> str | None:
-    if value is None or value == "__null__":
-        return None
-    return value.strip() or None
-
-
-def _parse_tags(value: str | None) -> list[str]:
-    if not value:
-        return []
-    return [tag.strip() for tag in value.split(",") if tag.strip()]

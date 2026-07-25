@@ -36,6 +36,7 @@ class ScrapingRepository(Protocol):
         created_by: str | None,
         limit: int,
         continuation_token: str | None,
+        search: str | None = None,
     ) -> ScrapingPage: ...
 
     def queue_tasks(
@@ -153,17 +154,28 @@ class InMemoryScrapingRepository:
         created_by: str | None,
         limit: int,
         continuation_token: str | None,
+        search: str | None = None,
     ) -> ScrapingPage:
         try:
             offset = int(continuation_token or "0")
         except ValueError as exc:
             raise ScrapingContinuationTokenError("Invalid continuation token") from exc
 
+        normalized_search = (search or "").strip().casefold()
         with self._lock:
             items = [
                 deepcopy(scraping)
                 for (owner, _), scraping in self._scrapings.items()
                 if (created_by is None or owner == created_by)
+                and (
+                    not normalized_search
+                    or normalized_search in scraping.metadata.title.casefold()
+                    or (
+                        scraping.metadata.author is not None
+                        and normalized_search in scraping.metadata.author.casefold()
+                    )
+                    or normalized_search in scraping.source_url.casefold()
+                )
             ]
         items.sort(key=lambda item: (item.updated_at, item.id), reverse=True)
         page = items[offset : offset + limit]

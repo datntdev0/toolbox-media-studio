@@ -22,8 +22,6 @@ const toast = useToast()
 const state = reactive<Schema>({
   title: '', author: '', language: '', description: '', tags: '', notes: ''
 })
-const coverImage = ref<File | null>(null)
-const clearCoverImage = ref(false)
 
 function valueOf(value: unknown) {
   if (!value) return ''
@@ -61,34 +59,16 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       etag: props.novel.etag
     }
     const { updateNovel } = useApiClient()
-    validateCoverImage(coverImage.value)
-    const form = new FormData()
-    Object.entries(request).forEach(([key, value]) => form.set(key, Array.isArray(value) ? value.join(',') : value ? String(value) : '__null__'))
-    form.set('clear_cover_image', String(clearCoverImage.value))
-    if (coverImage.value) form.set('coverImage', coverImage.value)
-    const novel = await updateNovel(props.novel.id, form)
+    const novel = await updateNovel(props.novel.id, request)
     emit('updated', novel)
     toast.add({ title: 'Novel updated', description: `“${novel.title}” has been updated.`, color: 'success' })
     open.value = false
-    coverImage.value = null
-    clearCoverImage.value = false
   } catch {
     toast.add({ title: 'Unable to update novel', description: 'Please check the library service and try again.', color: 'error' })
   } finally {
     submitting.value = false
   }
 }
-
-function validateCoverImage(file: File | null) {
-  if (!file) return
-  if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 1024 * 1024) {
-    throw new Error('Cover image must be a JPEG or PNG no larger than 1 MB.')
-  }
-}
-
-watch(coverImage, (file) => {
-  if (file) clearCoverImage.value = false
-})
 </script>
 
 <template>
@@ -107,21 +87,6 @@ watch(coverImage, (file) => {
         @submit="onSubmit"
       >
         <div class="flex items-start gap-4">
-          <div class="w-48 shrink-0">
-            <UFormField label="Cover image" name="coverImage">
-              <UFileUpload
-                v-model="coverImage"
-                variant="area"
-                accept="image/jpeg,image/png"
-                label="Choose cover image"
-                description="max 1 MB"
-                :file-image="true"
-                :preview="true"
-                class="w-48 aspect-[2/3]"
-              />
-              <UCheckbox v-if="novel.coverImageUrl" v-model="clearCoverImage" label="Remove current cover" />
-            </UFormField>
-          </div>
           <div class="min-w-0 flex-1 space-y-4">
             <UFormField label="Title" name="title" required>
               <UInput v-model="state.title" class="w-full" autofocus />

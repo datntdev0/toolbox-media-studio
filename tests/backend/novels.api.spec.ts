@@ -11,7 +11,7 @@ test.describe('/api/novels CRUD', () => {
 
     const createdResponse = await request.post('/api/novels', {
       headers,
-      multipart: {
+      data: {
         title: 'Playwright Novel',
         description: 'Novel created from API spec test',
         language: 'en',
@@ -62,7 +62,7 @@ test.describe('/api/novels CRUD', () => {
 
     const updatedResponse = await request.put(`/api/novels/${created.id}`, {
       headers,
-      multipart: {
+      data: {
         title: 'Updated Playwright Novel',
         notes: 'Updated by Playwright API spec',
         status: 'active',

@@ -2,7 +2,7 @@
 import { breakpointsTailwind } from '@vueuse/core'
 import {
   ScrapingSummaryResponse,
-  type Anonymous8,
+  type Anonymous2,
   type CrawlerSummaryResponse,
   type ScrapingCreateResponse,
   type ScrapingDetailResponse
@@ -117,9 +117,9 @@ async function loadScrapings(options: { more?: boolean } = {}) {
   try {
     const { scrapings: client } = useApiClient()
     const token = options.more && continuationToken.value
-      ? continuationToken.value as unknown as Anonymous8
+      ? continuationToken.value as unknown as Anonymous2
       : undefined
-    const response = await client.list_scrapings(50, token)
+    const response = await client.list_scrapings(50, token, undefined)
     const incoming = response.items || []
 
     if (options.more) {

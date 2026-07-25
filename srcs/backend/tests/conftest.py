@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from app.providers.cache_provider import InMemoryCacheProvider
+from app.repositories.novel_chapter_repository import InMemoryNovelChapterRepository
 from app.repositories.novel_repository import InMemoryNovelRepository
 from app.repositories.scraping_repository import InMemoryScrapingRepository
 from app.repositories.scraping_result_repository import InMemoryScrapingResultRepository
@@ -197,6 +198,13 @@ def novel_repository() -> InMemoryNovelRepository:
 
 
 @pytest.fixture
+def novel_chapter_repository() -> InMemoryNovelChapterRepository:
+    """Shared in-memory novel chapters for a test app instance."""
+
+    return InMemoryNovelChapterRepository()
+
+
+@pytest.fixture
 def scraping_repository() -> InMemoryScrapingRepository:
     """Shared in-memory Scraping repository for a test app instance."""
 
@@ -249,6 +257,7 @@ def client(
     _env: None,
     user_repository: InMemoryUserRepository,
     novel_repository: InMemoryNovelRepository,
+    novel_chapter_repository: InMemoryNovelChapterRepository,
     scraping_repository: InMemoryScrapingRepository,
     scraping_result_repository: InMemoryScrapingResultRepository,
     queue_provider_factory: FakeQueueProviderFactory,
@@ -288,6 +297,7 @@ def client(
 
     service_provider.repository_user = user_repository
     service_provider.repository_novel = novel_repository
+    service_provider.repository_novel_chapter = novel_chapter_repository
     service_provider.repository_scraping = scraping_repository
     service_provider.repository_scraping_result = scraping_result_repository
     service_provider.provider_cache = cache_provider
