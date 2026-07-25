@@ -7,11 +7,12 @@ from hashlib import sha256
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Path, Query, Response, status
+from fastapi import APIRouter, File, Form, HTTPException, Path, Query, Response, UploadFile, status
 
 from app.core.injection import (
     PollingQueuePublisherDep,
     ProviderCacheDep,
+    ProviderPublicBlobDep,
     ProviderProxyDep,
     RealtimeHubDep,
     RepositoryScrapingDep,
@@ -44,6 +45,7 @@ from app.providers.crawler_provider import (
     UnknownCrawlerError,
     fetch_metadata,
 )
+from app.providers.blob_storage_provider import BlobStorageError, validate_cover_content
 from app.repositories.scraping_repository import (
     ScrapingChapterRangeError,
     ScrapingConflictError,
@@ -78,7 +80,7 @@ def create_scraping_route(
             source_url=body.source_url,
             cache_provider=provider_cache,
             proxy_provider=provider_proxy,
-            use_cache=False,
+            use_cache=True,
         )
     except UnknownCrawlerError as exc:
         raise HTTPException(
@@ -342,6 +344,57 @@ def get_scraping_route(
     return to_scraping_detail(scraping)
 
 
+@router.put(
+    "/{id}",
+    response_model=ScrapingDetailResponse,
+    operation_id="update_scraping",
+)
+def update_scraping_route(
+    session_user: SessionUser,
+    repository_scraping: RepositoryScrapingDep,
+    provider_public_blob: ProviderPublicBlobDep,
+    realtime_hub: RealtimeHubDep,
+    id: str,
+    title: Annotated[str, Form(min_length=1)],
+    author: Annotated[str | None, Form()] = None,
+    category: Annotated[str | None, Form()] = None,
+    updated_date: Annotated[str | None, Form(alias="updatedDate")] = None,
+    protagonists: Annotated[str | None, Form()] = None,
+    description: Annotated[str | None, Form()] = None,
+    cover_image: Annotated[UploadFile | None, File(alias="coverImage")] = None,
+    clear_cover_image: Annotated[bool, Form(alias="clearCoverImage")] = False,
+) -> ScrapingDetailResponse:
+    """Update the editable metadata and cover for a Scraping."""
+
+    del session_user
+    scraping = repository_scraping.get(id)
+    if scraping is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scraping not found")
+
+    metadata = scraping.metadata
+    metadata.title = title.strip()
+    metadata.author = _nullable_text(author)
+    metadata.category = _nullable_text(category)
+    metadata.updated_date = _nullable_text(updated_date)
+    metadata.protagonists = _parse_list(protagonists)
+    metadata.description = _nullable_text(description)
+    if cover_image is not None:
+        metadata.cover_image_url = _upload_cover(provider_public_blob, scraping.id, cover_image)
+    elif clear_cover_image:
+        metadata.cover_image_url = None
+    scraping.updated_at = datetime.now(UTC)
+
+    try:
+        updated = repository_scraping.update(scraping, etag=scraping.etag)
+    except ScrapingConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Scraping has changed") from exc
+    except ScrapingTooLargeError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+    realtime_hub.publish("scraping.updated", build_scraping_updated_payload(updated))
+    return to_scraping_detail(updated)
+
+
 @router.delete(
     "/{id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -433,3 +486,22 @@ def _idempotency_key(created_by: str, crawler_id: str, source_url: str) -> str:
 
 def _task_id(source_url: str) -> str:
     return f"sha256:{sha256(source_url.encode('utf-8')).hexdigest()}"
+
+
+def _upload_cover(provider: ProviderPublicBlobDep, scraping_id: str, cover_image: UploadFile) -> str:
+    try:
+        content = cover_image.file.read(1024 * 1024 + 1)
+        content_type = validate_cover_content(content, cover_image.content_type or "")
+        return provider.upload_cover(scraping_id, content, content_type)
+    except BlobStorageError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+
+def _nullable_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return value.strip() or None
+
+
+def _parse_list(value: str | None) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()] if value else []

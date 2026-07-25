@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
-import { NovelCreateRequest, type INovelCreateRequest, type NovelResponse } from '~~/shared/api-services/srv-core.client'
+import type { NovelResponse } from '~~/shared/api-services/srv-core.client'
 
 const emit = defineEmits<{ created: [novel: NovelResponse] }>()
 
@@ -36,7 +36,7 @@ function optional(value: string) {
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   submitting.value = true
   try {
-    const { novels } = useApiClient()
+    const { createNovel } = useApiClient()
     const request = {
       title: event.data.title.trim(),
       author: optional(event.data.author),
@@ -46,7 +46,10 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       notes: optional(event.data.notes)
     }
     validateCoverImage(coverImage.value)
-    const novel = await novels.create_novel(new NovelCreateRequest(request as unknown as INovelCreateRequest), coverImage.value)
+    const form = new FormData()
+    Object.entries(request).forEach(([key, value]) => form.set(key, Array.isArray(value) ? value.join(',') : value ? String(value) : '__null__'))
+    if (coverImage.value) form.set('coverImage', coverImage.value)
+    const novel = await createNovel(form)
 
     emit('created', novel)
     toast.add({ title: 'Novel created', description: `“${novel.title}” has been added to your library.`, color: 'success' })

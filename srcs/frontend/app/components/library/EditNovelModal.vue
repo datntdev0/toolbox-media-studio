@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
-import { NovelUpdateRequest, type INovelUpdateRequest, type NovelResponse } from '~~/shared/api-services/srv-core.client'
+import type { NovelResponse } from '~~/shared/api-services/srv-core.client'
 
 const props = defineProps<{ novel: NovelResponse }>()
 const emit = defineEmits<{ updated: [novel: NovelResponse] }>()
@@ -60,14 +60,13 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       notes: optional(event.data.notes),
       etag: props.novel.etag
     }
-    const { novels } = useApiClient()
+    const { updateNovel } = useApiClient()
     validateCoverImage(coverImage.value)
-    const novel = await novels.update_novel(
-      props.novel.id,
-      new NovelUpdateRequest(request as unknown as INovelUpdateRequest),
-      coverImage.value,
-      clearCoverImage.value
-    )
+    const form = new FormData()
+    Object.entries(request).forEach(([key, value]) => form.set(key, Array.isArray(value) ? value.join(',') : value ? String(value) : '__null__'))
+    form.set('clear_cover_image', String(clearCoverImage.value))
+    if (coverImage.value) form.set('coverImage', coverImage.value)
+    const novel = await updateNovel(props.novel.id, form)
     emit('updated', novel)
     toast.add({ title: 'Novel updated', description: `“${novel.title}” has been updated.`, color: 'success' })
     open.value = false

@@ -206,6 +206,10 @@ class CosmosScrapingRepository:
         ensure_scraping_size(scraping)
         return self._replace(scraping, etag=etag or scraping.etag)
 
+    def update(self, scraping: Scraping, *, etag: str | None = None) -> Scraping:
+        ensure_scraping_size(scraping)
+        return self._replace(scraping, etag=etag or scraping.etag)
+
     def claim_task(
         self,
         id: str,

@@ -120,8 +120,8 @@ async function deleteNovel(novel: NovelResponse) {
 
   deletingNovelId.value = novel.id
   try {
-    const { novels: novelsClient } = useApiClient()
-    await novelsClient.delete_novel(novel.id)
+    const { deleteNovel } = useApiClient()
+    await deleteNovel(novel.id)
     onNovelDeleted(novel.id)
     toast.add({ title: 'Novel deleted', description: `“${novel.title}” has been removed.`, color: 'success' })
   } catch {

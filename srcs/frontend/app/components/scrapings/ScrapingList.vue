@@ -22,6 +22,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [id: string]
   delete: [scraping: ScrapingSummaryResponse]
+  edit: [scraping: ScrapingSummaryResponse]
   create: []
   retry: []
   loadMore: []
@@ -58,6 +59,12 @@ function sourceLabel(scraping: ScrapingSummaryResponse) {
 
 function activityMeta(scraping: ScrapingSummaryResponse) {
   return scrapingActivityMeta(scraping.progress)
+}
+
+function coverImageSrc(scraping: ScrapingSummaryResponse) {
+  if (!scraping.coverImageUrl) return ''
+  const separator = String(scraping.coverImageUrl).includes('?') ? '&' : '?'
+  return `${scraping.coverImageUrl}${separator}v=${new Date(scraping.updatedAt).getTime()}`
 }
 
 function focusSelected() {
@@ -183,7 +190,7 @@ defineExpose({ focusSelected, focusRow })
             role="option"
             :aria-selected="selectedId === scraping.id"
             :aria-label="`${scraping.title}, ${activityMeta(scraping).label}, ${scraping.progress.completed} of ${scraping.progress.total} chapters`"
-            class="flex w-full cursor-pointer gap-3 p-4 pe-12 text-left focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:ps-5"
+            class="flex w-full cursor-pointer gap-3 p-4 pe-20 text-left focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:ps-5"
             @click="select(scraping.id)"
             @keydown.down.prevent="moveSelection(1)"
             @keydown.up.prevent="moveSelection(-1)"
@@ -191,7 +198,7 @@ defineExpose({ focusSelected, focusRow })
             <div class="flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden rounded bg-primary/10">
               <img
                 v-if="scraping.coverImageUrl && !failedCovers.has(scraping.id)"
-                :src="String(scraping.coverImageUrl)"
+                :src="coverImageSrc(scraping)"
                 :alt="`${scraping.title} cover`"
                 class="size-full object-cover"
                 @error="failedCovers.add(scraping.id)"
@@ -245,20 +252,10 @@ defineExpose({ focusSelected, focusRow })
             </div>
           </button>
 
-          <UTooltip text="Delete scraping">
-            <UButton
-              icon="lucide:trash-2"
-              color="error"
-              variant="ghost"
-              size="xs"
-              class="absolute end-3 top-3 opacity-70 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-              :aria-label="`Delete ${scraping.title}`"
-              :loading="deletingId === scraping.id"
-              :disabled="Boolean(deletingId && deletingId !== scraping.id)"
-              @click.stop="emit('delete', scraping)"
-              @keydown.stop
-            />
-          </UTooltip>
+          <div class="absolute end-3 top-3 flex opacity-70 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <UTooltip text="Edit scraping"><UButton icon="lucide:pencil" color="neutral" variant="ghost" size="xs" :aria-label="`Edit ${scraping.title}`" :disabled="Boolean(deletingId)" @click.stop="emit('edit', scraping)" @keydown.stop /></UTooltip>
+            <UTooltip text="Delete scraping"><UButton icon="lucide:trash-2" color="error" variant="ghost" size="xs" :aria-label="`Delete ${scraping.title}`" :loading="deletingId === scraping.id" :disabled="Boolean(deletingId && deletingId !== scraping.id)" @click.stop="emit('delete', scraping)" @keydown.stop /></UTooltip>
+          </div>
         </div>
 
         <div v-if="canLoadMore" class="flex justify-center p-4">

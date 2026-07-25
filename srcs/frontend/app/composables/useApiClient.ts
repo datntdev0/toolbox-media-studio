@@ -2,7 +2,9 @@ import {
   AuthClient,
   CrawlersClient,
   NovelsClient,
+  NovelResponse,
   ScrapingsClient,
+  ScrapingDetailResponse,
   UsersClient
 } from '~~/shared/api-services/srv-core.client'
 
@@ -33,6 +35,29 @@ export function useApiClient() {
     users: new UsersClient(baseUrl, http),
     novels: new NovelsClient(baseUrl, http),
     crawlers: new CrawlersClient(baseUrl, http),
-    scrapings: new ScrapingsClient(baseUrl, http)
+    scrapings: new ScrapingsClient(baseUrl, http),
+    async createNovel(form: FormData) {
+      const response = await http.fetch(`${baseUrl}/api/novels`, { method: 'POST', body: form, headers: { Accept: 'application/json' } })
+      if (!response.ok) throw new Error('Unable to create novel')
+      return NovelResponse.fromJS(await response.json())
+    },
+    async updateNovel(id: string, form: FormData) {
+      const response = await http.fetch(`${baseUrl}/api/novels/${encodeURIComponent(id)}`, { method: 'PUT', body: form, headers: { Accept: 'application/json' } })
+      if (!response.ok) throw new Error('Unable to update novel')
+      return NovelResponse.fromJS(await response.json())
+    },
+    async deleteNovel(id: string) {
+      const response = await http.fetch(`${baseUrl}/api/novels/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('Unable to delete novel')
+    },
+    async updateScraping(id: string, form: FormData) {
+      const response = await http.fetch(`${baseUrl}/api/scrapings/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: form,
+        headers: { Accept: 'application/json' }
+      })
+      if (!response.ok) throw new Error('Unable to update scraping')
+      return ScrapingDetailResponse.fromJS(await response.json())
+    }
   }
 }

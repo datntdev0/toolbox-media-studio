@@ -122,6 +122,45 @@ def test_list_and_detail_return_summaries_and_embedded_tasks(
     assert "lastError" not in detail.json()
 
 
+def test_update_replaces_editable_scraping_metadata(
+    client: TestClient,
+    flaresolverr_client: Any,
+    scraping_repository: InMemoryScrapingRepository,
+) -> None:
+    flaresolverr_client.html = METADATA_HTML
+    token = _login(client)
+    created = _create(client, token)
+
+    updated = client.put(
+        f"/api/scrapings/{created['id']}",
+        headers=_headers(token),
+        data={
+            "title": "Edited Novel",
+            "author": "Edited Author",
+            "category": "Science Fiction",
+            "updatedDate": "2026-07-25",
+            "protagonists": "Ari, Bea",
+            "description": "Edited description",
+        },
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["metadata"] == {
+        "sourceNovelId": "0603625457",
+        "title": "Edited Novel",
+        "author": "Edited Author",
+        "category": "Science Fiction",
+        "updatedDate": "2026-07-25",
+        "protagonists": ["Ari", "Bea"],
+        "description": "Edited description",
+        "coverImageUrl": "https://www.novel543.com/cover.jpg",
+        "fetchedAt": updated.json()["metadata"]["fetchedAt"],
+    }
+    stored = scraping_repository.get(created["id"], _admin_id(client, token))
+    assert stored is not None
+    assert stored.metadata.title == "Edited Novel"
+
+
 def test_duplicate_create_refreshes_metadata_and_appends_new_chapters(
     client: TestClient,
     flaresolverr_client: Any,

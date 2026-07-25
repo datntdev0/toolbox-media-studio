@@ -57,6 +57,8 @@ class ScrapingRepository(Protocol):
         etag: str | None = None,
     ) -> Scraping: ...
 
+    def update(self, scraping: Scraping, *, etag: str | None = None) -> Scraping: ...
+
     def claim_task(
         self,
         id: str,
@@ -234,6 +236,16 @@ class InMemoryScrapingRepository:
                 scraping.etag = self._next_etag()
                 ensure_scraping_size(scraping)
             return deepcopy(scraping)
+
+    def update(self, scraping: Scraping, *, etag: str | None = None) -> Scraping:
+        with self._lock:
+            stored = self._require(scraping.id, scraping.created_by)
+            self._check_etag(stored, etag)
+            updated = deepcopy(scraping)
+            updated.etag = self._next_etag()
+            ensure_scraping_size(updated)
+            self._scrapings[(updated.created_by, updated.id)] = updated
+            return deepcopy(updated)
 
     def claim_task(
         self,

@@ -9,7 +9,8 @@ import {
 } from '~~/shared/api-services/srv-core.client'
 
 definePageMeta({
-  title: 'Scrapings'
+  title: 'Scrapings',
+  middleware: ['auth']
 })
 
 useHead({ title: 'Scrapings' })
@@ -29,7 +30,9 @@ const continuationToken = ref<string | null>(null)
 const loading = ref(true)
 const loadingMore = ref(false)
 const listError = ref(false)
-const newScrapingOpen = ref(false)
+const createScrapingOpen = ref(false)
+const editScrapingOpen = ref(false)
+const editingScrapingId = ref<string | null>(null)
 const crawlerNames = ref<Record<string, string>>({})
 const listRef = ref<{ focusSelected: () => void, focusRow: (id: string) => void } | null>(null)
 const detailRef = ref<{ refresh: () => void } | null>(null)
@@ -260,6 +263,17 @@ function onDetailUpdated(detail: ScrapingDetailResponse) {
     })
   ], true)
 }
+
+function editScraping(scraping: ScrapingSummaryResponse) {
+  editingScrapingId.value = scraping.id
+  editScrapingOpen.value = true
+}
+
+async function onScrapingEdited(detail: ScrapingDetailResponse) {
+  onDetailUpdated(detail)
+  await loadScrapings()
+  if (selectedId.value === detail.id) detailRef.value?.refresh()
+}
 </script>
 
 <template>
@@ -275,7 +289,8 @@ function onDetailUpdated(detail: ScrapingDetailResponse) {
     :deleting-id="deletingId"
     @select="selectScraping"
     @delete="deleteScraping"
-    @create="newScrapingOpen = true"
+    @edit="editScraping"
+    @create="createScrapingOpen = true"
     @retry="loadScrapings()"
     @load-more="loadScrapings({ more: true })"
   />
@@ -323,9 +338,15 @@ function onDetailUpdated(detail: ScrapingDetailResponse) {
     </USlideover>
   </ClientOnly>
 
-  <ScrapingsNewScrapingModal
-    v-model:open="newScrapingOpen"
+  <ScrapingsCreateScrapingModal
+    v-model:open="createScrapingOpen"
     @created="onCreated"
     @crawlers-loaded="setCrawlerNames"
+  />
+
+  <ScrapingsEditScrapingModal
+    v-model:open="editScrapingOpen"
+    :scraping-id="editingScrapingId"
+    @updated="onScrapingEdited"
   />
 </template>
