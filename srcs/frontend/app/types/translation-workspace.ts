@@ -72,6 +72,7 @@ export interface TranslationChapter {
 
 export interface TranslationWorkspace {
   id: string
+  name: string
   novelId: string
   novelTitle: string
   coverImageUrl: string | null
@@ -82,4 +83,31 @@ export interface TranslationWorkspace {
   configuration: TranslationConfiguration | null
   chapters: TranslationChapter[]
   updatedAt: string
+  etag: string | null
+}
+
+export interface WorkspaceNovelApiRecord {
+  id: string
+  title: string
+  coverImageUrl?: string | null
+  language?: string | null
+  chapterCount?: number
+}
+
+export interface WorkspaceApiRecord {
+  id: string
+  name: string
+  kind: 'translation' | 'audio' | 'video'
+  novelId: string
+  targetLanguage: string
+  status: TranslationWorkspaceStatus
+  novel?: WorkspaceNovelApiRecord | null
+  createdAt: string
+  updatedAt: string
+  etag?: string | null
+}
+
+export interface WorkspaceListApiRecord {
+  items: WorkspaceApiRecord[]
+  continuationToken?: string | null
 }

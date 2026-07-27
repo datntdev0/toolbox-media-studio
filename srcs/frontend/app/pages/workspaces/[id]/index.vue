@@ -3,12 +3,7 @@ import type {
   TranslationChapter,
   TranslationWorkspace
 } from '~/types/translation-workspace'
-import {
-  findTranslationWorkspace,
-  translationLanguages,
-  translationNovels,
-  translationWorkspaces
-} from '~/utils/translation-workspace-fixtures'
+import type { NovelChapterContent } from '~/types/novel-workspace'
 
 definePageMeta({
   title: 'Translation workspace',
@@ -18,6 +13,13 @@ definePageMeta({
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const loading = ref(true)
+const loadError = ref<unknown>()
+const workspace = ref<TranslationWorkspace | null>(null)
+const translationChapterIds = ref(new Set<string>())
+const sourceContentChapterIds = ref(new Set<string>())
+const originalLoading = ref(false)
+const originalLoadError = ref(false)
 const chaptersOpen = ref(false)
 const rangeStart = ref('')
 const rangeEnd = ref('')
@@ -27,33 +29,44 @@ const comparisonRef = ref<{
 } | null>(null)
 
 const workspaceId = computed(() => String(route.params.id || ''))
-const workspace = computed<TranslationWorkspace | null>(() => {
-  const existing = findTranslationWorkspace(workspaceId.value)
-  if (existing) return existing
-  if (workspaceId.value !== 'prototype-new') return null
 
-  const novelId = typeof route.query.novel === 'string' ? route.query.novel : ''
-  const languageCode = typeof route.query.language === 'string' ? route.query.language : ''
-  const novel = translationNovels.find(item => item.id === novelId) || translationNovels[3]!
-  const target = translationLanguages.find(language => language.code === languageCode)
-    || translationLanguages[3]!
-  const template = translationWorkspaces.find(item => item.status === 'needs_setup')!
+async function loadWorkspace() {
+  loading.value = true
+  loadError.value = undefined
+  try {
+    const loadedWorkspace = await useTranslationWorkspaceApi().get(workspaceId.value)
+    const novel = await useNovelWorkspaceApi().getNovel(loadedWorkspace.novelId)
+    const translationChapters = new Map(
+      loadedWorkspace.chapters.map(chapter => [chapter.id, chapter])
+    )
 
-  return {
-    ...template,
-    id: 'prototype-new',
-    novelId: novel.id,
-    novelTitle: novel.title,
-    coverImageUrl: novel.coverImageUrl,
-    sourceLanguage: novel.sourceLanguage,
-    targetLanguage: target,
-    progress: {
-      ...template.progress,
-      total: novel.chapterCount
-    },
-    chapters: template.chapters.slice(0, novel.chapterCount)
+    translationChapterIds.value = new Set(translationChapters.keys())
+    sourceContentChapterIds.value = new Set(
+      novel.chapters
+        .filter(chapter => chapter.contentAvailable)
+        .map(chapter => chapter.id)
+    )
+    loadedWorkspace.chapters = novel.chapters.map((sourceChapter, index) => {
+      const translationChapter = translationChapters.get(sourceChapter.id)
+      return {
+        id: sourceChapter.id,
+        number: sourceChapter.chapterNumber ?? index + 1,
+        title: sourceChapter.title,
+        status: translationChapter?.status ?? 'not_started',
+        originalParagraphs: [],
+        translatedParagraphs: translationChapter?.translatedParagraphs ?? []
+      }
+    })
+    workspace.value = loadedWorkspace
+  } catch (cause) {
+    loadError.value = cause
+    workspace.value = null
+  } finally {
+    loading.value = false
   }
-})
+}
+
+onMounted(() => void loadWorkspace())
 
 const selectedChapterId = computed(() => {
   const value = route.query.chapter
@@ -67,10 +80,51 @@ const selectedChapter = computed(() =>
     ? workspace.value?.chapters[selectedIndex.value] || null
     : workspace.value?.chapters[0] || null
 )
+const translationAvailable = computed(() =>
+  selectedChapter.value
+    ? translationChapterIds.value.has(selectedChapter.value.id)
+    : false
+)
+
+function applyOriginalContent(chapter: TranslationChapter, content: NovelChapterContent) {
+  chapter.originalParagraphs = content.content
+    .split(/\n\s*\n/g)
+    .map(paragraph => paragraph.trim())
+    .filter(Boolean)
+}
+
+watch(() => selectedChapter.value?.id, async (chapterId) => {
+  originalLoading.value = false
+  originalLoadError.value = false
+  if (!chapterId || !workspace.value) return
+
+  const chapter = workspace.value.chapters.find(item => item.id === chapterId)
+  if (
+    !chapter
+    || chapter.originalParagraphs.length
+    || !sourceContentChapterIds.value.has(chapterId)
+  ) return
+
+  originalLoading.value = true
+  try {
+    const content = await useNovelWorkspaceApi().getChapter(workspace.value.novelId, chapterId)
+    if (selectedChapter.value?.id === chapterId) {
+      applyOriginalContent(chapter, content)
+    }
+  } catch {
+    if (selectedChapter.value?.id === chapterId) {
+      originalLoadError.value = true
+    }
+  } finally {
+    if (selectedChapter.value?.id === chapterId) {
+      originalLoading.value = false
+    }
+  }
+}, { immediate: true })
 
 useHead(() => ({
   title: workspace.value
-    ? `${workspace.value.novelTitle} · ${workspace.value.targetLanguage.label}`
+    ? `${workspace.value.name} · ${workspace.value.targetLanguage.label}`
     : 'Translation workspace'
 }))
 
@@ -141,7 +195,7 @@ function showPrototypeAction(action: 'start' | 'stop') {
 
 <template>
   <UDashboardPanel id="translation-workspace">
-    <UDashboardNavbar :title="workspace?.novelTitle || 'Translation workspace'">
+    <UDashboardNavbar :title="workspace?.name || 'Translation workspace'">
       <template #leading>
         <UDashboardSidebarCollapse />
       </template>
@@ -158,7 +212,33 @@ function showPrototypeAction(action: 'start' | 'stop') {
       </template>
     </UDashboardNavbar>
 
-    <UDashboardToolbar v-if="workspace" :ui="{ root: 'items-start gap-6 py-5', left: 'min-w-0 flex-1 self-stretch', right: 'min-w-0 flex-1 self-stretch' }">
+    <div v-if="loading" class="p-6">
+      <USkeleton class="h-64 rounded-xl" />
+    </div>
+
+    <UAlert
+      v-else-if="loadError"
+      class="m-6"
+      color="error"
+      variant="subtle"
+      icon="lucide:circle-alert"
+      title="Unable to load workspace"
+      description="The workspace could not be found or the service is unavailable."
+      :actions="[{
+        label: 'Back to Workspaces',
+        icon: 'lucide:arrow-left',
+        to: '/workspaces'
+      }]"
+    />
+
+    <UDashboardToolbar
+      v-if="workspace"
+      :ui="{
+        root: 'items-start gap-6 py-5',
+        left: 'min-w-0 flex-1 self-stretch items-start',
+        right: 'min-w-0 flex-1 self-stretch items-start'
+      }"
+    >
       <template #left>
         <section aria-labelledby="novel-info-heading" class="w-full">
           <div class="mb-3 flex items-center justify-between">
@@ -188,7 +268,7 @@ function showPrototypeAction(action: 'start' | 'stop') {
               <h1 class="text-lg font-semibold text-highlighted">
                 {{ workspace.novelTitle }}
               </h1>
-              <dl class="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+              <dl class="grid grid-cols-3 gap-x-3 gap-y-2 text-sm">
                 <div>
                   <dt class="text-xs text-muted">
                     Source language
@@ -207,14 +287,6 @@ function showPrototypeAction(action: 'start' | 'stop') {
                 </div>
                 <div>
                   <dt class="text-xs text-muted">
-                    Status
-                  </dt>
-                  <dd class="capitalize text-toned">
-                    {{ workspace.status.replace('_', ' ') }}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-xs text-muted">
                     Chapters
                   </dt>
                   <dd class="text-toned">
@@ -222,26 +294,8 @@ function showPrototypeAction(action: 'start' | 'stop') {
                   </dd>
                 </div>
               </dl>
-              <div class="flex flex-wrap gap-1.5">
-                <UBadge
-                  label="Translation"
-                  icon="lucide:languages"
-                  color="neutral"
-                  variant="subtle"
-                  size="sm"
-                />
-                <UBadge
-                  :label="workspace.targetLanguage.nativeLabel"
-                  color="neutral"
-                  variant="subtle"
-                  size="sm"
-                />
-              </div>
             </div>
           </div>
-          <p class="mt-3 line-clamp-4 text-sm/6 text-muted">
-            Compare the original novel chapters with their {{ workspace.targetLanguage.label }} translation.
-          </p>
         </section>
       </template>
 
@@ -262,9 +316,13 @@ function showPrototypeAction(action: 'start' | 'stop') {
       ref="comparisonRef"
       :workspace="workspace"
       :chapter="selectedChapter"
+      :translation-available="translationAvailable"
+      :original-loading="originalLoading"
+      :original-load-error="originalLoadError"
       :can-previous="selectedIndex > 0"
       :can-next="selectedIndex < workspace.chapters.length - 1"
       @chapters="chaptersOpen = true"
+      @configure="openConfiguration"
       @navigate="navigateChapter"
     />
   </UDashboardPanel>

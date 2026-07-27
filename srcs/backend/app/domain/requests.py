@@ -1,12 +1,16 @@
 """Inbound request bodies."""
 
 from datetime import UTC, datetime
+from typing import Annotated
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, model_validator
 
 from app.domain.novels import Novel, NovelStatus
 from app.domain.users import User, UserRole, UserStatus
+from app.domain.workspaces import Workspace, WorkspaceKind, WorkspaceStatus
+
+NonBlankStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class LoginRequest(BaseModel):
@@ -84,6 +88,28 @@ class NovelUpdateRequest(BaseModel):
         return self
 
 
+class WorkspaceCreateRequest(BaseModel):
+    """Payload for creating a workspace."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    name: NonBlankStr
+    kind: WorkspaceKind
+    novel_id: NonBlankStr = Field(alias="novelId")
+    target_language: NonBlankStr = Field(alias="targetLanguage")
+
+
+class WorkspaceUpdateRequest(BaseModel):
+    """Editable workspace values."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    name: NonBlankStr
+    novel_id: NonBlankStr = Field(alias="novelId")
+    target_language: NonBlankStr = Field(alias="targetLanguage")
+    etag: str | None = None
+
+
 def to_user_entity(body: UserCreateRequest) -> User:
     """Convert a UserCreateRequest to a User entity."""
 
@@ -118,6 +144,24 @@ def to_novel_entity(body: NovelCreateRequest, created_by: str) -> Novel:
         tags=list(body.tags or []),
         notes=body.notes,
         status=NovelStatus.DRAFT,
+        created_by=created_by,
+        created_at=now,
+        updated_by=created_by,
+        updated_at=now,
+    )
+
+
+def to_workspace_entity(body: WorkspaceCreateRequest, created_by: str) -> Workspace:
+    """Convert a WorkspaceCreateRequest to a Workspace entity."""
+
+    now = datetime.now(UTC)
+    return Workspace(
+        id=str(uuid4()),
+        name=body.name.strip(),
+        kind=body.kind,
+        novel_id=body.novel_id,
+        target_language=body.target_language.strip(),
+        status=WorkspaceStatus.NEEDS_SETUP,
         created_by=created_by,
         created_at=now,
         updated_by=created_by,

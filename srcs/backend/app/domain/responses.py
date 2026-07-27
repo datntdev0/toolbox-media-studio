@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.novels import Novel, NovelBinding, NovelChapter, NovelStatus, NovelSyncResult
 from app.domain.users import User, UserRole, UserStatus
+from app.domain.workspaces import Workspace, WorkspaceKind, WorkspaceStatus
 
 
 class TokenResponse(BaseModel):
@@ -124,6 +125,32 @@ class NovelSyncResponse(BaseModel):
     changes: NovelSyncChangesResponse
 
 
+class WorkspaceResponse(BaseModel):
+    """Workspace payload enriched with the current bound novel."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    name: str
+    kind: WorkspaceKind
+    novel_id: str = Field(alias="novelId")
+    target_language: str = Field(alias="targetLanguage")
+    status: WorkspaceStatus
+    novel: NovelResponse | None = None
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")
+    etag: str | None = None
+
+
+class WorkspaceListResponse(BaseModel):
+    """Paged workspace list response."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    items: list[WorkspaceResponse]
+    continuation_token: str | None = Field(default=None, alias="continuationToken")
+
+
 def to_user_response(current_user: User) -> UserResponse:
     """Convert a User domain model to a UserResponse model."""
 
@@ -208,6 +235,26 @@ def to_novel_sync_response(result: NovelSyncResult) -> NovelSyncResponse:
             preserved=result.preserved,
             removed=result.removed,
         ),
+    )
+
+
+def to_workspace_response(
+    workspace: Workspace,
+    novel: Novel | None,
+) -> WorkspaceResponse:
+    """Convert a workspace and its live novel reference to an API response."""
+
+    return WorkspaceResponse(
+        id=workspace.id,
+        name=workspace.name,
+        kind=workspace.kind,
+        novel_id=workspace.novel_id,
+        target_language=workspace.target_language,
+        status=workspace.status,
+        novel=to_novel_response(novel) if novel is not None else None,
+        created_at=workspace.created_at,
+        updated_at=workspace.updated_at,
+        etag=workspace.etag,
     )
 
 

@@ -1,74 +1,68 @@
 <script setup lang="ts">
-import type { TranslationWorkspace } from '~/types/translation-workspace'
-import {
-  translationLanguages,
-  translationNovels
-} from '~/utils/translation-workspace-fixtures'
+import type { NovelResponse } from '~~/shared/api-services/srv-core.client'
+import type { WorkspaceApiRecord } from '~/types/translation-workspace'
+import { SUPPORTED_LANGUAGES, resolveLanguage } from '~/constants/supported-languages'
 
-const props = defineProps<{ workspaces: TranslationWorkspace[] }>()
+const props = defineProps<{ novels: NovelResponse[] }>()
+const emit = defineEmits<{ created: [workspace: WorkspaceApiRecord] }>()
 const open = defineModel<boolean>('open', { default: false })
 const router = useRouter()
-
+const toast = useToast()
+const name = ref('')
 const selectedNovelId = ref<string>()
 const selectedLanguageCode = ref<string>()
+const submitting = ref(false)
 
-const novelItems = translationNovels.map(novel => ({
+const novelItems = computed(() => props.novels.map(novel => ({
   label: novel.title,
   value: novel.id,
-  description: `${novel.sourceLanguage.label} · ${novel.chapterCount} chapters`,
+  description: `${resolveLanguage(String(novel.language || '')).label} · ${Number(novel.chapterCount || 0)} chapters`,
   icon: 'lucide:book-open'
-}))
-
+})))
 const selectedNovel = computed(() =>
-  translationNovels.find(novel => novel.id === selectedNovelId.value) || null
+  props.novels.find(novel => novel.id === selectedNovelId.value) || null
 )
-
-const languageItems = computed(() => translationLanguages
-  .filter(language => language.code !== selectedNovel.value?.sourceLanguage.code)
-  .map(language => ({
-    label: language.label,
-    value: language.code,
-    description: language.nativeLabel
-  }))
-)
-
-const duplicate = computed(() => props.workspaces.find(workspace =>
-  workspace.novelId === selectedNovelId.value
-  && workspace.targetLanguage.code === selectedLanguageCode.value
-))
-
-watch(selectedNovelId, () => {
-  if (
-    selectedLanguageCode.value
-    && selectedLanguageCode.value === selectedNovel.value?.sourceLanguage.code
-  ) {
-    selectedLanguageCode.value = undefined
-  }
-})
+const languageItems = SUPPORTED_LANGUAGES.map(language => ({
+  label: language.label,
+  value: language.code,
+  description: language.nativeLabel
+}))
 
 watch(open, (value) => {
   if (!value) {
+    name.value = ''
     selectedNovelId.value = undefined
     selectedLanguageCode.value = undefined
   }
 })
 
 async function submit() {
-  if (duplicate.value) {
+  const workspaceName = name.value.trim()
+  if (!workspaceName || !selectedNovel.value || !selectedLanguageCode.value) return
+  submitting.value = true
+  try {
+    const workspace = await useTranslationWorkspaceApi().create({
+      name: workspaceName,
+      novelId: selectedNovel.value.id,
+      targetLanguage: selectedLanguageCode.value
+    })
+    emit('created', workspace)
     open.value = false
-    await router.push(`/workspaces/${duplicate.value.id}`)
-    return
+    toast.add({
+      title: 'Workspace created',
+      description: `“${workspace.name}” is ready for setup.`,
+      color: 'success'
+    })
+    await router.push(`/workspaces/${workspace.id}`)
+  } catch (error) {
+    toast.add({
+      title: 'Unable to create workspace',
+      description: error instanceof Error ? error.message : 'Please try again.',
+      color: 'error'
+    })
+  } finally {
+    submitting.value = false
   }
-  if (!selectedNovel.value || !selectedLanguageCode.value) return
-
-  open.value = false
-  await router.push({
-    path: '/workspaces/prototype-new',
-    query: {
-      novel: selectedNovel.value.id,
-      language: selectedLanguageCode.value
-    }
-  })
 }
 </script>
 
@@ -76,11 +70,21 @@ async function submit() {
   <UModal
     v-model:open="open"
     title="New translation project"
-    description="Choose a novel and its permanent target language."
+    description="Name the workspace, then choose its novel and target language."
     :ui="{ content: 'sm:max-w-2xl' }"
   >
     <template #body>
       <div class="space-y-6">
+        <UFormField label="Workspace name" required>
+          <UInput
+            v-model="name"
+            placeholder="Vietnamese translation"
+            icon="lucide:folder-pen"
+            class="w-full"
+            autofocus
+          />
+        </UFormField>
+
         <UFormField label="Project type" required>
           <button
             type="button"
@@ -118,7 +122,7 @@ async function submit() {
 
         <UFormField
           label="Target language"
-          description="The target language cannot be changed after project creation."
+          description="You can change the target language later."
           required
         >
           <USelectMenu
@@ -128,19 +132,9 @@ async function submit() {
             label-key="label"
             placeholder="Select target language"
             icon="lucide:globe-2"
-            :disabled="!selectedNovelId"
             class="w-full"
           />
         </UFormField>
-
-        <UAlert
-          v-if="duplicate"
-          color="warning"
-          variant="subtle"
-          icon="lucide:copy-check"
-          title="This translation project already exists"
-          :description="`${duplicate.novelTitle} already has a ${duplicate.targetLanguage.label} workspace.`"
-        />
       </div>
     </template>
 
@@ -161,9 +155,10 @@ async function submit() {
             @click="open = false"
           />
           <UButton
-            :label="duplicate ? 'Open existing project' : 'Create project'"
-            :icon="duplicate ? 'lucide:arrow-up-right' : 'lucide:plus'"
-            :disabled="!selectedNovelId || !selectedLanguageCode"
+            label="Create project"
+            icon="lucide:plus"
+            :disabled="!name.trim() || !selectedNovelId || !selectedLanguageCode"
+            :loading="submitting"
             @click="submit"
           />
         </div>

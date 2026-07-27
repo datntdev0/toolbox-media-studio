@@ -1,11 +1,5 @@
 <script setup lang="ts">
 import type { TranslationWorkspace } from '~/types/translation-workspace'
-import {
-  findTranslationWorkspace,
-  translationLanguages,
-  translationNovels,
-  translationWorkspaces
-} from '~/utils/translation-workspace-fixtures'
 
 definePageMeta({
   title: 'Translation configuration',
@@ -16,36 +10,62 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const previewValid = ref(true)
+const loading = ref(true)
+const loadError = ref<unknown>()
 const workspaceId = computed(() => String(route.params.id || ''))
-
-const workspace = computed<TranslationWorkspace | null>(() => {
-  const existing = findTranslationWorkspace(workspaceId.value)
-  if (existing) return existing
-  if (workspaceId.value !== 'prototype-new') return null
-
-  const novelId = typeof route.query.novel === 'string' ? route.query.novel : ''
-  const languageCode = typeof route.query.language === 'string' ? route.query.language : ''
-  const novel = translationNovels.find(item => item.id === novelId) || translationNovels[3]!
-  const target = translationLanguages.find(language => language.code === languageCode)
-    || translationLanguages[3]!
-  const template = translationWorkspaces.find(item => item.status === 'needs_setup')!
-
-  return {
-    ...template,
-    id: 'prototype-new',
-    novelId: novel.id,
-    novelTitle: novel.title,
-    coverImageUrl: novel.coverImageUrl,
-    sourceLanguage: novel.sourceLanguage,
-    targetLanguage: target,
-    progress: { ...template.progress, total: novel.chapterCount },
-    chapters: template.chapters.slice(0, novel.chapterCount)
-  }
+const previewChapterId = computed(() => {
+  const value = route.query.chapter
+  return typeof value === 'string' ? value : ''
 })
+const workspace = ref<TranslationWorkspace | null>(null)
+
+async function loadWorkspace() {
+  loading.value = true
+  loadError.value = undefined
+  try {
+    const loadedWorkspace = await useTranslationWorkspaceApi().get(workspaceId.value)
+    const novelApi = useNovelWorkspaceApi()
+    const novel = await novelApi.getNovel(loadedWorkspace.novelId)
+    const requestedChapter = novel.chapters.find(chapter =>
+      chapter.id === previewChapterId.value
+    )
+
+    loadedWorkspace.chapters = novel.chapters.map((chapter, index) => ({
+      id: chapter.id,
+      number: chapter.chapterNumber ?? index + 1,
+      title: chapter.title,
+      status: 'not_started',
+      originalParagraphs: [],
+      translatedParagraphs: []
+    }))
+
+    if (requestedChapter?.contentAvailable) {
+      const content = await novelApi.getChapter(loadedWorkspace.novelId, requestedChapter.id)
+      const previewChapter = loadedWorkspace.chapters.find(chapter =>
+        chapter.id === requestedChapter.id
+      )
+      if (previewChapter) {
+        previewChapter.originalParagraphs = content.content
+          .split(/\n\s*\n/g)
+          .map(paragraph => paragraph.trim())
+          .filter(Boolean)
+      }
+    }
+
+    workspace.value = loadedWorkspace
+  } catch (cause) {
+    loadError.value = cause
+    workspace.value = null
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => void loadWorkspace())
 
 useHead(() => ({
   title: workspace.value
-    ? `Configure ${workspace.value.novelTitle}`
+    ? `Configure ${workspace.value.name}`
     : 'Translation configuration'
 }))
 
@@ -94,26 +114,13 @@ async function save() {
     </template>
 
     <template #body>
-      <div v-if="workspace">
-        <WorkspacesConfigurationPreview
-          v-model:preview-valid="previewValid"
-          :workspace="workspace"
-        />
-      </div>
+      <USkeleton v-if="loading" class="h-96 rounded-xl" />
 
-      <UAlert
-        v-else
-        class="mx-auto max-w-lg"
-        color="error"
-        variant="subtle"
-        icon="lucide:circle-alert"
-        title="Workspace not found"
-        description="This prototype workspace does not exist."
-        :actions="[{
-          label: 'Back to Workspaces',
-          icon: 'lucide:arrow-left',
-          to: '/workspaces'
-        }]"
+      <WorkspacesConfigurationPreview
+        v-else-if="workspace"
+        v-model:preview-valid="previewValid"
+        :workspace="workspace"
+        :preview-chapter-id="previewChapterId"
       />
     </template>
   </UDashboardPanel>

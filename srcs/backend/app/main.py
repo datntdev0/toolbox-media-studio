@@ -18,8 +18,9 @@ from app.core.injection import (
     repository_scraping,
     repository_scraping_result,
     repository_user,
+    repository_workspace,
 )
-from app.routers import auth, crawlers, health, novels, realtime, scrapings, users
+from app.routers import auth, crawlers, health, novels, realtime, scrapings, users, workspaces
 
 app_config = AppConfig()
 
@@ -33,6 +34,7 @@ async def lifespan(app: FastAPI):
     app.state.config = config  # Store the app config instance in app state
     app.state.repository_user = repository_user  # Store the user repository instance in app state
     app.state.repository_novel = repository_novel
+    app.state.repository_workspace = repository_workspace
     app.state.repository_scraping = repository_scraping
     app.state.repository_scraping_result = repository_scraping_result
     app.state.provider_cache = provider_cache  # Backward-compatible cache provider state name
@@ -76,6 +78,7 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(novels.router)
+app.include_router(workspaces.router)
 app.include_router(crawlers.router)
 app.include_router(scrapings.router)
 app.include_router(realtime.router)

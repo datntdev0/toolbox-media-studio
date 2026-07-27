@@ -5,16 +5,9 @@ import type {
   TranslationProviderOption,
   TranslationWorkspace
 } from '~/types/translation-workspace'
+import { SUPPORTED_LANGUAGES } from '~/constants/supported-languages'
 
-export const translationLanguages: TranslationLanguageOption[] = [
-  { code: 'zh', label: 'Chinese', nativeLabel: '中文' },
-  { code: 'en', label: 'English', nativeLabel: 'English' },
-  { code: 'vi', label: 'Vietnamese', nativeLabel: 'Tiếng Việt' },
-  { code: 'ja', label: 'Japanese', nativeLabel: '日本語' },
-  { code: 'ko', label: 'Korean', nativeLabel: '한국어' },
-  { code: 'fr', label: 'French', nativeLabel: 'Français' },
-  { code: 'es', label: 'Spanish', nativeLabel: 'Español' }
-]
+export const translationLanguages: TranslationLanguageOption[] = SUPPORTED_LANGUAGES
 
 const chinese = translationLanguages[0]!
 const english = translationLanguages[1]!
@@ -150,6 +143,7 @@ const defaultPrompt = `You are a professional literary translator. Translate fai
 export const translationWorkspaces: TranslationWorkspace[] = [
   {
     id: 'clockwork-vietnamese',
+    name: 'Vietnamese translation',
     novelId: 'novel-clockwork',
     novelTitle: 'The Clockwork Ascendant',
     coverImageUrl: '/workspace-covers/clockwork-ascendant.svg',
@@ -176,10 +170,12 @@ export const translationWorkspaces: TranslationWorkspace[] = [
       'not_started',
       'unavailable'
     ]),
-    updatedAt: '2026-07-27T09:14:00Z'
+    updatedAt: '2026-07-27T09:14:00Z',
+    etag: null
   },
   {
     id: 'clockwork-english',
+    name: 'English translation',
     novelId: 'novel-clockwork',
     novelTitle: 'The Clockwork Ascendant',
     coverImageUrl: '/workspace-covers/clockwork-ascendant.svg',
@@ -206,10 +202,12 @@ export const translationWorkspaces: TranslationWorkspace[] = [
       'translated',
       'translated'
     ]),
-    updatedAt: '2026-07-24T12:40:00Z'
+    updatedAt: '2026-07-24T12:40:00Z',
+    etag: null
   },
   {
     id: 'lantern-french',
+    name: 'French translation',
     novelId: 'novel-lantern-city',
     novelTitle: 'Lantern City at the Edge of Dawn',
     coverImageUrl: '/workspace-covers/lantern-city.svg',
@@ -238,10 +236,12 @@ export const translationWorkspaces: TranslationWorkspace[] = [
       'not_started',
       'unavailable'
     ]).slice(0, 6),
-    updatedAt: '2026-07-26T07:18:00Z'
+    updatedAt: '2026-07-26T07:18:00Z',
+    etag: null
   },
   {
     id: 'orchard-korean',
+    name: 'Korean translation',
     novelId: 'novel-iron-orchard',
     novelTitle: 'The Iron Orchard',
     coverImageUrl: null,
@@ -267,10 +267,12 @@ export const translationWorkspaces: TranslationWorkspace[] = [
       'not_started',
       'not_started'
     ]).slice(0, 6),
-    updatedAt: '2026-07-22T08:42:00Z'
+    updatedAt: '2026-07-22T08:42:00Z',
+    etag: null
   },
   {
     id: 'moonlit-japanese',
+    name: 'Japanese translation',
     novelId: 'novel-moonlit',
     novelTitle: 'Moonlit Swordmaster',
     coverImageUrl: null,
@@ -287,7 +289,8 @@ export const translationWorkspaces: TranslationWorkspace[] = [
       'not_started',
       'unavailable'
     ]).slice(0, 6),
-    updatedAt: '2026-07-20T06:30:00Z'
+    updatedAt: '2026-07-20T06:30:00Z',
+    etag: null
   }
 ]
 

@@ -44,27 +44,21 @@ const running = computed(() => props.workspace.status === 'running')
 </script>
 
 <template>
-  <UPageCard
-    class="w-full"
-    variant="naked"
-    :ui="{ header: 'mb-4 w-full' }"
-  >
-    <template #header>
-      <div class="flex w-full items-center gap-3">
-        <h2 class="font-semibold text-highlighted">
-          Start translation chapter by range
-        </h2>
-        <UButton
-          class="ml-auto"
-          label="Configure AI"
-          icon="lucide:settings-2"
-          color="neutral"
-          variant="soft"
-          size="sm"
-          @click="emit('configure')"
-        />
-      </div>
-    </template>
+  <section aria-labelledby="novel-info-heading" class="w-full">
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="font-semibold text-highlighted">
+        Start translation chapter by range
+      </h2>
+      <UButton
+        class="ml-auto"
+        label="Configure AI"
+        icon="lucide:settings-2"
+        color="neutral"
+        variant="soft"
+        size="sm"
+        @click="emit('configure')"
+      />
+    </div>
 
     <div
       v-if="!workspace.configuration"
@@ -87,11 +81,7 @@ const running = computed(() => props.workspace.status === 'running')
 
     <div v-else class="space-y-4">
       <div class="flex flex-wrap items-center gap-2">
-        <UBadge
-          :label="workspace.targetLanguage.label"
-          icon="lucide:globe-2"
-          variant="subtle"
-        />
+        <UBadge :label="workspace.targetLanguage.label" icon="lucide:globe-2" variant="subtle" />
         <span class="text-xs text-muted">
           {{ workspace.configuration.providerName }} · {{ workspace.configuration.modelName }}
         </span>
@@ -149,16 +139,12 @@ const running = computed(() => props.workspace.status === 'running')
             {{ workspace.progress.translated }} / {{ workspace.progress.total }} chapters
           </span>
         </div>
-        <UProgress
-          :model-value="workspace.progress.translated"
-          :max="Math.max(workspace.progress.total, 1)"
-          size="xs"
-        />
+        <UProgress :model-value="workspace.progress.translated" :max="Math.max(workspace.progress.total, 1)" size="xs" />
       </div>
 
       <p class="text-xs text-muted">
         {{ selectedCount }} {{ selectedCount === 1 ? 'chapter' : 'chapters' }} selected for this translation run.
       </p>
     </div>
-  </UPageCard>
+  </section>
 </template>

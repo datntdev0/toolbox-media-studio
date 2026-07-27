@@ -253,8 +253,31 @@ defineExpose({ focusSelected, focusRow })
           </button>
 
           <div class="absolute end-3 top-3 flex opacity-70 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-            <UTooltip text="Edit scraping"><UButton icon="lucide:pencil" color="neutral" variant="ghost" size="xs" :aria-label="`Edit ${scraping.title}`" :disabled="Boolean(deletingId)" @click.stop="emit('edit', scraping)" @keydown.stop /></UTooltip>
-            <UTooltip text="Delete scraping"><UButton icon="lucide:trash-2" color="error" variant="ghost" size="xs" :aria-label="`Delete ${scraping.title}`" :loading="deletingId === scraping.id" :disabled="Boolean(deletingId && deletingId !== scraping.id)" @click.stop="emit('delete', scraping)" @keydown.stop /></UTooltip>
+            <UTooltip text="Edit scraping">
+              <UButton
+                icon="lucide:pencil"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                :aria-label="`Edit ${scraping.title}`"
+                :disabled="Boolean(deletingId)"
+                @click.stop="emit('edit', scraping)"
+                @keydown.stop
+              />
+            </UTooltip>
+            <UTooltip text="Delete scraping">
+              <UButton
+                icon="lucide:trash-2"
+                color="error"
+                variant="ghost"
+                size="xs"
+                :aria-label="`Delete ${scraping.title}`"
+                :loading="deletingId === scraping.id"
+                :disabled="Boolean(deletingId && deletingId !== scraping.id)"
+                @click.stop="emit('delete', scraping)"
+                @keydown.stop
+              />
+            </UTooltip>
           </div>
         </div>
 

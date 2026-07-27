@@ -2,7 +2,10 @@
 import type { TranslationWorkspace } from '~/types/translation-workspace'
 import { translationProviders } from '~/utils/translation-workspace-fixtures'
 
-const props = defineProps<{ workspace: TranslationWorkspace }>()
+const props = defineProps<{
+  workspace: TranslationWorkspace
+  previewChapterId?: string
+}>()
 const previewValid = defineModel<boolean>('previewValid', { default: true })
 const toast = useToast()
 
@@ -32,6 +35,9 @@ const modelItems = computed(() => selectedProvider.value.models.map(model => ({
 })))
 const previewChapter = computed(() =>
   props.workspace.chapters.find(chapter =>
+    chapter.id === props.previewChapterId
+  )
+  || props.workspace.chapters.find(chapter =>
     chapter.id === props.workspace.configuration?.previewChapterId
   )
   || props.workspace.chapters.find(chapter => chapter.originalParagraphs.length)
@@ -67,7 +73,7 @@ function generatePreview() {
 </script>
 
 <template>
-  <div class="grid gap-6 lg:grid-cols-12">
+  <div class="grid gap-6 lg:grid-cols-12 h-full">
     <div class="space-y-6 lg:col-span-5">
       <UPageCard
         title="LLM model"
@@ -98,16 +104,29 @@ function generatePreview() {
         </div>
       </UPageCard>
 
-      <UPageCard
-        title="Translation instructions"
-        description="Set the permanent target and the instructions applied to every chapter."
-        variant="subtle"
-      >
+      <UPageCard variant="subtle" :ui="{ header: 'w-full' }">
+        <template #header>
+          <div class="flex w-full items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <h2 class="font-semibold text-highlighted">
+                Translation instructions
+              </h2>
+              <p class="mt-1 text-sm text-muted">
+                Review the target and the instructions applied to every chapter.
+              </p>
+            </div>
+            <UButton
+              label="Preview"
+              icon="lucide:scan-text"
+              color="primary"
+              class="ml-auto shrink-0"
+              @click="generatePreview"
+            />
+          </div>
+        </template>
+
         <div class="space-y-5">
-          <UFormField
-            label="Target language"
-            description="Create another workspace to translate this novel into a different language."
-          >
+          <UFormField label="Target language" description="Use the workspace edit action to change this value.">
             <UInput
               :model-value="`${workspace.targetLanguage.label} · ${workspace.targetLanguage.nativeLabel}`"
               icon="lucide:lock"
@@ -135,16 +154,12 @@ function generatePreview() {
       </UPageCard>
     </div>
 
-    <UPageCard
-      class="overflow-hidden lg:col-span-7"
-      variant="subtle"
-      :ui="{ body: 'p-0 sm:p-0', header: 'mb-4 w-full' }"
-    >
+    <UPageCard class="overflow-hidden lg:col-span-7" variant="naked" :ui="{ header: 'mb-4 w-full' }">
       <template #header>
         <div class="flex w-full items-start gap-3">
           <div class="min-w-0 flex-1">
             <p class="text-xs font-medium tracking-wide text-primary uppercase">
-              First chapter preview
+              Chapter preview
             </p>
             <h2 class="mt-1 text-lg font-semibold text-highlighted">
               Chapter {{ previewChapter?.number }} · {{ previewChapter?.title }}
@@ -153,58 +168,59 @@ function generatePreview() {
               {{ workspace.sourceLanguage.label }} → {{ workspace.targetLanguage.label }}
             </p>
           </div>
-          <UButton
-            label="Preview"
-            icon="lucide:scan-text"
-            color="neutral"
-            variant="soft"
-            class="ml-auto shrink-0"
-            @click="generatePreview"
-          />
         </div>
       </template>
 
-      <div class="border-b border-default bg-elevated/30 px-5 py-6 sm:px-8 sm:py-8">
-        <p class="mb-2 text-xs font-medium text-muted">
-          Original excerpt
-        </p>
-        <article
-          :lang="workspace.sourceLanguage.code"
-          class="space-y-5 text-base/8 text-toned sm:text-lg/9"
-        >
-          <p>
-            {{ previewChapter?.originalParagraphs[0] || 'Original chapter content is unavailable.' }}
-          </p>
-        </article>
-      </div>
+      <template #body>
+        <section class="min-h-0">
+          <h5 class="mb-2 text-muted font-medium">
+            Original content
+          </h5>
+          <article
+            :lang="workspace.sourceLanguage.code"
+            class="ps-4 space-y-5 text-base/8 text-toned sm:text-lg/9 h-[400px] overflow-y-auto"
+          >
+            <p v-for="(paragraph, index) in previewChapter?.originalParagraphs || []" :key="index">
+              {{ paragraph }}
+            </p>
+            <p v-if="!previewChapter?.originalParagraphs.length">
+              Original chapter content is unavailable.
+            </p>
+          </article>
+        </section>
 
-      <div v-if="previewValid" class="px-5 py-6 sm:px-8 sm:py-8">
-        <div class="mb-6 flex items-center gap-2 text-xs text-muted">
-          <UIcon name="lucide:circle-check" class="size-4 text-success" />
-          <span>Preview generated from Chapter {{ previewChapter?.number }}</span>
-        </div>
-        <article
-          :lang="workspace.targetLanguage.code"
-          class="space-y-5 text-base/8 text-toned sm:text-lg/9"
-        >
-          <p v-for="(paragraph, index) in previewParagraphs" :key="index">
-            {{ paragraph }}
-          </p>
-        </article>
-      </div>
+        <USeparator :ui="{ root: 'my-4' }" />
 
-      <div v-else class="flex min-h-80 items-center justify-center p-6">
-        <UEmpty
-          icon="lucide:refresh-cw"
-          title="Preview is out of date"
-          description="Generate a new fixed preview after changing the provider, model, or prompt."
-          :actions="[{
-            label: 'Preview',
-            icon: 'lucide:scan-text',
-            onClick: generatePreview
-          }]"
-        />
-      </div>
+        <section class="min-h-0">
+          <div v-if="previewValid">
+            <h5 class="mb-2 flex items-center gap-2 text-muted font-medium">
+              <UIcon name="lucide:circle-check" class="size-4 text-success" />
+              Preview generated from Chapter {{ previewChapter?.number }}
+            </h5>
+            <article
+              :lang="workspace.targetLanguage.code"
+              class="ps-4 space-y-5 text-base/8 text-toned sm:text-lg/9 h-[400px] overflow-y-auto"
+            >
+              <p v-for="(paragraph, index) in previewParagraphs" :key="index">
+                {{ paragraph }}
+              </p>
+            </article>
+          </div>
+
+          <div v-else class="flex min-h-full items-center justify-center p-6">
+            <UEmpty
+              icon="lucide:refresh-cw"
+              title="Preview is out of date"
+              description="Generate a new fixed preview after changing the provider, model, or prompt."
+              :actions="[{
+                label: 'Preview',
+                icon: 'lucide:scan-text',
+                onClick: generatePreview
+              }]"
+            />
+          </div>
+        </section>
+      </template>
     </UPageCard>
   </div>
 </template>

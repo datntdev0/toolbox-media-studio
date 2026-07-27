@@ -25,11 +25,15 @@ from app.repositories.cosmosdb.cosmos_scraping_result_repository import (
     build_cosmos_scraping_result_repository,
 )
 from app.repositories.cosmosdb.cosmos_user_repository import build_cosmos_user_repository
+from app.repositories.cosmosdb.cosmos_workspace_repository import (
+    build_cosmos_workspace_repository,
+)
 from app.repositories.novel_chapter_repository import NovelChapterRepository
 from app.repositories.novel_repository import NovelRepository
 from app.repositories.scraping_repository import ScrapingRepository
 from app.repositories.scraping_result_repository import ScrapingResultRepository
 from app.repositories.user_repository import UserRepository
+from app.repositories.workspace_repository import WorkspaceRepository
 from app.services.novel_binding_service import NovelBindingService
 
 log_manager = LogManager() # Singleton instance of Logger
@@ -40,6 +44,7 @@ repository_user = build_cosmos_user_repository(config)
 repository_novel = build_cosmos_novel_repository(config)
 repository_scraping = build_cosmos_scraping_repository(config)
 repository_scraping_result = build_cosmos_scraping_result_repository(config)
+repository_workspace = build_cosmos_workspace_repository(config)
 # Lazily constructed so existing API/test setups that do not use novel chapters
 # do not require the new Cosmos container.
 repository_novel_chapter: NovelChapterRepository | None = None
@@ -69,6 +74,10 @@ LogManagerDep = Annotated[LogManager, Depends(lambda: log_manager)]
 
 RepositoryUserDep = Annotated[UserRepository, Depends(lambda: repository_user)]
 RepositoryNovelDep = Annotated[NovelRepository, Depends(lambda: repository_novel)]
+RepositoryWorkspaceDep = Annotated[
+    WorkspaceRepository,
+    Depends(lambda: repository_workspace),
+]
 RepositoryScrapingDep = Annotated[
     ScrapingRepository,
     Depends(lambda: repository_scraping),

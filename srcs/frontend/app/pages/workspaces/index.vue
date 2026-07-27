@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
-import { translationWorkspaces } from '~/utils/translation-workspace-fixtures'
+import type { NovelResponse } from '~~/shared/api-services/srv-core.client'
+import type {
+  TranslationWorkspace,
+  WorkspaceApiRecord
+} from '~/types/translation-workspace'
+import { normalizeTranslationWorkspace } from '~/composables/useTranslationWorkspaceApi'
 
 definePageMeta({
   title: 'Workspaces',
@@ -11,6 +16,21 @@ useHead({ title: 'Workspaces' })
 
 const search = ref('')
 const createOpen = ref(false)
+const workspaces = ref<TranslationWorkspace[]>([])
+const novels = ref<NovelResponse[]>([])
+const loading = ref(true)
+const error = ref<unknown>()
+const editingWorkspace = ref<TranslationWorkspace | null>(null)
+const deletingWorkspaceId = ref<string | null>(null)
+const toast = useToast()
+const confirm = useConfirmDialog()
+
+const editOpen = computed({
+  get: () => !!editingWorkspace.value,
+  set: (value: boolean) => {
+    if (!value) editingWorkspace.value = null
+  }
+})
 
 const links = [{
   label: 'Translations',
@@ -28,11 +48,12 @@ const links = [{
 
 const filteredWorkspaces = computed(() => {
   const query = search.value.trim().toLowerCase()
-  if (!query) return translationWorkspaces
+  if (!query) return workspaces.value
 
-  return translationWorkspaces.filter((workspace) => {
+  return workspaces.value.filter((workspace) => {
     const configuration = workspace.configuration
     return [
+      workspace.name,
       workspace.novelTitle,
       workspace.targetLanguage.label,
       workspace.targetLanguage.nativeLabel,
@@ -43,6 +64,63 @@ const filteredWorkspaces = computed(() => {
       .some(value => String(value).toLowerCase().includes(query))
   })
 })
+
+async function loadWorkspaces() {
+  loading.value = true
+  error.value = undefined
+  try {
+    const { novels: novelClient } = useApiClient()
+    const [workspaceItems, novelPage] = await Promise.all([
+      useTranslationWorkspaceApi().list(),
+      novelClient.list_novels(100, undefined)
+    ])
+    workspaces.value = workspaceItems
+    novels.value = novelPage.items || []
+  } catch (cause) {
+    error.value = cause
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => void loadWorkspaces())
+
+function upsertWorkspace(record: WorkspaceApiRecord) {
+  const workspace = normalizeTranslationWorkspace(record)
+  workspaces.value = [
+    workspace,
+    ...workspaces.value.filter(item => item.id !== workspace.id)
+  ]
+}
+
+async function deleteWorkspace(workspace: TranslationWorkspace) {
+  const confirmed = await confirm({
+    title: 'Delete workspace',
+    description: `Delete “${workspace.name}”? This action cannot be undone from the app.`,
+    confirmLabel: 'Delete workspace',
+    confirmColor: 'error'
+  })
+  if (!confirmed) return
+
+  deletingWorkspaceId.value = workspace.id
+  try {
+    await useTranslationWorkspaceApi().delete(workspace.id)
+    workspaces.value = workspaces.value.filter(item => item.id !== workspace.id)
+    toast.add({
+      title: 'Workspace deleted',
+      description: `“${workspace.name}” has been removed.`,
+      color: 'success'
+    })
+  } catch (cause) {
+    toast.add({
+      title: 'Unable to delete workspace',
+      description: cause instanceof Error ? cause.message : 'Please try again.',
+      color: 'error'
+    })
+  } finally {
+    deletingWorkspaceId.value = null
+  }
+}
 </script>
 
 <template>
@@ -88,14 +166,34 @@ const filteredWorkspaces = computed(() => {
           </p>
         </div>
 
+        <UAlert
+          v-if="error"
+          color="error"
+          variant="subtle"
+          icon="lucide:circle-alert"
+          title="Unable to load workspaces"
+          description="Please check the workspace service and try again."
+          :actions="[{ label: 'Retry', icon: 'lucide:refresh-cw', onClick: loadWorkspaces }]"
+        />
+
         <UPageGrid
-          v-if="filteredWorkspaces.length"
+          v-else-if="loading"
+          class="grid-cols-1 gap-4 xl:grid-cols-2"
+        >
+          <USkeleton v-for="index in 4" :key="index" class="h-48 rounded-xl" />
+        </UPageGrid>
+
+        <UPageGrid
+          v-else-if="filteredWorkspaces.length"
           class="grid-cols-1 gap-4 sm:grid-cols-1 lg:grid-cols-1 xl:grid-cols-2"
         >
           <WorkspacesWorkspaceCard
             v-for="workspace in filteredWorkspaces"
             :key="workspace.id"
             :workspace="workspace"
+            :class="{ 'pointer-events-none opacity-60': deletingWorkspaceId === workspace.id }"
+            @edit="editingWorkspace = $event"
+            @delete="deleteWorkspace"
           />
         </UPageGrid>
 
@@ -104,7 +202,7 @@ const filteredWorkspaces = computed(() => {
           icon="lucide:languages"
           :title="search ? 'No projects found' : 'No translation projects yet'"
           :description="search
-            ? 'Try a novel title, provider, model, or target language.'
+            ? 'Try a workspace name, novel title, provider, model, or target language.'
             : 'Translation projects begin with a novel already stored in your Library.'"
           size="xl"
           :actions="search
@@ -127,6 +225,15 @@ const filteredWorkspaces = computed(() => {
 
   <WorkspacesCreateProjectModal
     v-model:open="createOpen"
-    :workspaces="translationWorkspaces"
+    :novels="novels"
+    @created="upsertWorkspace"
+  />
+
+  <WorkspacesEditProjectModal
+    v-if="editingWorkspace"
+    v-model:open="editOpen"
+    :workspace="editingWorkspace"
+    :novels="novels"
+    @updated="upsertWorkspace"
   />
 </template>

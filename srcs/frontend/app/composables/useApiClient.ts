@@ -5,7 +5,8 @@ import {
   NovelResponse,
   ScrapingsClient,
   ScrapingDetailResponse,
-  UsersClient
+  UsersClient,
+  WorkspacesClient
 } from '~~/shared/api-services/srv-core.client'
 
 type GeneratedHttp = {
@@ -36,6 +37,7 @@ export function useApiClient() {
     novels: new NovelsClient(baseUrl, http),
     crawlers: new CrawlersClient(baseUrl, http),
     scrapings: new ScrapingsClient(baseUrl, http),
+    workspaces: new WorkspacesClient(baseUrl, http),
     async createNovel(body: Record<string, unknown>) {
       const response = await http.fetch(`${baseUrl}/api/novels`, {
         method: 'POST',

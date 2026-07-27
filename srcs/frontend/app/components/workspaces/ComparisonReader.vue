@@ -8,6 +8,9 @@ import { chapterStatusMeta } from '~/utils/translation-workspaces'
 const props = defineProps<{
   workspace: TranslationWorkspace
   chapter: TranslationChapter
+  translationAvailable: boolean
+  originalLoading: boolean
+  originalLoadError: boolean
   canPrevious: boolean
   canNext: boolean
 }>()
@@ -15,6 +18,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   navigate: [offset: number]
   chapters: []
+  configure: []
 }>()
 const confirm = useConfirmDialog()
 const toast = useToast()
@@ -39,7 +43,8 @@ const chapterStatus = computed(() =>
     : chapterStatusMeta[props.chapter.status]
 )
 const canEdit = computed(() =>
-  props.chapter.status !== 'unavailable'
+  props.translationAvailable
+  && props.chapter.status !== 'unavailable'
   && props.chapter.status !== 'translating'
   && props.chapter.originalParagraphs.length > 0
 )
@@ -169,23 +174,47 @@ defineExpose({ confirmDiscard, focusChapters })
           </div>
         </header>
 
-        <article
-          v-if="chapter.originalParagraphs.length"
-          :lang="workspace.sourceLanguage.code"
-          class="mx-auto w-full max-w-3xl space-y-5 px-6 py-9 text-base/8 text-toned sm:px-10 sm:py-12 sm:text-lg/9"
-        >
-          <p v-for="(paragraph, index) in chapter.originalParagraphs" :key="index">
-            {{ paragraph }}
-          </p>
-        </article>
+        <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <div
+            v-if="originalLoading"
+            class="mx-auto w-full max-w-3xl space-y-4 p-8 sm:p-12"
+            aria-label="Loading original chapter content"
+          >
+            <USkeleton v-for="index in 10" :key="index" class="h-4" />
+          </div>
 
-        <div v-else class="flex min-h-96 flex-1 items-center justify-center p-6">
-          <UEmpty
-            icon="lucide:file-clock"
-            title="Original content unavailable"
-            description="This chapter is listed in the novel, but its source text has not been downloaded."
-            size="lg"
-          />
+          <div
+            v-else-if="originalLoadError"
+            class="flex min-h-96 flex-1 items-center justify-center p-6"
+          >
+            <UAlert
+              class="max-w-lg"
+              color="error"
+              variant="subtle"
+              icon="lucide:circle-alert"
+              title="Unable to load original content"
+              description="The original chapter content could not be opened."
+            />
+          </div>
+
+          <article
+            v-else-if="chapter.originalParagraphs.length"
+            :lang="workspace.sourceLanguage.code"
+            class="mx-auto w-full max-w-3xl space-y-5 px-6 py-9 text-base/8 text-toned sm:px-10 sm:py-12 sm:text-lg/9"
+          >
+            <p v-for="(paragraph, index) in chapter.originalParagraphs" :key="index">
+              {{ paragraph }}
+            </p>
+          </article>
+
+          <div v-else class="flex min-h-96 flex-1 items-center justify-center p-6">
+            <UEmpty
+              icon="lucide:file-clock"
+              title="Original content unavailable"
+              description="This chapter is listed in the novel, but its source text has not been downloaded."
+              size="lg"
+            />
+          </div>
         </div>
       </section>
 
@@ -229,83 +258,102 @@ defineExpose({ confirmDiscard, focusChapters })
           />
         </header>
 
-        <div v-if="editing" class="flex min-h-96 flex-1 flex-col p-4 sm:p-6">
-          <UAlert
-            class="mb-4"
-            color="neutral"
-            variant="subtle"
-            icon="lucide:pencil-line"
-            title="Editing translated copy"
-            description="Changes are kept only while this prototype screen remains open."
-          />
-          <UTextarea
-            v-model="draft"
-            aria-label="Translated chapter content"
-            :rows="22"
-            autoresize
-            class="w-full flex-1 font-mono text-sm/7"
-            :placeholder="`Enter the ${workspace.targetLanguage.label} translation…`"
-          />
-          <div class="sticky bottom-0 mt-4 flex justify-end gap-2 border-t border-default bg-default/95 py-3 backdrop-blur">
-            <UButton
-              label="Cancel"
+        <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <div v-if="editing" class="flex min-h-96 flex-1 flex-col p-4 sm:p-6">
+            <UAlert
+              class="mb-4"
               color="neutral"
               variant="subtle"
-              @click="cancelEdit"
+              icon="lucide:pencil-line"
+              title="Editing translated copy"
+              description="Changes are kept only while this prototype screen remains open."
             />
-            <UButton
-              label="Save translation"
-              icon="lucide:save"
-              @click="saveEdit"
+            <UTextarea
+              v-model="draft"
+              aria-label="Translated chapter content"
+              :rows="22"
+              autoresize
+              class="w-full flex-1 font-mono text-sm/7"
+              :placeholder="`Enter the ${workspace.targetLanguage.label} translation…`"
+            />
+            <div class="sticky bottom-0 mt-4 flex justify-end gap-2 border-t border-default bg-default/95 py-3 backdrop-blur">
+              <UButton
+                label="Cancel"
+                color="neutral"
+                variant="subtle"
+                @click="cancelEdit"
+              />
+              <UButton
+                label="Save translation"
+                icon="lucide:save"
+                @click="saveEdit"
+              />
+            </div>
+          </div>
+
+          <article
+            v-else-if="localTranslation.length"
+            :lang="workspace.targetLanguage.code"
+            class="mx-auto w-full max-w-3xl space-y-5 px-6 py-9 text-base/8 text-toned sm:px-10 sm:py-12 sm:text-lg/9"
+          >
+            <p v-for="(paragraph, index) in localTranslation" :key="index">
+              {{ paragraph }}
+            </p>
+          </article>
+
+          <div
+            v-else-if="!translationAvailable"
+            class="flex min-h-96 flex-1 items-center justify-center p-6"
+          >
+            <UEmpty
+              icon="lucide:languages"
+              title="Translation has not started"
+              description="Configure this workspace before chapter translation data becomes available."
+              :actions="[{
+                label: 'Configure workspace',
+                icon: 'lucide:settings-2',
+                onClick: () => emit('configure')
+              }]"
+              size="lg"
             />
           </div>
-        </div>
 
-        <article
-          v-else-if="localTranslation.length"
-          :lang="workspace.targetLanguage.code"
-          class="mx-auto w-full max-w-3xl space-y-5 px-6 py-9 text-base/8 text-toned sm:px-10 sm:py-12 sm:text-lg/9"
-        >
-          <p v-for="(paragraph, index) in localTranslation" :key="index">
-            {{ paragraph }}
-          </p>
-        </article>
+          <div
+            v-else-if="chapter.status === 'translating'"
+            class="mx-auto w-full max-w-3xl space-y-4 p-8 sm:p-12"
+            aria-label="Translating chapter"
+          >
+            <UAlert
+              color="primary"
+              variant="subtle"
+              icon="lucide:loader-circle"
+              title="Translation in progress"
+              description="This chapter will refresh when the background translation finishes."
+            />
+            <USkeleton v-for="index in 8" :key="index" class="h-4" />
+          </div>
 
-        <div
-          v-else-if="chapter.status === 'translating'"
-          class="mx-auto w-full max-w-3xl space-y-4 p-8 sm:p-12"
-          aria-label="Translating chapter"
-        >
-          <UAlert
-            color="primary"
-            variant="subtle"
-            icon="lucide:loader-circle"
-            title="Translation in progress"
-            description="This chapter will refresh when the background translation finishes."
-          />
-          <USkeleton v-for="index in 8" :key="index" class="h-4" />
-        </div>
+          <div v-else-if="chapter.status === 'failed'" class="flex min-h-96 flex-1 items-center justify-center p-6">
+            <UAlert
+              class="max-w-lg"
+              color="error"
+              variant="subtle"
+              icon="lucide:circle-x"
+              title="Translation failed"
+              description="The provider could not translate this chapter. It can be included in a later retry range or entered manually."
+            />
+          </div>
 
-        <div v-else-if="chapter.status === 'failed'" class="flex min-h-96 flex-1 items-center justify-center p-6">
-          <UAlert
-            class="max-w-lg"
-            color="error"
-            variant="subtle"
-            icon="lucide:circle-x"
-            title="Translation failed"
-            description="The provider could not translate this chapter. It can be included in a later retry range or entered manually."
-          />
-        </div>
-
-        <div v-else class="flex min-h-96 flex-1 items-center justify-center p-6">
-          <UEmpty
-            :icon="chapter.status === 'queued' ? 'lucide:clock-3' : 'lucide:languages'"
-            :title="chapter.status === 'queued' ? 'Queued for translation' : 'No translation yet'"
-            :description="chapter.status === 'queued'
-              ? 'This chapter is waiting for the current translation run.'
-              : 'Translate this chapter range or add the translated content manually.'"
-            size="lg"
-          />
+          <div v-else class="flex min-h-96 flex-1 items-center justify-center p-6">
+            <UEmpty
+              :icon="chapter.status === 'queued' ? 'lucide:clock-3' : 'lucide:languages'"
+              :title="chapter.status === 'queued' ? 'Queued for translation' : 'No translation yet'"
+              :description="chapter.status === 'queued'
+                ? 'This chapter is waiting for the current translation run.'
+                : 'Translate this chapter range or add the translated content manually.'"
+              size="lg"
+            />
+          </div>
         </div>
       </section>
     </div>

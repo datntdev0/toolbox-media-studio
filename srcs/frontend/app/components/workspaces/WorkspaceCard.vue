@@ -6,6 +6,10 @@ import {
 } from '~/utils/translation-workspaces'
 
 const props = defineProps<{ workspace: TranslationWorkspace }>()
+const emit = defineEmits<{
+  edit: [workspace: TranslationWorkspace]
+  delete: [workspace: TranslationWorkspace]
+}>()
 
 const status = computed(() => workspaceStatusMeta[props.workspace.status])
 const configuredModel = computed(() => props.workspace.configuration
@@ -24,7 +28,9 @@ const configuredModel = computed(() => props.workspace.configuration
       wrapper: 'min-w-0',
       container: 'flex flex-row items-stretch gap-3 p-3 sm:p-3 lg:flex lg:flex-row lg:items-stretch lg:gap-3',
       title: 'line-clamp-2',
-      description: 'line-clamp-2'
+      description: 'line-clamp-2',
+      body: 'w-full',
+      footer: 'w-full'
     }"
   >
     <div class="flex min-h-48 w-24 shrink-0 items-center justify-center overflow-hidden bg-primary/10 sm:w-32">
@@ -42,12 +48,16 @@ const configuredModel = computed(() => props.workspace.configuration
         :to="`/workspaces/${workspace.id}`"
         class="after:absolute after:inset-0 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
       >
-        {{ workspace.novelTitle }}
+        {{ workspace.name }}
       </NuxtLink>
     </template>
 
     <template #description>
       <div class="space-y-2.5">
+        <p class="truncate text-sm font-medium text-toned">
+          {{ workspace.novelTitle }}
+        </p>
+
         <div class="flex flex-wrap gap-2">
           <UBadge
             label="Translation"
@@ -95,10 +105,35 @@ const configuredModel = computed(() => props.workspace.configuration
     </template>
 
     <template #footer>
-      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+      <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted">
         <span>{{ workspace.sourceLanguage.label }} → {{ workspace.targetLanguage.label }}</span>
         <span>Updated {{ formatWorkspaceDate(workspace.updatedAt) }}</span>
       </div>
     </template>
+
+    <div class="absolute top-3 right-3 z-10 flex items-center gap-1 rounded-md bg-default/80 p-0.5 shadow-sm backdrop-blur">
+      <UTooltip text="Edit workspace">
+        <UButton
+          icon="lucide:pencil"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          square
+          aria-label="Edit workspace"
+          @click="emit('edit', workspace)"
+        />
+      </UTooltip>
+      <UTooltip text="Delete workspace">
+        <UButton
+          icon="lucide:trash-2"
+          color="error"
+          variant="ghost"
+          size="sm"
+          square
+          aria-label="Delete workspace"
+          @click="emit('delete', workspace)"
+        />
+      </UTooltip>
+    </div>
   </UPageCard>
 </template>
