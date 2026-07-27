@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 480" role="img" aria-labelledby="title desc">
+  <title id="title">Lantern City at the Edge of Dawn cover</title>
+  <desc id="desc">A row of glowing lanterns above a dark city skyline.</desc>
+  <rect width="320" height="480" fill="#111827"/>
+  <rect y="0" width="320" height="260" fill="#064e3b"/>
+  <circle cx="250" cy="82" r="46" fill="#fde68a" opacity=".92"/>
+  <path d="M0 270l42-42 30 26 48-76 44 68 35-42 44 50 38-34 39 44v216H0z" fill="#052e16"/>
+  <g stroke="#a7f3d0" stroke-width="3">
+    <path d="M76 0v118M160 0v158M244 0v128"/>
+  </g>
+  <g fill="#fbbf24" stroke="#fef3c7" stroke-width="3">
+    <rect x="53" y="110" width="46" height="58" rx="9"/>
+    <rect x="137" y="150" width="46" height="58" rx="9"/>
+    <rect x="221" y="120" width="46" height="58" rx="9"/>
+  </g>
+  <text x="160" y="382" fill="#ecfdf5" font-family="Arial, sans-serif" font-size="27" font-weight="700" text-anchor="middle">LANTERN CITY</text>
+  <text x="160" y="416" fill="#6ee7b7" font-family="Arial, sans-serif" font-size="18" text-anchor="middle">AT THE EDGE OF DAWN</text>
+</svg>

@@ -1,25 +1,10 @@
 <script setup lang="ts">
 definePageMeta({
-  title: 'Workspaces'
+  title: 'Workspaces',
+  middleware: ['auth']
 })
 </script>
 
 <template>
-  <UDashboardPanel id="workspaces">
-    <template #header>
-      <UDashboardNavbar title="Workspaces">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-      </UDashboardNavbar>
-    </template>
-
-    <template #body>
-      <div class="flex flex-col gap-4 sm:gap-6 lg:gap-12 w-full lg:max-w-2xl mx-auto">
-        <p class="text-default">
-          Workspaces page content coming soon...
-        </p>
-      </div>
-    </template>
-  </UDashboardPanel>
+  <NuxtPage />
 </template>

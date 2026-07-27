@@ -1,23 +1,19 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
 
-definePageMeta({ title: 'Videos', middleware: ['auth'] })
+definePageMeta({ title: 'Video workspaces', middleware: ['auth'] })
 
-const links = [{
-  label: 'Novels',
-  icon: 'lucide:book-open',
-  to: '/library/novels'
-}, {
-  label: 'Videos',
-  icon: 'lucide:clapperboard',
-  to: '/library/videos'
-}] satisfies NavigationMenuItem[]
+const links = [
+  { label: 'Translations', icon: 'lucide:languages', to: '/workspaces' },
+  { label: 'Audios', icon: 'lucide:audio-lines', to: '/workspaces/audios' },
+  { label: 'Videos', icon: 'lucide:clapperboard', to: '/workspaces/videos' }
+] satisfies NavigationMenuItem[]
 </script>
 
 <template>
-  <UDashboardPanel id="video-library">
+  <UDashboardPanel id="video-workspaces">
     <template #header>
-      <UDashboardNavbar title="Library">
+      <UDashboardNavbar title="Workspaces">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -29,7 +25,7 @@ const links = [{
     <template #body>
       <UEmpty
         icon="lucide:clapperboard"
-        title="Video library is coming soon"
+        title="Video workspaces are coming soon"
         description="Video project tools will appear here."
         size="xl"
       />

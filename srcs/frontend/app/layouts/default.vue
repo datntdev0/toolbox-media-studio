@@ -25,14 +25,6 @@ const links = [
       }
     },
     {
-      label: 'Translations',
-      icon: 'lucide:languages',
-      to: '/translations',
-      onSelect: () => {
-        open.value = false
-      }
-    },
-    {
       label: 'Scrapings',
       icon: 'lucide:loader',
       to: '/scrapings',
