@@ -18,23 +18,6 @@ class CrawlerSource:
     source_novel_id: str
 
 
-class CrawlerSummaryResponse(BaseModel):
-    """Available crawler summary."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    id: str
-    name: str
-    hosts: tuple[str, ...]
-    metadata_supported: bool = Field(alias="metadataSupported")
-
-
-class CrawlerListResponse(BaseModel):
-    """Available crawler registry response."""
-
-    items: list[CrawlerSummaryResponse]
-
-
 class CrawlerChapterResponse(BaseModel):
     """Chapter metadata returned by the crawler endpoint."""
 

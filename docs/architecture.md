@@ -101,7 +101,7 @@ sequenceDiagram
     participant Q as Queue (crawler-jobs)
     participant C as Cosmos DB
 
-    U->>A: POST /api/crawlers/{id}/jobs
+    U->>A: PATCH /api/scrapings/{id}/start
     A->>C: create job (status = queued)
     A->>Q: publish crawler job message
     A-->>U: 202 { id, status, reused:false }
@@ -193,8 +193,8 @@ class Connector(Protocol):
 
 Before full background chapter crawling, the API supports a synchronous metadata endpoint:
 
-- `GET /api/crawlers`
-- `GET /api/crawlers/{id}/metadata?url=<source_url>`
+- Supported crawler definitions are static in the backend provider and frontend.
+- `GET /api/scrapings/preview?crawlerId=<id>&sourceUrl=<source_url>`
 
 The first supported crawler is `novel543`. Its source URL must be the full chapter directory,
 ending in `/dir`; metadata responses contain the complete ordered `chapters` list. URL validation lives in
@@ -204,9 +204,8 @@ ending in `/dir`; metadata responses contain the complete ordered `chapters` lis
 HTML and parsed metadata are cached through `srcs/backend/app/providers/cache_provider.py` and the
 generic `cache` repository.
 
-Crawler jobs are submitted through `POST /api/crawlers/{id}/jobs`. The endpoint hashes the
-relative route plus canonical payload for idempotency, stores jobs in Cosmos, and publishes new
-work to `crawler-jobs`. FastAPI creates and consumes `crawler-jobs` and
+Scraping jobs are submitted through `PATCH /api/scrapings/{id}/start`. The endpoint stores task
+state in the scraping manifest and publishes new work to `crawler-jobs`. FastAPI creates and consumes `crawler-jobs` and
 `crawler-jobs-dead-letter`; there is no separate worker application in this stack.
 
 ## Media pipeline (audio → video)

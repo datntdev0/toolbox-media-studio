@@ -134,6 +134,22 @@ def test_novel_cover_image_url_is_accepted(client: TestClient) -> None:
     assert created.json()["coverImageUrl"] == "https://images.test/cover.jpg"
 
 
+def test_novel_cover_upload_updates_cover_url(client: TestClient) -> None:
+    token = _login(client)
+    headers = _auth_headers(token)
+    created = client.post("/api/novels", headers=headers, json={"title": "Uploaded Cover"})
+    assert created.status_code == 201
+
+    uploaded = client.put(
+        f"/api/novels/{created.json()['id']}/cover",
+        headers=headers,
+        files={"coverImage": ("cover.jpg", b"\xff\xd8\xffcover", "image/jpeg")},
+    )
+
+    assert uploaded.status_code == 200
+    assert uploaded.json()["coverImageUrl"].endswith("/cover.jpg")
+
+
 def test_novel_update_with_stale_etag_returns_412(client: TestClient) -> None:
     token = _login(client)
     headers = _auth_headers(token)

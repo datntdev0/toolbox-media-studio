@@ -1,6 +1,5 @@
 import {
   AuthClient,
-  CrawlersClient,
   NovelsClient,
   NovelResponse,
   ScrapingsClient,
@@ -35,7 +34,6 @@ export function useApiClient() {
     auth: new AuthClient(baseUrl, http),
     users: new UsersClient(baseUrl, http),
     novels: new NovelsClient(baseUrl, http),
-    crawlers: new CrawlersClient(baseUrl, http),
     scrapings: new ScrapingsClient(baseUrl, http),
     translations: new TranslationsClient(baseUrl, http),
     async createNovel(body: Record<string, unknown>) {
@@ -56,17 +54,39 @@ export function useApiClient() {
       if (!response.ok) throw new Error('Unable to update novel')
       return NovelResponse.fromJS(await response.json())
     },
+    async uploadNovelCover(id: string, file: File) {
+      const body = new FormData()
+      body.set('coverImage', file)
+      const response = await http.fetch(`${baseUrl}/api/novels/${encodeURIComponent(id)}/cover`, {
+        method: 'PUT',
+        body,
+        headers: { 'Accept': 'application/json' }
+      })
+      if (!response.ok) throw new Error('Unable to upload novel cover')
+      return NovelResponse.fromJS(await response.json())
+    },
     async deleteNovel(id: string) {
       const response = await http.fetch(`${baseUrl}/api/novels/${encodeURIComponent(id)}`, { method: 'DELETE' })
       if (!response.ok) throw new Error('Unable to delete novel')
     },
-    async updateScraping(id: string, form: FormData) {
+    async updateScraping(id: string, body: Record<string, unknown>) {
       const response = await http.fetch(`${baseUrl}/api/scrapings/${encodeURIComponent(id)}`, {
         method: 'PUT',
-        body: form,
-        headers: { Accept: 'application/json' }
+        body: JSON.stringify(body),
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
       })
       if (!response.ok) throw new Error('Unable to update scraping')
+      return ScrapingDetailResponse.fromJS(await response.json())
+    },
+    async uploadScrapingCover(id: string, file: File) {
+      const body = new FormData()
+      body.set('coverImage', file)
+      const response = await http.fetch(`${baseUrl}/api/scrapings/${encodeURIComponent(id)}/cover`, {
+        method: 'PUT',
+        body,
+        headers: { 'Accept': 'application/json' }
+      })
+      if (!response.ok) throw new Error('Unable to upload scraping cover')
       return ScrapingDetailResponse.fromJS(await response.json())
     }
   }

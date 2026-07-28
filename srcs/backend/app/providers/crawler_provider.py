@@ -13,7 +13,6 @@ from app.domain.crawlers import (
     CrawlerChapterResponse,
     CrawlerMetadataResponse,
     CrawlerSource,
-    CrawlerSummaryResponse,
 )
 from app.providers.cache_provider import CACHE_TYPE_PREFIX_CRAWLER, CacheProvider
 from app.providers.crawler_parser_novel543 import (
@@ -67,7 +66,8 @@ NOVEL543_CRAWLER = CrawlerDefinition(
 _CACHE_KIND_HTML = "html"
 _CACHE_KIND_METADATA = "metadata"
 _CACHE_KIND_CONTENT = "content"
-_CRAWLERS = {NOVEL543_CRAWLER.id: NOVEL543_CRAWLER}
+SUPPORTED_CRAWLERS = (NOVEL543_CRAWLER,)
+_CRAWLERS = {crawler.id: crawler for crawler in SUPPORTED_CRAWLERS}
 
 
 def get_crawler(crawler_id: str) -> CrawlerDefinition:
@@ -77,18 +77,6 @@ def get_crawler(crawler_id: str) -> CrawlerDefinition:
     if crawler is None:
         raise UnknownCrawlerError(f"Unknown crawler: {crawler_id}")
     return crawler
-
-
-def list_crawlers() -> list[CrawlerSummaryResponse]:
-    return [
-        CrawlerSummaryResponse(
-            id=crawler.id,
-            name=crawler.name,
-            hosts=crawler.hosts,
-            metadata_supported=crawler.metadata_supported,
-        )
-        for crawler in list(_CRAWLERS.values())
-    ]
 
 
 def validate_novel_url(crawler_id: str, source_url: str) -> CrawlerSource:

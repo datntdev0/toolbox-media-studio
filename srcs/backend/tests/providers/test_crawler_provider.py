@@ -12,7 +12,6 @@ from app.providers.crawler_provider import (
     UnknownCrawlerError,
     fetch_chapter_content,
     get_crawler,
-    list_crawlers,
     validate_chapter_url,
     validate_crawler_source,
 )
@@ -31,14 +30,6 @@ class _FakeProxyProvider:
     def get(self, url: str, max_timeout_ms: int | None = None) -> _ProxyResult:
         self.calls.append((url, max_timeout_ms))
         return _ProxyResult(self.responses[url])
-
-
-def test_list_crawlers_includes_novel543() -> None:
-    crawlers = list_crawlers()
-
-    assert [crawler.id for crawler in crawlers] == ["novel543"]
-    assert crawlers[0].hosts == ("www.novel543.com",)
-    assert crawlers[0].metadata_supported is True
 
 
 def test_validate_novel543_directory_url() -> None:

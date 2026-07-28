@@ -7,18 +7,19 @@ from hashlib import sha256
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, File, Form, HTTPException, Path, Query, Response, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Path, Query, Response, UploadFile, status
 
 from app.core.injection import (
     PollingQueuePublisherDep,
     ProviderCacheDep,
-    ProviderPublicBlobDep,
     ProviderProxyDep,
+    ProviderPublicBlobDep,
     RealtimeHubDep,
     RepositoryScrapingDep,
     RepositoryScrapingResultDep,
 )
 from app.core.security.authorization import SessionUser
+from app.domain.crawlers import CrawlerMetadataResponse
 from app.domain.scraping_results import ScrapingResultResponse, to_scraping_result_response
 from app.domain.scrapings import (
     Scraping,
@@ -30,6 +31,7 @@ from app.domain.scrapings import (
     ScrapingProgress,
     ScrapingStartRequest,
     ScrapingTask,
+    ScrapingUpdateRequest,
     to_scraping_detail,
     to_scraping_summary,
 )
@@ -55,6 +57,52 @@ from app.repositories.scraping_repository import (
 )
 
 router = APIRouter(prefix="/api/scrapings", tags=["scrapings"])
+
+
+@router.get(
+    "/preview",
+    response_model=CrawlerMetadataResponse,
+    operation_id="preview_scraping",
+)
+def preview_scraping_route(
+    session_user: SessionUser,
+    provider_cache: ProviderCacheDep,
+    provider_proxy: ProviderProxyDep,
+    crawler_id: Annotated[str, Query(alias="crawlerId")],
+    source_url: Annotated[str, Query(alias="sourceUrl")],
+    use_cache: Annotated[bool, Query(alias="cache")] = True,
+) -> CrawlerMetadataResponse:
+    """Preview novel metadata before creating a Scraping."""
+
+    del session_user
+    try:
+        return fetch_metadata(
+            crawler_id=crawler_id,
+            source_url=source_url,
+            cache_provider=provider_cache,
+            proxy_provider=provider_proxy,
+            use_cache=use_cache,
+        )
+    except UnknownCrawlerError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Crawler not found",
+        ) from exc
+    except InvalidCrawlerUrlError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    except CrawlerFetchTimeoutError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Crawler source timed out",
+        ) from exc
+    except CrawlerFetchError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Crawler source could not be fetched",
+        ) from exc
 
 
 @router.post(
@@ -347,6 +395,49 @@ def get_scraping_route(
 
 
 @router.put(
+    "/{id}/cover",
+    response_model=ScrapingDetailResponse,
+    operation_id="upload_scraping_cover",
+)
+def upload_scraping_cover_route(
+    session_user: SessionUser,
+    repository_scraping: RepositoryScrapingDep,
+    provider_public_blob: ProviderPublicBlobDep,
+    realtime_hub: RealtimeHubDep,
+    id: str,
+    cover_image: Annotated[UploadFile, File(alias="coverImage")],
+) -> ScrapingDetailResponse:
+    """Upload and attach a JPEG or PNG cover image to a scraping."""
+
+    del session_user
+    scraping = repository_scraping.get(id)
+    if scraping is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scraping not found")
+    try:
+        content = cover_image.file.read(1024 * 1024 + 1)
+        content_type = validate_cover_content(content, cover_image.content_type or "")
+        scraping.metadata.cover_image_url = provider_public_blob.upload_cover(
+            id,
+            content,
+            content_type,
+        )
+        scraping.updated_at = datetime.now(UTC)
+        updated = repository_scraping.update(scraping, etag=scraping.etag)
+    except BlobStorageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    except ScrapingConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Scraping has changed",
+        ) from exc
+    realtime_hub.publish("scraping.updated", build_scraping_updated_payload(updated))
+    return to_scraping_detail(updated)
+
+
+@router.put(
     "/{id}",
     response_model=ScrapingDetailResponse,
     operation_id="update_scraping",
@@ -354,17 +445,9 @@ def get_scraping_route(
 def update_scraping_route(
     session_user: SessionUser,
     repository_scraping: RepositoryScrapingDep,
-    provider_public_blob: ProviderPublicBlobDep,
     realtime_hub: RealtimeHubDep,
     id: str,
-    title: Annotated[str, Form(min_length=1)],
-    author: Annotated[str | None, Form()] = None,
-    category: Annotated[str | None, Form()] = None,
-    updated_date: Annotated[str | None, Form(alias="updatedDate")] = None,
-    protagonists: Annotated[str | None, Form()] = None,
-    description: Annotated[str | None, Form()] = None,
-    cover_image: Annotated[UploadFile | None, File(alias="coverImage")] = None,
-    clear_cover_image: Annotated[bool, Form(alias="clearCoverImage")] = False,
+    body: ScrapingUpdateRequest,
 ) -> ScrapingDetailResponse:
     """Update the editable metadata and cover for a Scraping."""
 
@@ -374,24 +457,30 @@ def update_scraping_route(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scraping not found")
 
     metadata = scraping.metadata
-    metadata.title = title.strip()
-    metadata.author = _nullable_text(author)
-    metadata.category = _nullable_text(category)
-    metadata.updated_date = _nullable_text(updated_date)
-    metadata.protagonists = _parse_list(protagonists)
-    metadata.description = _nullable_text(description)
-    if cover_image is not None:
-        metadata.cover_image_url = _upload_cover(provider_public_blob, scraping.id, cover_image)
-    elif clear_cover_image:
+    metadata.title = body.title.strip()
+    metadata.author = _nullable_text(body.author)
+    metadata.category = _nullable_text(body.category)
+    metadata.updated_date = _nullable_text(body.updated_date)
+    metadata.protagonists = [item.strip() for item in body.protagonists if item.strip()]
+    metadata.description = _nullable_text(body.description)
+    if body.cover_image_url is not None:
+        metadata.cover_image_url = body.cover_image_url
+    elif body.clear_cover_image:
         metadata.cover_image_url = None
     scraping.updated_at = datetime.now(UTC)
 
     try:
         updated = repository_scraping.update(scraping, etag=scraping.etag)
     except ScrapingConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Scraping has changed") from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Scraping has changed",
+        ) from exc
     except ScrapingTooLargeError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
 
     realtime_hub.publish("scraping.updated", build_scraping_updated_payload(updated))
     return to_scraping_detail(updated)
@@ -490,20 +579,7 @@ def _task_id(source_url: str) -> str:
     return f"sha256:{sha256(source_url.encode('utf-8')).hexdigest()}"
 
 
-def _upload_cover(provider: ProviderPublicBlobDep, scraping_id: str, cover_image: UploadFile) -> str:
-    try:
-        content = cover_image.file.read(1024 * 1024 + 1)
-        content_type = validate_cover_content(content, cover_image.content_type or "")
-        return provider.upload_cover(scraping_id, content, content_type)
-    except BlobStorageError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
-
-
 def _nullable_text(value: str | None) -> str | None:
     if value is None:
         return None
     return value.strip() or None
-
-
-def _parse_list(value: str | None) -> list[str]:
-    return [item.strip() for item in value.split(",") if item.strip()] if value else []

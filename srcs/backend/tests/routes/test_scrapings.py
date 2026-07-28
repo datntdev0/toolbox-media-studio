@@ -134,12 +134,12 @@ def test_update_replaces_editable_scraping_metadata(
     updated = client.put(
         f"/api/scrapings/{created['id']}",
         headers=_headers(token),
-        data={
+        json={
             "title": "Edited Novel",
             "author": "Edited Author",
             "category": "Science Fiction",
             "updatedDate": "2026-07-25",
-            "protagonists": "Ari, Bea",
+            "protagonists": ["Ari", "Bea"],
             "description": "Edited description",
         },
     )
@@ -159,6 +159,24 @@ def test_update_replaces_editable_scraping_metadata(
     stored = scraping_repository.get(created["id"], _admin_id(client, token))
     assert stored is not None
     assert stored.metadata.title == "Edited Novel"
+
+
+def test_cover_upload_updates_scraping_cover_url(
+    client: TestClient,
+    flaresolverr_client: Any,
+) -> None:
+    flaresolverr_client.html = METADATA_HTML
+    token = _login(client)
+    created = _create(client, token)
+
+    uploaded = client.put(
+        f"/api/scrapings/{created['id']}/cover",
+        headers=_headers(token),
+        files={"coverImage": ("cover.jpg", b"\xff\xd8\xffcover", "image/jpeg")},
+    )
+
+    assert uploaded.status_code == 200
+    assert uploaded.json()["metadata"]["coverImageUrl"].endswith("/cover.jpg")
 
 
 def test_duplicate_create_refreshes_metadata_and_appends_new_chapters(

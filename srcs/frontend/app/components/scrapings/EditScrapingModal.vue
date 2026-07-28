@@ -34,8 +34,8 @@ function syncState(item: ScrapingDetailResponse) {
   state.updatedDate = item.metadata.updatedDate ? String(item.metadata.updatedDate) : ''
   state.protagonists = (item.metadata.protagonists || []).join(', ')
   state.description = item.metadata.description ? String(item.metadata.description) : ''
-  coverImage.value = null
   clearCoverImage.value = false
+  coverImage.value = null
 }
 
 async function loadDetail() {
@@ -55,7 +55,6 @@ async function loadDetail() {
 watch(open, value => { if (value) void loadDetail() })
 watch(() => props.scrapingId, () => { if (open.value) void loadDetail() })
 watch(coverImage, file => { if (file) clearCoverImage.value = false })
-
 function populateMetadata(metadata: CrawlerMetadataResponse) {
   state.title = metadata.title
   state.author = metadata.author ? String(metadata.author) : ''
@@ -69,8 +68,8 @@ async function refetchMetadata() {
   if (!detail.value) return
   refetching.value = true
   try {
-    const { crawlers } = useApiClient()
-    populateMetadata(await crawlers.get_crawler_metadata(detail.value.crawlerId, detail.value.sourceUrl, false))
+    const { scrapings } = useApiClient()
+    populateMetadata(await scrapings.preview_scraping(detail.value.crawlerId, detail.value.sourceUrl, false))
     toast.add({ title: 'Metadata refetched', description: 'Review the refreshed values, then save your changes.', color: 'success' })
   } catch {
     toast.add({ title: 'Unable to refetch metadata', description: 'The source could not be read. Please try again.', color: 'error' })
@@ -79,29 +78,25 @@ async function refetchMetadata() {
   }
 }
 
-function validateCoverImage(file: File | null) {
-  if (!file) return
-  if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 1024 * 1024) {
-    throw new Error('Cover image must be a JPEG or PNG no larger than 1 MB.')
-  }
-}
-
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   if (!props.scrapingId) return
   submitting.value = true
   try {
-    validateCoverImage(coverImage.value)
-    const form = new FormData()
-    form.set('title', event.data.title.trim())
-    form.set('author', event.data.author.trim())
-    form.set('category', event.data.category.trim())
-    form.set('updatedDate', event.data.updatedDate.trim())
-    form.set('protagonists', event.data.protagonists)
-    form.set('description', event.data.description.trim())
-    form.set('clearCoverImage', String(clearCoverImage.value))
-    if (coverImage.value) form.set('coverImage', coverImage.value)
+    const body = {
+      title: event.data.title.trim(),
+      author: event.data.author.trim() || null,
+      category: event.data.category.trim() || null,
+      updatedDate: event.data.updatedDate.trim() || null,
+      protagonists: event.data.protagonists.split(',').map(item => item.trim()).filter(Boolean),
+      description: event.data.description.trim() || null,
+      clearCoverImage: clearCoverImage.value
+    }
     const { updateScraping } = useApiClient()
-    const updated = await updateScraping(props.scrapingId, form)
+    let updated = await updateScraping(props.scrapingId, body)
+    if (coverImage.value) {
+      const { uploadScrapingCover } = useApiClient()
+      updated = await uploadScrapingCover(updated.id, coverImage.value)
+    }
     emit('updated', updated)
     toast.add({ title: 'Scraping updated', description: `“${updated.metadata.title}” has been updated.`, color: 'success' })
     open.value = false
@@ -121,7 +116,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         <div class="flex items-start gap-4">
           <div class="w-48 shrink-0">
             <UFormField label="Cover image" name="coverImage">
-              <UFileUpload v-model="coverImage" variant="area" accept="image/jpeg,image/png" label="Choose cover image" description="max 1 MB" :file-image="true" :preview="true" class="w-48 aspect-[2/3]" />
+              <UFileUpload v-model="coverImage" variant="area" accept="image/jpeg,image/png" label="Choose cover image" description="JPEG or PNG, max 1 MB" :file-image="true" :preview="true" class="w-48 aspect-[2/3]" />
               <UCheckbox v-if="detail?.metadata.coverImageUrl" v-model="clearCoverImage" label="Remove current cover" />
             </UFormField>
           </div>

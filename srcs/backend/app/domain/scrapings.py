@@ -130,6 +130,21 @@ class ScrapingCreateRequest(BaseModel):
     source_url: str = Field(min_length=1, alias="sourceUrl")
 
 
+class ScrapingUpdateRequest(BaseModel):
+    """JSON payload accepted by PUT /api/scrapings/{id}."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    title: str = Field(min_length=1)
+    author: str | None = None
+    category: str | None = None
+    updated_date: str | None = Field(default=None, alias="updatedDate")
+    protagonists: list[str] = Field(default_factory=list)
+    description: str | None = None
+    cover_image_url: str | None = Field(default=None, alias="coverImageUrl")
+    clear_cover_image: bool = Field(default=False, alias="clearCoverImage")
+
+
 class ScrapingStartRequest(BaseModel):
     """One-based manifest range accepted by PATCH /api/scrapings/{id}/start."""
 

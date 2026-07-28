@@ -791,7 +791,7 @@ export class NovelsClient {
 
         let options_: RequestInit = {
             body: content_,
-            method: "PATCH",
+            method: "PUT",
             headers: {
                 "Content-Type": "application/json",
                 "Accept": "application/json"
@@ -826,6 +826,62 @@ export class NovelsClient {
             });
         }
         return Promise.resolve<NovelChapterContentResponse>(null as any);
+    }
+
+    /**
+     * Upload Novel Cover Route
+     * @param coverImage (optional) 
+     * @return Successful Response
+     */
+    upload_novel_cover(id: string, coverImage: string | undefined): Promise<NovelResponse> {
+        let url_ = this.baseUrl + "/api/novels/{id}/cover";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = new FormData();
+        if (coverImage === null || coverImage === undefined)
+            throw new globalThis.Error("The parameter 'coverImage' cannot be null.");
+        else
+            content_.append("coverImage", coverImage.toString());
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PUT",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processUpload_novel_cover(_response);
+        });
+    }
+
+    protected processUpload_novel_cover(response: Response): Promise<NovelResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = NovelResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<NovelResponse>(null as any);
     }
 }
 
@@ -1088,7 +1144,7 @@ export class TranslationsClient {
     }
 }
 
-export class CrawlersClient {
+export class ScrapingsClient {
     private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
     private baseUrl: string;
     protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
@@ -1099,57 +1155,20 @@ export class CrawlersClient {
     }
 
     /**
-     * List Crawlers Route
-     * @return Successful Response
-     */
-    list_crawlers(): Promise<CrawlerListResponse> {
-        let url_ = this.baseUrl + "/api/crawlers";
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "GET",
-            headers: {
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processList_crawlers(_response);
-        });
-    }
-
-    protected processList_crawlers(response: Response): Promise<CrawlerListResponse> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            let result200: any = null;
-            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
-            result200 = CrawlerListResponse.fromJS(resultData200);
-            return result200;
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<CrawlerListResponse>(null as any);
-    }
-
-    /**
-     * Get Crawler Metadata Route
+     * Preview Scraping Route
      * @param cache (optional) 
      * @return Successful Response
      */
-    get_crawler_metadata(id: string, url: string, cache: boolean | undefined): Promise<CrawlerMetadataResponse> {
-        let url_ = this.baseUrl + "/api/crawlers/{id}/metadata?";
-        if (id === undefined || id === null)
-            throw new globalThis.Error("The parameter 'id' must be defined.");
-        url_ = url_.replace("{id}", encodeURIComponent("" + id));
-        if (url === undefined || url === null)
-            throw new globalThis.Error("The parameter 'url' must be defined and cannot be null.");
+    preview_scraping(crawlerId: string, sourceUrl: string, cache: boolean | undefined): Promise<CrawlerMetadataResponse> {
+        let url_ = this.baseUrl + "/api/scrapings/preview?";
+        if (crawlerId === undefined || crawlerId === null)
+            throw new globalThis.Error("The parameter 'crawlerId' must be defined and cannot be null.");
         else
-            url_ += "url=" + encodeURIComponent("" + url) + "&";
+            url_ += "crawlerId=" + encodeURIComponent("" + crawlerId) + "&";
+        if (sourceUrl === undefined || sourceUrl === null)
+            throw new globalThis.Error("The parameter 'sourceUrl' must be defined and cannot be null.");
+        else
+            url_ += "sourceUrl=" + encodeURIComponent("" + sourceUrl) + "&";
         if (cache === null)
             throw new globalThis.Error("The parameter 'cache' cannot be null.");
         else if (cache !== undefined)
@@ -1164,11 +1183,11 @@ export class CrawlersClient {
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processGet_crawler_metadata(_response);
+            return this.processPreview_scraping(_response);
         });
     }
 
-    protected processGet_crawler_metadata(response: Response): Promise<CrawlerMetadataResponse> {
+    protected processPreview_scraping(response: Response): Promise<CrawlerMetadataResponse> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
@@ -1191,74 +1210,6 @@ export class CrawlersClient {
             });
         }
         return Promise.resolve<CrawlerMetadataResponse>(null as any);
-    }
-
-    /**
-     * Get Crawler Chapter Route
-     * @param cache (optional) 
-     * @return Successful Response
-     */
-    get_crawler_chapter(id: string, url: string, cache: boolean | undefined): Promise<CrawlerChapterContentResponse> {
-        let url_ = this.baseUrl + "/api/crawlers/{id}/chapter?";
-        if (id === undefined || id === null)
-            throw new globalThis.Error("The parameter 'id' must be defined.");
-        url_ = url_.replace("{id}", encodeURIComponent("" + id));
-        if (url === undefined || url === null)
-            throw new globalThis.Error("The parameter 'url' must be defined and cannot be null.");
-        else
-            url_ += "url=" + encodeURIComponent("" + url) + "&";
-        if (cache === null)
-            throw new globalThis.Error("The parameter 'cache' cannot be null.");
-        else if (cache !== undefined)
-            url_ += "cache=" + encodeURIComponent("" + cache) + "&";
-        url_ = url_.replace(/[?&]$/, "");
-
-        let options_: RequestInit = {
-            method: "GET",
-            headers: {
-                "Accept": "application/json"
-            }
-        };
-
-        return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processGet_crawler_chapter(_response);
-        });
-    }
-
-    protected processGet_crawler_chapter(response: Response): Promise<CrawlerChapterContentResponse> {
-        const status = response.status;
-        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
-        if (status === 200) {
-            return response.text().then((_responseText) => {
-            let result200: any = null;
-            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
-            result200 = CrawlerChapterContentResponse.fromJS(resultData200);
-            return result200;
-            });
-        } else if (status === 422) {
-            return response.text().then((_responseText) => {
-            let result422: any = null;
-            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
-            result422 = HTTPValidationError.fromJS(resultData422);
-            return throwException("Validation Error", status, _responseText, _headers, result422);
-            });
-        } else if (status !== 200 && status !== 204) {
-            return response.text().then((_responseText) => {
-            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
-            });
-        }
-        return Promise.resolve<CrawlerChapterContentResponse>(null as any);
-    }
-}
-
-export class ScrapingsClient {
-    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
-    private baseUrl: string;
-    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
-
-    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
-        this.http = http ? http : window as any;
-        this.baseUrl = baseUrl ?? "";
     }
 
     /**
@@ -1520,61 +1471,22 @@ export class ScrapingsClient {
 
     /**
      * Update Scraping Route
-     * @param title (optional) 
-     * @param author (optional) 
-     * @param category (optional) 
-     * @param updatedDate (optional) 
-     * @param protagonists (optional) 
-     * @param description (optional) 
-     * @param coverImage (optional) 
-     * @param clearCoverImage (optional) 
      * @return Successful Response
      */
-    update_scraping(id: string, title: string | undefined, author: Author | undefined, category: Category | undefined, updatedDate: Updateddate | undefined, protagonists: Protagonists | undefined, description: Description | undefined, coverImage: Coverimage | undefined, clearCoverImage: boolean | undefined): Promise<ScrapingDetailResponse> {
+    update_scraping(id: string, body: ScrapingUpdateRequest): Promise<ScrapingDetailResponse> {
         let url_ = this.baseUrl + "/api/scrapings/{id}";
         if (id === undefined || id === null)
             throw new globalThis.Error("The parameter 'id' must be defined.");
         url_ = url_.replace("{id}", encodeURIComponent("" + id));
         url_ = url_.replace(/[?&]$/, "");
 
-        const content_ = new FormData();
-        if (title === null || title === undefined)
-            throw new globalThis.Error("The parameter 'title' cannot be null.");
-        else
-            content_.append("title", title.toString());
-        if (author === null || author === undefined)
-            throw new globalThis.Error("The parameter 'author' cannot be null.");
-        else
-            content_.append("author", author.toString());
-        if (category === null || category === undefined)
-            throw new globalThis.Error("The parameter 'category' cannot be null.");
-        else
-            content_.append("category", category.toString());
-        if (updatedDate === null || updatedDate === undefined)
-            throw new globalThis.Error("The parameter 'updatedDate' cannot be null.");
-        else
-            content_.append("updatedDate", updatedDate.toString());
-        if (protagonists === null || protagonists === undefined)
-            throw new globalThis.Error("The parameter 'protagonists' cannot be null.");
-        else
-            content_.append("protagonists", protagonists.toString());
-        if (description === null || description === undefined)
-            throw new globalThis.Error("The parameter 'description' cannot be null.");
-        else
-            content_.append("description", description.toString());
-        if (coverImage === null || coverImage === undefined)
-            throw new globalThis.Error("The parameter 'coverImage' cannot be null.");
-        else
-            content_.append("coverImage", coverImage.toString());
-        if (clearCoverImage === null || clearCoverImage === undefined)
-            throw new globalThis.Error("The parameter 'clearCoverImage' cannot be null.");
-        else
-            content_.append("clearCoverImage", clearCoverImage.toString());
+        const content_ = JSON.stringify(body);
 
         let options_: RequestInit = {
             body: content_,
             method: "PUT",
             headers: {
+                "Content-Type": "application/json",
                 "Accept": "application/json"
             }
         };
@@ -1654,6 +1566,62 @@ export class ScrapingsClient {
     }
 
     /**
+     * Upload Scraping Cover Route
+     * @param coverImage (optional) 
+     * @return Successful Response
+     */
+    upload_scraping_cover(id: string, coverImage: string | undefined): Promise<ScrapingDetailResponse> {
+        let url_ = this.baseUrl + "/api/scrapings/{id}/cover";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = new FormData();
+        if (coverImage === null || coverImage === undefined)
+            throw new globalThis.Error("The parameter 'coverImage' cannot be null.");
+        else
+            content_.append("coverImage", coverImage.toString());
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PUT",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processUpload_scraping_cover(_response);
+        });
+    }
+
+    protected processUpload_scraping_cover(response: Response): Promise<ScrapingDetailResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = ScrapingDetailResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<ScrapingDetailResponse>(null as any);
+    }
+
+    /**
      * Get Scraping Result Route
      * @return Successful Response
      */
@@ -1705,27 +1673,17 @@ export class ScrapingsClient {
     }
 }
 
-export class Body_update_scraping implements IBody_update_scraping {
-    title!: string;
-    author?: Author;
-    category?: Category;
-    updatedDate?: Updateddate;
-    protagonists?: Protagonists;
-    description?: Description;
-    coverImage?: Coverimage;
-    clearCoverImage?: boolean;
+export class Body_upload_novel_cover implements IBody_upload_novel_cover {
+    coverImage!: string;
 
     [key: string]: any;
 
-    constructor(data?: IBody_update_scraping) {
+    constructor(data?: IBody_upload_novel_cover) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
                     (this as any)[property] = (data as any)[property];
             }
-        }
-        if (!data) {
-            this.clearCoverImage = false;
         }
     }
 
@@ -1735,20 +1693,13 @@ export class Body_update_scraping implements IBody_update_scraping {
                 if (_data.hasOwnProperty(property))
                     this[property] = _data[property];
             }
-            this.title = _data["title"];
-            this.author = _data["author"];
-            this.category = _data["category"];
-            this.updatedDate = _data["updatedDate"];
-            this.protagonists = _data["protagonists"];
-            this.description = _data["description"];
             this.coverImage = _data["coverImage"];
-            this.clearCoverImage = _data["clearCoverImage"] !== undefined ? _data["clearCoverImage"] : false;
         }
     }
 
-    static fromJS(data: any): Body_update_scraping {
+    static fromJS(data: any): Body_upload_novel_cover {
         data = typeof data === 'object' ? data : {};
-        let result = new Body_update_scraping();
+        let result = new Body_upload_novel_cover();
         result.init(data);
         return result;
     }
@@ -1759,53 +1710,28 @@ export class Body_update_scraping implements IBody_update_scraping {
             if (this.hasOwnProperty(property))
                 data[property] = this[property];
         }
-        data["title"] = this.title;
-        data["author"] = this.author;
-        data["category"] = this.category;
-        data["updatedDate"] = this.updatedDate;
-        data["protagonists"] = this.protagonists;
-        data["description"] = this.description;
         data["coverImage"] = this.coverImage;
-        data["clearCoverImage"] = this.clearCoverImage;
         return data;
     }
 }
 
-export interface IBody_update_scraping {
-    title: string;
-    author?: Author;
-    category?: Category;
-    updatedDate?: Updateddate;
-    protagonists?: Protagonists;
-    description?: Description;
-    coverImage?: Coverimage;
-    clearCoverImage?: boolean;
+export interface IBody_upload_novel_cover {
+    coverImage: string;
 
     [key: string]: any;
 }
 
-/** Chapter content returned by the crawler endpoint. */
-export class CrawlerChapterContentResponse implements ICrawlerChapterContentResponse {
-    crawlerId!: string;
-    novelUrl!: string;
-    chapterUrl!: string;
-    chapterTitle!: string;
-    chapterNumber?: ChapterNumber;
-    content!: string[];
-    cached!: boolean;
-    fetchedAt!: Date;
+export class Body_upload_scraping_cover implements IBody_upload_scraping_cover {
+    coverImage!: string;
 
     [key: string]: any;
 
-    constructor(data?: ICrawlerChapterContentResponse) {
+    constructor(data?: IBody_upload_scraping_cover) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
                     (this as any)[property] = (data as any)[property];
             }
-        }
-        if (!data) {
-            this.content = [];
         }
     }
 
@@ -1815,24 +1741,13 @@ export class CrawlerChapterContentResponse implements ICrawlerChapterContentResp
                 if (_data.hasOwnProperty(property))
                     this[property] = _data[property];
             }
-            this.crawlerId = _data["crawlerId"];
-            this.novelUrl = _data["novelUrl"];
-            this.chapterUrl = _data["chapterUrl"];
-            this.chapterTitle = _data["chapterTitle"];
-            this.chapterNumber = _data["chapterNumber"];
-            if (Array.isArray(_data["content"])) {
-                this.content = [] as any;
-                for (let item of _data["content"])
-                    this.content!.push(item);
-            }
-            this.cached = _data["cached"];
-            this.fetchedAt = _data["fetchedAt"] ? new Date(_data["fetchedAt"].toString()) : undefined as any;
+            this.coverImage = _data["coverImage"];
         }
     }
 
-    static fromJS(data: any): CrawlerChapterContentResponse {
+    static fromJS(data: any): Body_upload_scraping_cover {
         data = typeof data === 'object' ? data : {};
-        let result = new CrawlerChapterContentResponse();
+        let result = new Body_upload_scraping_cover();
         result.init(data);
         return result;
     }
@@ -1843,32 +1758,13 @@ export class CrawlerChapterContentResponse implements ICrawlerChapterContentResp
             if (this.hasOwnProperty(property))
                 data[property] = this[property];
         }
-        data["crawlerId"] = this.crawlerId;
-        data["novelUrl"] = this.novelUrl;
-        data["chapterUrl"] = this.chapterUrl;
-        data["chapterTitle"] = this.chapterTitle;
-        data["chapterNumber"] = this.chapterNumber;
-        if (Array.isArray(this.content)) {
-            data["content"] = [];
-            for (let item of this.content)
-                data["content"].push(item);
-        }
-        data["cached"] = this.cached;
-        data["fetchedAt"] = this.fetchedAt ? this.fetchedAt.toISOString() : undefined as any;
+        data["coverImage"] = this.coverImage;
         return data;
     }
 }
 
-/** Chapter content returned by the crawler endpoint. */
-export interface ICrawlerChapterContentResponse {
-    crawlerId: string;
-    novelUrl: string;
-    chapterUrl: string;
-    chapterTitle: string;
-    chapterNumber?: ChapterNumber;
-    content: string[];
-    cached: boolean;
-    fetchedAt: Date;
+export interface IBody_upload_scraping_cover {
+    coverImage: string;
 
     [key: string]: any;
 }
@@ -1877,7 +1773,7 @@ export interface ICrawlerChapterContentResponse {
 export class CrawlerChapterResponse implements ICrawlerChapterResponse {
     title!: string;
     url!: string;
-    chapterNumber?: ChapterNumber2;
+    chapterNumber?: ChapterNumber;
 
     [key: string]: any;
 
@@ -1926,68 +1822,7 @@ export class CrawlerChapterResponse implements ICrawlerChapterResponse {
 export interface ICrawlerChapterResponse {
     title: string;
     url: string;
-    chapterNumber?: ChapterNumber2;
-
-    [key: string]: any;
-}
-
-/** Available crawler registry response. */
-export class CrawlerListResponse implements ICrawlerListResponse {
-    items!: CrawlerSummaryResponse[];
-
-    [key: string]: any;
-
-    constructor(data?: ICrawlerListResponse) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-        if (!data) {
-            this.items = [];
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-            if (Array.isArray(_data["items"])) {
-                this.items = [] as any;
-                for (let item of _data["items"])
-                    this.items!.push(CrawlerSummaryResponse.fromJS(item));
-            }
-        }
-    }
-
-    static fromJS(data: any): CrawlerListResponse {
-        data = typeof data === 'object' ? data : {};
-        let result = new CrawlerListResponse();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        if (Array.isArray(this.items)) {
-            data["items"] = [];
-            for (let item of this.items)
-                data["items"].push(item ? item.toJSON() : undefined as any);
-        }
-        return data;
-    }
-}
-
-/** Available crawler registry response. */
-export interface ICrawlerListResponse {
-    items: CrawlerSummaryResponse[];
+    chapterNumber?: ChapterNumber;
 
     [key: string]: any;
 }
@@ -1998,11 +1833,11 @@ export class CrawlerMetadataResponse implements ICrawlerMetadataResponse {
     sourceUrl!: string;
     sourceNovelId!: string;
     title!: string;
-    author?: Author2;
-    category?: Category2;
+    author?: Author;
+    category?: Category;
     updatedDate?: UpdatedDate;
     protagonists!: string[];
-    description?: Description2;
+    description?: Description;
     coverImageUrl?: CoverImageUrl;
     chapters!: CrawlerChapterResponse[];
     cached!: boolean;
@@ -2097,88 +1932,15 @@ export interface ICrawlerMetadataResponse {
     sourceUrl: string;
     sourceNovelId: string;
     title: string;
-    author?: Author2;
-    category?: Category2;
+    author?: Author;
+    category?: Category;
     updatedDate?: UpdatedDate;
     protagonists: string[];
-    description?: Description2;
+    description?: Description;
     coverImageUrl?: CoverImageUrl;
     chapters: CrawlerChapterResponse[];
     cached: boolean;
     fetchedAt: Date;
-
-    [key: string]: any;
-}
-
-/** Available crawler summary. */
-export class CrawlerSummaryResponse implements ICrawlerSummaryResponse {
-    id!: string;
-    name!: string;
-    hosts!: string[];
-    metadataSupported!: boolean;
-
-    [key: string]: any;
-
-    constructor(data?: ICrawlerSummaryResponse) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-        if (!data) {
-            this.hosts = [];
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-            this.id = _data["id"];
-            this.name = _data["name"];
-            if (Array.isArray(_data["hosts"])) {
-                this.hosts = [] as any;
-                for (let item of _data["hosts"])
-                    this.hosts!.push(item);
-            }
-            this.metadataSupported = _data["metadataSupported"];
-        }
-    }
-
-    static fromJS(data: any): CrawlerSummaryResponse {
-        data = typeof data === 'object' ? data : {};
-        let result = new CrawlerSummaryResponse();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        data["id"] = this.id;
-        data["name"] = this.name;
-        if (Array.isArray(this.hosts)) {
-            data["hosts"] = [];
-            for (let item of this.hosts)
-                data["hosts"].push(item);
-        }
-        data["metadataSupported"] = this.metadataSupported;
-        return data;
-    }
-}
-
-/** Available crawler summary. */
-export interface ICrawlerSummaryResponse {
-    id: string;
-    name: string;
-    hosts: string[];
-    metadataSupported: boolean;
 
     [key: string]: any;
 }
@@ -2393,7 +2155,7 @@ export interface INovelBindingResponse {
 export class NovelChapterContentResponse implements INovelChapterContentResponse {
     id!: string;
     title!: string;
-    chapterNumber?: ChapterNumber3;
+    chapterNumber?: ChapterNumber2;
     manifestIndex!: number;
     contentAvailable!: boolean;
     manuallyEdited!: boolean;
@@ -2474,7 +2236,7 @@ export class NovelChapterContentResponse implements INovelChapterContentResponse
 export interface INovelChapterContentResponse {
     id: string;
     title: string;
-    chapterNumber?: ChapterNumber3;
+    chapterNumber?: ChapterNumber2;
     manifestIndex: number;
     contentAvailable: boolean;
     manuallyEdited: boolean;
@@ -2491,7 +2253,7 @@ export interface INovelChapterContentResponse {
 export class NovelChapterSummaryResponse implements INovelChapterSummaryResponse {
     id!: string;
     title!: string;
-    chapterNumber?: ChapterNumber4;
+    chapterNumber?: ChapterNumber3;
     manifestIndex!: number;
     contentAvailable!: boolean;
     manuallyEdited!: boolean;
@@ -2561,7 +2323,7 @@ export class NovelChapterSummaryResponse implements INovelChapterSummaryResponse
 export interface INovelChapterSummaryResponse {
     id: string;
     title: string;
-    chapterNumber?: ChapterNumber4;
+    chapterNumber?: ChapterNumber3;
     manifestIndex: number;
     contentAvailable: boolean;
     manuallyEdited: boolean;
@@ -2618,10 +2380,10 @@ export interface INovelChapterUpdateRequest {
 /** Payload for creating a novel. */
 export class NovelCreateRequest implements INovelCreateRequest {
     title!: string;
-    description?: Description3;
+    description?: Description2;
     coverImageUrl?: CoverImageUrl2;
     language?: Language;
-    author?: Author3;
+    author?: Author2;
     tags?: Tags;
     notes?: Notes;
 
@@ -2679,10 +2441,10 @@ export class NovelCreateRequest implements INovelCreateRequest {
 /** Payload for creating a novel. */
 export interface INovelCreateRequest {
     title: string;
-    description?: Description3;
+    description?: Description2;
     coverImageUrl?: CoverImageUrl2;
     language?: Language;
-    author?: Author3;
+    author?: Author2;
     tags?: Tags;
     notes?: Notes;
 
@@ -2693,10 +2455,10 @@ export interface INovelCreateRequest {
 export class NovelDetailResponse implements INovelDetailResponse {
     id!: string;
     title!: string;
-    description?: Description4;
+    description?: Description3;
     coverImageUrl?: CoverImageUrl3;
     language?: Language2;
-    author?: Author4;
+    author?: Author3;
     tags!: string[];
     notes?: Notes2;
     status!: NovelStatus;
@@ -2798,10 +2560,10 @@ export class NovelDetailResponse implements INovelDetailResponse {
 export interface INovelDetailResponse {
     id: string;
     title: string;
-    description?: Description4;
+    description?: Description3;
     coverImageUrl?: CoverImageUrl3;
     language?: Language2;
-    author?: Author4;
+    author?: Author3;
     tags: string[];
     notes?: Notes2;
     status: NovelStatus;
@@ -2884,10 +2646,10 @@ export interface INovelListResponse {
 export class NovelResponse implements INovelResponse {
     id!: string;
     title!: string;
-    description?: Description5;
+    description?: Description4;
     coverImageUrl?: CoverImageUrl4;
     language?: Language3;
-    author?: Author5;
+    author?: Author4;
     tags!: string[];
     notes?: Notes3;
     status!: NovelStatus;
@@ -2978,10 +2740,10 @@ export class NovelResponse implements INovelResponse {
 export interface INovelResponse {
     id: string;
     title: string;
-    description?: Description5;
+    description?: Description4;
     coverImageUrl?: CoverImageUrl4;
     language?: Language3;
-    author?: Author5;
+    author?: Author4;
     tags: string[];
     notes?: Notes3;
     status: NovelStatus;
@@ -3125,10 +2887,10 @@ export interface INovelSyncResponse {
 /** Payload for updating a novel while allowing nullable fields to be cleared. */
 export class NovelUpdateRequest implements INovelUpdateRequest {
     title?: Title;
-    description?: Description6;
+    description?: Description5;
     coverImageUrl?: CoverImageUrl5;
     language?: Language4;
-    author?: Author6;
+    author?: Author5;
     tags?: Tags2;
     notes?: Notes4;
     status?: Status;
@@ -3192,10 +2954,10 @@ export class NovelUpdateRequest implements INovelUpdateRequest {
 /** Payload for updating a novel while allowing nullable fields to be cleared. */
 export interface INovelUpdateRequest {
     title?: Title;
-    description?: Description6;
+    description?: Description5;
     coverImageUrl?: CoverImageUrl5;
     language?: Language4;
-    author?: Author6;
+    author?: Author5;
     tags?: Tags2;
     notes?: Notes4;
     status?: Status;
@@ -3487,11 +3249,11 @@ export interface IScrapingListResponse {
 export class ScrapingMetadataResponse implements IScrapingMetadataResponse {
     sourceNovelId!: string;
     title!: string;
-    author?: Author7;
-    category?: Category3;
+    author?: Author6;
+    category?: Category2;
     updatedDate?: UpdatedDate2;
     protagonists?: string[];
-    description?: Description7;
+    description?: Description6;
     coverImageUrl?: CoverImageUrl7;
     fetchedAt!: Date;
 
@@ -3562,11 +3324,11 @@ export class ScrapingMetadataResponse implements IScrapingMetadataResponse {
 export interface IScrapingMetadataResponse {
     sourceNovelId: string;
     title: string;
-    author?: Author7;
-    category?: Category3;
+    author?: Author6;
+    category?: Category2;
     updatedDate?: UpdatedDate2;
     protagonists?: string[];
-    description?: Description7;
+    description?: Description6;
     coverImageUrl?: CoverImageUrl7;
     fetchedAt: Date;
 
@@ -3648,7 +3410,7 @@ export class ScrapingResultResponse implements IScrapingResultResponse {
     scrapingId!: string;
     taskId!: string;
     title!: string;
-    chapterNumber?: ChapterNumber5;
+    chapterNumber?: ChapterNumber4;
     content?: string[];
     createdAt!: Date;
 
@@ -3714,7 +3476,7 @@ export interface IScrapingResultResponse {
     scrapingId: string;
     taskId: string;
     title: string;
-    chapterNumber?: ChapterNumber5;
+    chapterNumber?: ChapterNumber4;
     content?: string[];
     createdAt: Date;
 
@@ -3860,7 +3622,7 @@ export interface IScrapingSummaryResponse {
 export class ScrapingTaskResponse implements IScrapingTaskResponse {
     id!: string;
     title!: string;
-    chapterNumber?: ChapterNumber6;
+    chapterNumber?: ChapterNumber5;
     manifestIndex!: number;
     status!: ScrapingTaskStatus;
     attempts!: number;
@@ -3927,7 +3689,7 @@ export class ScrapingTaskResponse implements IScrapingTaskResponse {
 export interface IScrapingTaskResponse {
     id: string;
     title: string;
-    chapterNumber?: ChapterNumber6;
+    chapterNumber?: ChapterNumber5;
     manifestIndex: number;
     status: ScrapingTaskStatus;
     attempts: number;
@@ -3945,6 +3707,83 @@ export enum ScrapingTaskStatus {
     Running = "running",
     Completed = "completed",
     Failed = "failed",
+}
+
+/** JSON payload accepted by PUT /api/scrapings/{id}. */
+export class ScrapingUpdateRequest implements IScrapingUpdateRequest {
+    title!: string;
+    author?: Author7;
+    category?: Category3;
+    updatedDate?: UpdatedDate3;
+    protagonists?: string[];
+    description?: Description7;
+    coverImageUrl?: CoverImageUrl9;
+    clearCoverImage?: boolean;
+
+    constructor(data?: IScrapingUpdateRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+        if (!data) {
+            this.clearCoverImage = false;
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.title = _data["title"];
+            this.author = _data["author"];
+            this.category = _data["category"];
+            this.updatedDate = _data["updatedDate"];
+            if (Array.isArray(_data["protagonists"])) {
+                this.protagonists = [] as any;
+                for (let item of _data["protagonists"])
+                    this.protagonists!.push(item);
+            }
+            this.description = _data["description"];
+            this.coverImageUrl = _data["coverImageUrl"];
+            this.clearCoverImage = _data["clearCoverImage"] !== undefined ? _data["clearCoverImage"] : false;
+        }
+    }
+
+    static fromJS(data: any): ScrapingUpdateRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new ScrapingUpdateRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["title"] = this.title;
+        data["author"] = this.author;
+        data["category"] = this.category;
+        data["updatedDate"] = this.updatedDate;
+        if (Array.isArray(this.protagonists)) {
+            data["protagonists"] = [];
+            for (let item of this.protagonists)
+                data["protagonists"].push(item);
+        }
+        data["description"] = this.description;
+        data["coverImageUrl"] = this.coverImageUrl;
+        data["clearCoverImage"] = this.clearCoverImage;
+        return data;
+    }
+}
+
+/** JSON payload accepted by PUT /api/scrapings/{id}. */
+export interface IScrapingUpdateRequest {
+    title: string;
+    author?: Author7;
+    category?: Category3;
+    updatedDate?: UpdatedDate3;
+    protagonists?: string[];
+    description?: Description7;
+    coverImageUrl?: CoverImageUrl9;
+    clearCoverImage?: boolean;
 }
 
 /** Issued on successful login. */
@@ -4957,6 +4796,50 @@ export interface ISearch {
     [key: string]: any;
 }
 
+export class ChapterNumber implements IChapterNumber {
+
+    [key: string]: any;
+
+    constructor(data?: IChapterNumber) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): ChapterNumber {
+        data = typeof data === 'object' ? data : {};
+        let result = new ChapterNumber();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IChapterNumber {
+
+    [key: string]: any;
+}
+
 export class Author implements IAuthor {
 
     [key: string]: any;
@@ -5045,11 +4928,11 @@ export interface ICategory {
     [key: string]: any;
 }
 
-export class Updateddate implements IUpdateddate {
+export class UpdatedDate implements IUpdatedDate {
 
     [key: string]: any;
 
-    constructor(data?: IUpdateddate) {
+    constructor(data?: IUpdatedDate) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5067,9 +4950,9 @@ export class Updateddate implements IUpdateddate {
         }
     }
 
-    static fromJS(data: any): Updateddate {
+    static fromJS(data: any): UpdatedDate {
         data = typeof data === 'object' ? data : {};
-        let result = new Updateddate();
+        let result = new UpdatedDate();
         result.init(data);
         return result;
     }
@@ -5084,51 +4967,7 @@ export class Updateddate implements IUpdateddate {
     }
 }
 
-export interface IUpdateddate {
-
-    [key: string]: any;
-}
-
-export class Protagonists implements IProtagonists {
-
-    [key: string]: any;
-
-    constructor(data?: IProtagonists) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Protagonists {
-        data = typeof data === 'object' ? data : {};
-        let result = new Protagonists();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IProtagonists {
+export interface IUpdatedDate {
 
     [key: string]: any;
 }
@@ -5177,11 +5016,11 @@ export interface IDescription {
     [key: string]: any;
 }
 
-export class Coverimage implements ICoverimage {
+export class CoverImageUrl implements ICoverImageUrl {
 
     [key: string]: any;
 
-    constructor(data?: ICoverimage) {
+    constructor(data?: ICoverImageUrl) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5199,9 +5038,9 @@ export class Coverimage implements ICoverimage {
         }
     }
 
-    static fromJS(data: any): Coverimage {
+    static fromJS(data: any): CoverImageUrl {
         data = typeof data === 'object' ? data : {};
-        let result = new Coverimage();
+        let result = new CoverImageUrl();
         result.init(data);
         return result;
     }
@@ -5216,51 +5055,7 @@ export class Coverimage implements ICoverimage {
     }
 }
 
-export interface ICoverimage {
-
-    [key: string]: any;
-}
-
-export class ChapterNumber implements IChapterNumber {
-
-    [key: string]: any;
-
-    constructor(data?: IChapterNumber) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): ChapterNumber {
-        data = typeof data === 'object' ? data : {};
-        let result = new ChapterNumber();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IChapterNumber {
+export interface ICoverImageUrl {
 
     [key: string]: any;
 }
@@ -5309,11 +5104,11 @@ export interface IChapterNumber2 {
     [key: string]: any;
 }
 
-export class Author2 implements IAuthor2 {
+export class Etag implements IEtag {
 
     [key: string]: any;
 
-    constructor(data?: IAuthor2) {
+    constructor(data?: IEtag) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5331,9 +5126,9 @@ export class Author2 implements IAuthor2 {
         }
     }
 
-    static fromJS(data: any): Author2 {
+    static fromJS(data: any): Etag {
         data = typeof data === 'object' ? data : {};
-        let result = new Author2();
+        let result = new Etag();
         result.init(data);
         return result;
     }
@@ -5348,183 +5143,7 @@ export class Author2 implements IAuthor2 {
     }
 }
 
-export interface IAuthor2 {
-
-    [key: string]: any;
-}
-
-export class Category2 implements ICategory2 {
-
-    [key: string]: any;
-
-    constructor(data?: ICategory2) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Category2 {
-        data = typeof data === 'object' ? data : {};
-        let result = new Category2();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface ICategory2 {
-
-    [key: string]: any;
-}
-
-export class UpdatedDate implements IUpdatedDate {
-
-    [key: string]: any;
-
-    constructor(data?: IUpdatedDate) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): UpdatedDate {
-        data = typeof data === 'object' ? data : {};
-        let result = new UpdatedDate();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IUpdatedDate {
-
-    [key: string]: any;
-}
-
-export class Description2 implements IDescription2 {
-
-    [key: string]: any;
-
-    constructor(data?: IDescription2) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Description2 {
-        data = typeof data === 'object' ? data : {};
-        let result = new Description2();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IDescription2 {
-
-    [key: string]: any;
-}
-
-export class CoverImageUrl implements ICoverImageUrl {
-
-    [key: string]: any;
-
-    constructor(data?: ICoverImageUrl) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): CoverImageUrl {
-        data = typeof data === 'object' ? data : {};
-        let result = new CoverImageUrl();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface ICoverImageUrl {
+export interface IEtag {
 
     [key: string]: any;
 }
@@ -5573,94 +5192,6 @@ export interface IChapterNumber3 {
     [key: string]: any;
 }
 
-export class Etag implements IEtag {
-
-    [key: string]: any;
-
-    constructor(data?: IEtag) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Etag {
-        data = typeof data === 'object' ? data : {};
-        let result = new Etag();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IEtag {
-
-    [key: string]: any;
-}
-
-export class ChapterNumber4 implements IChapterNumber4 {
-
-    [key: string]: any;
-
-    constructor(data?: IChapterNumber4) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): ChapterNumber4 {
-        data = typeof data === 'object' ? data : {};
-        let result = new ChapterNumber4();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IChapterNumber4 {
-
-    [key: string]: any;
-}
-
 export class Etag2 implements IEtag2 {
 
     [key: string]: any;
@@ -5705,11 +5236,11 @@ export interface IEtag2 {
     [key: string]: any;
 }
 
-export class Description3 implements IDescription3 {
+export class Description2 implements IDescription2 {
 
     [key: string]: any;
 
-    constructor(data?: IDescription3) {
+    constructor(data?: IDescription2) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5727,9 +5258,9 @@ export class Description3 implements IDescription3 {
         }
     }
 
-    static fromJS(data: any): Description3 {
+    static fromJS(data: any): Description2 {
         data = typeof data === 'object' ? data : {};
-        let result = new Description3();
+        let result = new Description2();
         result.init(data);
         return result;
     }
@@ -5744,7 +5275,7 @@ export class Description3 implements IDescription3 {
     }
 }
 
-export interface IDescription3 {
+export interface IDescription2 {
 
     [key: string]: any;
 }
@@ -5837,11 +5368,11 @@ export interface ILanguage {
     [key: string]: any;
 }
 
-export class Author3 implements IAuthor3 {
+export class Author2 implements IAuthor2 {
 
     [key: string]: any;
 
-    constructor(data?: IAuthor3) {
+    constructor(data?: IAuthor2) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5859,9 +5390,9 @@ export class Author3 implements IAuthor3 {
         }
     }
 
-    static fromJS(data: any): Author3 {
+    static fromJS(data: any): Author2 {
         data = typeof data === 'object' ? data : {};
-        let result = new Author3();
+        let result = new Author2();
         result.init(data);
         return result;
     }
@@ -5876,7 +5407,7 @@ export class Author3 implements IAuthor3 {
     }
 }
 
-export interface IAuthor3 {
+export interface IAuthor2 {
 
     [key: string]: any;
 }
@@ -5969,11 +5500,11 @@ export interface INotes {
     [key: string]: any;
 }
 
-export class Description4 implements IDescription4 {
+export class Description3 implements IDescription3 {
 
     [key: string]: any;
 
-    constructor(data?: IDescription4) {
+    constructor(data?: IDescription3) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -5991,9 +5522,9 @@ export class Description4 implements IDescription4 {
         }
     }
 
-    static fromJS(data: any): Description4 {
+    static fromJS(data: any): Description3 {
         data = typeof data === 'object' ? data : {};
-        let result = new Description4();
+        let result = new Description3();
         result.init(data);
         return result;
     }
@@ -6008,7 +5539,7 @@ export class Description4 implements IDescription4 {
     }
 }
 
-export interface IDescription4 {
+export interface IDescription3 {
 
     [key: string]: any;
 }
@@ -6101,11 +5632,11 @@ export interface ILanguage2 {
     [key: string]: any;
 }
 
-export class Author4 implements IAuthor4 {
+export class Author3 implements IAuthor3 {
 
     [key: string]: any;
 
-    constructor(data?: IAuthor4) {
+    constructor(data?: IAuthor3) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -6123,9 +5654,9 @@ export class Author4 implements IAuthor4 {
         }
     }
 
-    static fromJS(data: any): Author4 {
+    static fromJS(data: any): Author3 {
         data = typeof data === 'object' ? data : {};
-        let result = new Author4();
+        let result = new Author3();
         result.init(data);
         return result;
     }
@@ -6140,7 +5671,7 @@ export class Author4 implements IAuthor4 {
     }
 }
 
-export interface IAuthor4 {
+export interface IAuthor3 {
 
     [key: string]: any;
 }
@@ -6321,11 +5852,11 @@ export interface IContinuationToken {
     [key: string]: any;
 }
 
-export class Description5 implements IDescription5 {
+export class Description4 implements IDescription4 {
 
     [key: string]: any;
 
-    constructor(data?: IDescription5) {
+    constructor(data?: IDescription4) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -6343,9 +5874,9 @@ export class Description5 implements IDescription5 {
         }
     }
 
-    static fromJS(data: any): Description5 {
+    static fromJS(data: any): Description4 {
         data = typeof data === 'object' ? data : {};
-        let result = new Description5();
+        let result = new Description4();
         result.init(data);
         return result;
     }
@@ -6360,7 +5891,7 @@ export class Description5 implements IDescription5 {
     }
 }
 
-export interface IDescription5 {
+export interface IDescription4 {
 
     [key: string]: any;
 }
@@ -6453,11 +5984,11 @@ export interface ILanguage3 {
     [key: string]: any;
 }
 
-export class Author5 implements IAuthor5 {
+export class Author4 implements IAuthor4 {
 
     [key: string]: any;
 
-    constructor(data?: IAuthor5) {
+    constructor(data?: IAuthor4) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -6475,9 +6006,9 @@ export class Author5 implements IAuthor5 {
         }
     }
 
-    static fromJS(data: any): Author5 {
+    static fromJS(data: any): Author4 {
         data = typeof data === 'object' ? data : {};
-        let result = new Author5();
+        let result = new Author4();
         result.init(data);
         return result;
     }
@@ -6492,7 +6023,7 @@ export class Author5 implements IAuthor5 {
     }
 }
 
-export interface IAuthor5 {
+export interface IAuthor4 {
 
     [key: string]: any;
 }
@@ -6673,11 +6204,11 @@ export interface ITitle {
     [key: string]: any;
 }
 
-export class Description6 implements IDescription6 {
+export class Description5 implements IDescription5 {
 
     [key: string]: any;
 
-    constructor(data?: IDescription6) {
+    constructor(data?: IDescription5) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -6695,9 +6226,9 @@ export class Description6 implements IDescription6 {
         }
     }
 
-    static fromJS(data: any): Description6 {
+    static fromJS(data: any): Description5 {
         data = typeof data === 'object' ? data : {};
-        let result = new Description6();
+        let result = new Description5();
         result.init(data);
         return result;
     }
@@ -6712,7 +6243,7 @@ export class Description6 implements IDescription6 {
     }
 }
 
-export interface IDescription6 {
+export interface IDescription5 {
 
     [key: string]: any;
 }
@@ -6805,11 +6336,11 @@ export interface ILanguage4 {
     [key: string]: any;
 }
 
-export class Author6 implements IAuthor6 {
+export class Author5 implements IAuthor5 {
 
     [key: string]: any;
 
-    constructor(data?: IAuthor6) {
+    constructor(data?: IAuthor5) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -6827,9 +6358,9 @@ export class Author6 implements IAuthor6 {
         }
     }
 
-    static fromJS(data: any): Author6 {
+    static fromJS(data: any): Author5 {
         data = typeof data === 'object' ? data : {};
-        let result = new Author6();
+        let result = new Author5();
         result.init(data);
         return result;
     }
@@ -6844,7 +6375,7 @@ export class Author6 implements IAuthor6 {
     }
 }
 
-export interface IAuthor6 {
+export interface IAuthor5 {
 
     [key: string]: any;
 }
@@ -7113,11 +6644,11 @@ export interface IContinuationToken2 {
     [key: string]: any;
 }
 
-export class Author7 implements IAuthor7 {
+export class Author6 implements IAuthor6 {
 
     [key: string]: any;
 
-    constructor(data?: IAuthor7) {
+    constructor(data?: IAuthor6) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -7135,9 +6666,9 @@ export class Author7 implements IAuthor7 {
         }
     }
 
-    static fromJS(data: any): Author7 {
+    static fromJS(data: any): Author6 {
         data = typeof data === 'object' ? data : {};
-        let result = new Author7();
+        let result = new Author6();
         result.init(data);
         return result;
     }
@@ -7152,16 +6683,16 @@ export class Author7 implements IAuthor7 {
     }
 }
 
-export interface IAuthor7 {
+export interface IAuthor6 {
 
     [key: string]: any;
 }
 
-export class Category3 implements ICategory3 {
+export class Category2 implements ICategory2 {
 
     [key: string]: any;
 
-    constructor(data?: ICategory3) {
+    constructor(data?: ICategory2) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -7179,9 +6710,9 @@ export class Category3 implements ICategory3 {
         }
     }
 
-    static fromJS(data: any): Category3 {
+    static fromJS(data: any): Category2 {
         data = typeof data === 'object' ? data : {};
-        let result = new Category3();
+        let result = new Category2();
         result.init(data);
         return result;
     }
@@ -7196,7 +6727,7 @@ export class Category3 implements ICategory3 {
     }
 }
 
-export interface ICategory3 {
+export interface ICategory2 {
 
     [key: string]: any;
 }
@@ -7245,11 +6776,11 @@ export interface IUpdatedDate2 {
     [key: string]: any;
 }
 
-export class Description7 implements IDescription7 {
+export class Description6 implements IDescription6 {
 
     [key: string]: any;
 
-    constructor(data?: IDescription7) {
+    constructor(data?: IDescription6) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -7267,9 +6798,9 @@ export class Description7 implements IDescription7 {
         }
     }
 
-    static fromJS(data: any): Description7 {
+    static fromJS(data: any): Description6 {
         data = typeof data === 'object' ? data : {};
-        let result = new Description7();
+        let result = new Description6();
         result.init(data);
         return result;
     }
@@ -7284,7 +6815,7 @@ export class Description7 implements IDescription7 {
     }
 }
 
-export interface IDescription7 {
+export interface IDescription6 {
 
     [key: string]: any;
 }
@@ -7333,11 +6864,11 @@ export interface ICoverImageUrl7 {
     [key: string]: any;
 }
 
-export class ChapterNumber5 implements IChapterNumber5 {
+export class ChapterNumber4 implements IChapterNumber4 {
 
     [key: string]: any;
 
-    constructor(data?: IChapterNumber5) {
+    constructor(data?: IChapterNumber4) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -7355,9 +6886,9 @@ export class ChapterNumber5 implements IChapterNumber5 {
         }
     }
 
-    static fromJS(data: any): ChapterNumber5 {
+    static fromJS(data: any): ChapterNumber4 {
         data = typeof data === 'object' ? data : {};
-        let result = new ChapterNumber5();
+        let result = new ChapterNumber4();
         result.init(data);
         return result;
     }
@@ -7372,7 +6903,7 @@ export class ChapterNumber5 implements IChapterNumber5 {
     }
 }
 
-export interface IChapterNumber5 {
+export interface IChapterNumber4 {
 
     [key: string]: any;
 }
@@ -7421,11 +6952,11 @@ export interface ICoverImageUrl8 {
     [key: string]: any;
 }
 
-export class ChapterNumber6 implements IChapterNumber6 {
+export class ChapterNumber5 implements IChapterNumber5 {
 
     [key: string]: any;
 
-    constructor(data?: IChapterNumber6) {
+    constructor(data?: IChapterNumber5) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -7443,9 +6974,9 @@ export class ChapterNumber6 implements IChapterNumber6 {
         }
     }
 
-    static fromJS(data: any): ChapterNumber6 {
+    static fromJS(data: any): ChapterNumber5 {
         data = typeof data === 'object' ? data : {};
-        let result = new ChapterNumber6();
+        let result = new ChapterNumber5();
         result.init(data);
         return result;
     }
@@ -7460,7 +6991,7 @@ export class ChapterNumber6 implements IChapterNumber6 {
     }
 }
 
-export interface IChapterNumber6 {
+export interface IChapterNumber5 {
 
     [key: string]: any;
 }
@@ -7549,6 +7080,226 @@ export class CompletedAt implements ICompletedAt {
 }
 
 export interface ICompletedAt {
+
+    [key: string]: any;
+}
+
+export class Author7 implements IAuthor7 {
+
+    [key: string]: any;
+
+    constructor(data?: IAuthor7) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Author7 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Author7();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAuthor7 {
+
+    [key: string]: any;
+}
+
+export class Category3 implements ICategory3 {
+
+    [key: string]: any;
+
+    constructor(data?: ICategory3) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Category3 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Category3();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ICategory3 {
+
+    [key: string]: any;
+}
+
+export class UpdatedDate3 implements IUpdatedDate3 {
+
+    [key: string]: any;
+
+    constructor(data?: IUpdatedDate3) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): UpdatedDate3 {
+        data = typeof data === 'object' ? data : {};
+        let result = new UpdatedDate3();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IUpdatedDate3 {
+
+    [key: string]: any;
+}
+
+export class Description7 implements IDescription7 {
+
+    [key: string]: any;
+
+    constructor(data?: IDescription7) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Description7 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Description7();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IDescription7 {
+
+    [key: string]: any;
+}
+
+export class CoverImageUrl9 implements ICoverImageUrl9 {
+
+    [key: string]: any;
+
+    constructor(data?: ICoverImageUrl9) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): CoverImageUrl9 {
+        data = typeof data === 'object' ? data : {};
+        let result = new CoverImageUrl9();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ICoverImageUrl9 {
 
     [key: string]: any;
 }

@@ -18,6 +18,7 @@ const schema = z.object({
 type Schema = z.output<typeof schema>
 
 const submitting = ref(false)
+const coverImage = ref<File | null>(null)
 const toast = useToast()
 const state = reactive<Schema>({
   title: '', author: '', language: '', description: '', tags: '', notes: ''
@@ -38,6 +39,7 @@ function syncState() {
   state.description = valueOf(props.novel.description)
   state.tags = (props.novel.tags ?? []).join(', ')
   state.notes = valueOf(props.novel.notes)
+  coverImage.value = null
 }
 
 watch(() => props.novel, syncState, { immediate: true })
@@ -59,7 +61,11 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       etag: props.novel.etag
     }
     const { updateNovel } = useApiClient()
-    const novel = await updateNovel(props.novel.id, request)
+    let novel = await updateNovel(props.novel.id, request)
+    if (coverImage.value) {
+      const { uploadNovelCover } = useApiClient()
+      novel = await uploadNovelCover(novel.id, coverImage.value)
+    }
     emit('updated', novel)
     toast.add({ title: 'Novel updated', description: `“${novel.title}” has been updated.`, color: 'success' })
     open.value = false
@@ -87,6 +93,11 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         @submit="onSubmit"
       >
         <div class="flex items-start gap-4">
+          <div class="w-48 shrink-0">
+            <UFormField label="Cover image" name="coverImage">
+              <UFileUpload v-model="coverImage" variant="area" accept="image/jpeg,image/png" label="Choose cover image" description="JPEG or PNG, max 1 MB" :file-image="true" :preview="true" class="w-48 aspect-[2/3]" />
+            </UFormField>
+          </div>
           <div class="min-w-0 flex-1 space-y-4">
             <UFormField label="Title" name="title" required>
               <UInput v-model="state.title" class="w-full" autofocus />

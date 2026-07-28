@@ -3,10 +3,10 @@ import { breakpointsTailwind } from '@vueuse/core'
 import {
   ScrapingSummaryResponse,
   type Anonymous2,
-  type CrawlerSummaryResponse,
   type ScrapingCreateResponse,
   type ScrapingDetailResponse
 } from '~~/shared/api-services/srv-core.client'
+import { SUPPORTED_CRAWLERS } from '~/constants/crawlers'
 
 definePageMeta({
   title: 'Scrapings',
@@ -33,7 +33,7 @@ const listError = ref(false)
 const createScrapingOpen = ref(false)
 const editScrapingOpen = ref(false)
 const editingScrapingId = ref<string | null>(null)
-const crawlerNames = ref<Record<string, string>>({})
+const crawlerNames = Object.fromEntries(SUPPORTED_CRAWLERS.map(item => [item.id, item.name]))
 const listRef = ref<{ focusSelected: () => void, focusRow: (id: string) => void } | null>(null)
 const detailRef = ref<{ refresh: () => void } | null>(null)
 const selectionPushed = ref(false)
@@ -74,26 +74,12 @@ const mobileDetailOpen = computed({
 })
 
 onMounted(() => {
-  void Promise.all([loadScrapings(), loadCrawlerNames()])
+  void loadScrapings()
 })
 
 onBeforeUnmount(() => {
   if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer)
 })
-
-async function loadCrawlerNames() {
-  try {
-    const { crawlers } = useApiClient()
-    const response = await crawlers.list_crawlers()
-    setCrawlerNames(response.items || [])
-  } catch {
-    // Crawler names are enhancement text; source hosts remain as the fallback.
-  }
-}
-
-function setCrawlerNames(crawlers: CrawlerSummaryResponse[]) {
-  crawlerNames.value = Object.fromEntries(crawlers.map(item => [item.id, item.name]))
-}
 
 function mergeScrapings(
   current: ScrapingSummaryResponse[],
@@ -341,7 +327,6 @@ async function onScrapingEdited(detail: ScrapingDetailResponse) {
   <ScrapingsCreateScrapingModal
     v-model:open="createScrapingOpen"
     @created="onCreated"
-    @crawlers-loaded="setCrawlerNames"
   />
 
   <ScrapingsEditScrapingModal

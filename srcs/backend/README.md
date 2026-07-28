@@ -142,8 +142,7 @@ flowchart TB
 
 ### Crawlers
 
-- `GET /api/crawlers` — List available crawlers
-- `GET /api/crawlers/{id}/metadata` — Fetch metadata from source URL
+- `GET /api/scrapings/preview?crawlerId=<id>&sourceUrl=<source_url>` — Preview metadata from a source URL
 
 ### Novels
 
@@ -238,7 +237,6 @@ srcs/backend/
       cosmosdb/                        # Cosmos DB implementations
     routers/
       auth.py                # Authentication endpoints
-      crawlers.py            # Crawler metadata endpoints
       health.py              # Health check endpoint
       novels.py              # Novel CRUD endpoints
       # ... other routers

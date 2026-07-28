@@ -3,9 +3,9 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Body, HTTPException, Path, Query, Response, status
+from fastapi import APIRouter, Body, File, HTTPException, Path, Query, Response, UploadFile, status
 
-from app.core.injection import RepositoryNovelDep, ServiceNovelBindingDep
+from app.core.injection import ProviderPublicBlobDep, RepositoryNovelDep, ServiceNovelBindingDep
 from app.core.security.authorization import SessionUser
 from app.domain.novels import NovelBindRequest, NovelChapterUpdateRequest
 from app.domain.requests import NovelCreateRequest, NovelUpdateRequest, to_novel_entity
@@ -20,6 +20,7 @@ from app.domain.responses import (
     to_novel_response,
     to_novel_sync_response,
 )
+from app.providers.blob_storage_provider import BlobStorageError, validate_cover_content
 from app.repositories.novel_repository import NovelConflictError
 from app.services.novel_binding_service import (
     NovelBindingConcurrencyError,
@@ -180,7 +181,7 @@ def get_novel_chapter_route(
     )
 
 
-@router.patch(
+@router.put(
     "/{id}/chapters/{chapterId}",
     response_model=NovelChapterContentResponse,
     operation_id="update_novel_chapter",
@@ -216,6 +217,42 @@ def update_novel_chapter_route(
         **to_novel_chapter_summary(chapter).model_dump(),
         content=content,
     )
+
+
+@router.put(
+    "/{id}/cover",
+    response_model=NovelResponse,
+    operation_id="upload_novel_cover",
+)
+def upload_novel_cover_route(
+    session_user: SessionUser,
+    repository_novel: RepositoryNovelDep,
+    provider_public_blob: ProviderPublicBlobDep,
+    id: str,
+    cover_image: Annotated[UploadFile, File(alias="coverImage")],
+) -> NovelResponse:
+    """Upload and attach a JPEG or PNG cover image to a novel."""
+
+    novel = repository_novel.get_by_id(id=id)
+    if novel is None or novel.created_by != session_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Novel not found")
+    try:
+        content = cover_image.file.read(1024 * 1024 + 1)
+        content_type = validate_cover_content(content, cover_image.content_type or "")
+        novel.cover_image_url = provider_public_blob.upload_cover(id, content, content_type)
+        novel.updated_at = datetime.now(UTC)
+        novel.updated_by = session_user.id
+        return to_novel_response(repository_novel.update(novel, novel.etag))
+    except BlobStorageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    except NovelConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail="Novel has changed",
+        ) from exc
 
 
 @router.put("/{id}", response_model=NovelResponse, operation_id="update_novel")

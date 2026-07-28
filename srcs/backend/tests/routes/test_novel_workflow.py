@@ -89,7 +89,7 @@ def test_bind_and_chapter_routes_allow_an_authenticated_non_owner(
     assert chapter.status_code == 200
     assert chapter.json()["content"] == ["First paragraph", "Second paragraph"]
 
-    edited = client.patch(
+    edited = client.put(
         f"/api/novels/{novel['id']}/chapters/chapter-1",
         headers=member_headers,
         json={
@@ -104,7 +104,7 @@ def test_bind_and_chapter_routes_allow_an_authenticated_non_owner(
     ]
     assert edited.json()["manuallyEdited"] is True
 
-    stale = client.patch(
+    stale = client.put(
         f"/api/novels/{novel['id']}/chapters/chapter-1",
         headers=admin_headers,
         json={"content": "Stale", "etag": chapter.json()["etag"]},
@@ -174,10 +174,10 @@ def test_novel_workflow_openapi_uses_json_contracts_and_chapter_id_alias(
     assert paths["/api/novels/{id}/sync"]["patch"]["operationId"] == "sync_novel"
     chapter_path = paths["/api/novels/{id}/chapters/{chapterId}"]
     assert chapter_path["get"]["operationId"] == "get_novel_chapter"
-    assert chapter_path["patch"]["operationId"] == "update_novel_chapter"
+    assert chapter_path["put"]["operationId"] == "update_novel_chapter"
     assert {
         (parameter["name"], parameter["in"])
-        for parameter in chapter_path["patch"]["parameters"]
+        for parameter in chapter_path["put"]["parameters"]
     } >= {("id", "path"), ("chapterId", "path")}
 
     bind_schema = schema["components"]["schemas"]["NovelBindRequest"]

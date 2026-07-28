@@ -5,15 +5,14 @@ import {
   ApiException,
   ScrapingCreateRequest,
   type CrawlerMetadataResponse,
-  type CrawlerSummaryResponse,
   type ScrapingCreateResponse
 } from '~~/shared/api-services/srv-core.client'
+import { SUPPORTED_CRAWLERS } from '~/constants/crawlers'
 
 const open = defineModel<boolean>('open', { default: false })
 
 const emit = defineEmits<{
   created: [scraping: ScrapingCreateResponse]
-  crawlersLoaded: [crawlers: CrawlerSummaryResponse[]]
 }>()
 
 const schema = z.object({
@@ -28,9 +27,6 @@ const state = reactive<Partial<Schema>>({
   sourceUrl: ''
 })
 
-const crawlers = ref<CrawlerSummaryResponse[]>([])
-const crawlersLoading = ref(false)
-const crawlersError = ref(false)
 const preview = ref<CrawlerMetadataResponse | null>(null)
 const previewing = ref(false)
 const submitting = ref(false)
@@ -38,7 +34,7 @@ const sourceError = ref('')
 const failedCover = ref(false)
 const toast = useToast()
 
-const crawlerItems = computed(() => crawlers.value
+const crawlerItems = computed(() => SUPPORTED_CRAWLERS
   .filter(item => item.metadataSupported)
   .map(item => ({
     label: item.name,
@@ -55,25 +51,6 @@ watch(
   }
 )
 
-watch(open, (value) => {
-  if (value && !crawlers.value.length) void loadCrawlers()
-})
-
-async function loadCrawlers() {
-  crawlersLoading.value = true
-  crawlersError.value = false
-  try {
-    const { crawlers: client } = useApiClient()
-    const response = await client.list_crawlers()
-    crawlers.value = response.items || []
-    emit('crawlersLoaded', crawlers.value)
-  } catch {
-    crawlersError.value = true
-  } finally {
-    crawlersLoading.value = false
-  }
-}
-
 function errorStatus(error: unknown) {
   return error instanceof ApiException ? error.status : undefined
 }
@@ -88,8 +65,8 @@ async function loadPreview(data: Schema) {
   previewing.value = true
   sourceError.value = ''
   try {
-    const { crawlers: client } = useApiClient()
-    preview.value = await client.get_crawler_metadata(data.crawlerId, data.sourceUrl, true)
+    const { scrapings } = useApiClient()
+    preview.value = await scrapings.preview_scraping(data.crawlerId, data.sourceUrl, true)
   } catch (error) {
     const status = errorStatus(error)
     sourceError.value = status === 504
@@ -161,22 +138,6 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     :dismissible="!submitting"
   >
     <template #body>
-      <UAlert
-        v-if="crawlersError"
-        class="mb-4"
-        color="error"
-        variant="subtle"
-        icon="lucide:circle-alert"
-        title="Unable to load crawlers"
-        description="The available sources could not be loaded."
-        :actions="[{
-          label: 'Retry',
-          color: 'error',
-          variant: 'soft',
-          onClick: loadCrawlers
-        }]"
-      />
-
       <UForm
         :schema="schema"
         :state="state"
@@ -191,8 +152,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
             label-key="label"
             placeholder="Select a crawler"
             icon="lucide:globe"
-            :loading="crawlersLoading"
-            :disabled="submitting || crawlersError"
+            :disabled="submitting"
             class="w-full"
           />
         </UFormField>
@@ -269,7 +229,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
             :label="preview ? 'Create Scraping' : 'Preview'"
             :icon="preview ? 'lucide:list-plus' : 'lucide:scan-search'"
             :loading="previewing || submitting"
-            :disabled="crawlersLoading || crawlersError"
+            :disabled="submitting"
           />
         </div>
       </UForm>

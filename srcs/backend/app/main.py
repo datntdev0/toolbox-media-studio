@@ -20,7 +20,7 @@ from app.core.injection import (
     repository_translation,
     repository_user,
 )
-from app.routers import auth, crawlers, health, novels, realtime, scrapings, translations, users
+from app.routers import auth, health, novels, realtime, scrapings, translations, users
 
 app_config = AppConfig()
 
@@ -79,7 +79,6 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(novels.router)
 app.include_router(translations.router)
-app.include_router(crawlers.router)
 app.include_router(scrapings.router)
 app.include_router(realtime.router)
 
