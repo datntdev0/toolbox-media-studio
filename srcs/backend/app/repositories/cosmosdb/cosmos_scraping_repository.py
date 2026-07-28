@@ -157,8 +157,8 @@ class CosmosScrapingRepository:
         id: str,
         created_by: str,
         *,
-        chapter_from: int,
-        chapter_to: int,
+        chapter_index_from: int,
+        chapter_index_to: int,
         force: bool,
         etag: str | None = None,
     ) -> ScrapingQueueResult:
@@ -167,12 +167,11 @@ class CosmosScrapingRepository:
         matching = [
             task
             for task in scraping.tasks
-            if task.chapter_number is not None
-            and chapter_from <= task.chapter_number <= chapter_to
+            if chapter_index_from <= task.manifest_index + 1 <= chapter_index_to
         ]
         if not matching:
             raise ScrapingChapterRangeError(
-                "No scraping tasks match the requested chapter range"
+                "No scraping tasks match the requested chapter index range"
             )
         queued = [
             task

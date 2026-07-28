@@ -124,6 +124,7 @@ function makeChapters(
   ]
   return titles.map((title, index) => ({
     id: `chapter-${index + 1}`,
+    chapterIndex: index + 1,
     number: index + 1,
     title,
     status: statuses[index] || 'not_started',

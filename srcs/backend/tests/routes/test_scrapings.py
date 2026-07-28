@@ -207,8 +207,8 @@ def test_start_and_stop_manage_task_queue_messages(
         f"/api/scrapings/{created['id']}/start",
         headers=_headers(token),
         json={
-            "chapterFrom": 1,
-            "chapterTo": 2,
+            "chapterIndexFrom": 1,
+            "chapterIndexTo": 2,
             "refetch": True,
         },
     )
@@ -224,7 +224,7 @@ def test_start_and_stop_manage_task_queue_messages(
     repeated = client.patch(
         f"/api/scrapings/{created['id']}/start",
         headers=_headers(token),
-        json={"chapterFrom": 1, "chapterTo": 2},
+        json={"chapterIndexFrom": 1, "chapterIndexTo": 2},
     )
     assert repeated.status_code == 202
     assert len(queue_publisher.messages) == 2
@@ -232,7 +232,7 @@ def test_start_and_stop_manage_task_queue_messages(
     forced = client.patch(
         f"/api/scrapings/{created['id']}/start",
         headers=_headers(token),
-        json={"chapterFrom": 1, "chapterTo": 2, "force": True},
+        json={"chapterIndexFrom": 1, "chapterIndexTo": 2, "force": True},
     )
     assert forced.status_code == 202
     assert len(queue_publisher.messages) == 4
@@ -249,6 +249,37 @@ def test_start_and_stop_manage_task_queue_messages(
     assert all(task.status == ScrapingTaskStatus.CREATED for task in stored.tasks)
 
 
+def test_start_by_index_queues_additional_chapter_without_parsed_number(
+    client: TestClient,
+    flaresolverr_client: Any,
+    scraping_repository: InMemoryScrapingRepository,
+    queue_publisher: Any,
+) -> None:
+    flaresolverr_client.html = METADATA_HTML.replace(
+        "</ul>",
+        '<li><a href="/0603625457/side-story.html">Side Story</a></li></ul>',
+    )
+    token = _login(client)
+    created = _create(client, token)
+
+    started = client.patch(
+        f"/api/scrapings/{created['id']}/start",
+        headers=_headers(token),
+        json={"chapterIndexFrom": 3, "chapterIndexTo": 3},
+    )
+
+    assert started.status_code == 202
+    assert started.json()["progress"]["queued"] == 1
+    stored = scraping_repository.get(created["id"], _admin_id(client, token))
+    assert stored is not None
+    assert stored.tasks[2].chapter_number is None
+    assert stored.tasks[2].manifest_index == 2
+    assert stored.tasks[2].status == ScrapingTaskStatus.QUEUED
+    assert [message[1]["taskId"] for message in queue_publisher.messages] == [
+        stored.tasks[2].id
+    ]
+
+
 def test_start_validates_range_and_openapi_has_task_scoped_contract(
     client: TestClient,
     flaresolverr_client: Any,
@@ -260,12 +291,12 @@ def test_start_validates_range_and_openapi_has_task_scoped_contract(
     reversed_range = client.patch(
         f"/api/scrapings/{created['id']}/start",
         headers=_headers(token),
-        json={"chapterFrom": 2, "chapterTo": 1},
+        json={"chapterIndexFrom": 2, "chapterIndexTo": 1},
     )
     missing_range = client.patch(
         f"/api/scrapings/{created['id']}/start",
         headers=_headers(token),
-        json={"chapterFrom": 99, "chapterTo": 100},
+        json={"chapterIndexFrom": 99, "chapterIndexTo": 100},
     )
     openapi = client.get("/openapi.json").json()
 
@@ -275,6 +306,10 @@ def test_start_validates_range_and_openapi_has_task_scoped_contract(
     assert "status" not in {parameter["name"] for parameter in parameters}
     summary_schema = openapi["components"]["schemas"]["ScrapingSummaryResponse"]
     assert "status" not in summary_schema["properties"]
+    start_schema = openapi["components"]["schemas"]["ScrapingStartRequest"]
+    assert {"chapterIndexFrom", "chapterIndexTo"} <= start_schema["properties"].keys()
+    assert "chapterFrom" not in start_schema["properties"]
+    assert "chapterTo" not in start_schema["properties"]
     assert "/api/scrapings/{id}/start" in openapi["paths"]
     assert "/api/scrapings/{id}/stop" in openapi["paths"]
 
@@ -302,7 +337,7 @@ def test_start_publication_failure_leaves_tasks_queued_for_force_retry(
     response = client.patch(
         f"/api/scrapings/{created['id']}/start",
         headers=_headers(token),
-        json={"chapterFrom": 1, "chapterTo": 2},
+        json={"chapterIndexFrom": 1, "chapterIndexTo": 2},
     )
 
     assert response.status_code == 503

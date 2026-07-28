@@ -11,22 +11,28 @@ const emit = defineEmits<{
   stop: []
 }>()
 
-const rangeStartNumber = computed<number | undefined>({
-  get: () => props.workspace.chapters.find(chapter => chapter.id === rangeStart.value)?.number,
+const rangeStartChapterIndex = computed<number | undefined>({
+  get: () => props.workspace.chapters.find(
+    chapter => chapter.id === rangeStart.value
+  )?.chapterIndex,
   set: (value) => {
-    const chapter = props.workspace.chapters.find(item => item.number === value)
+    const chapter = props.workspace.chapters.find(item => item.chapterIndex === value)
     if (chapter) rangeStart.value = chapter.id
   }
 })
-const rangeEndNumber = computed<number | undefined>({
-  get: () => props.workspace.chapters.find(chapter => chapter.id === rangeEnd.value)?.number,
+const rangeEndChapterIndex = computed<number | undefined>({
+  get: () => props.workspace.chapters.find(
+    chapter => chapter.id === rangeEnd.value
+  )?.chapterIndex,
   set: (value) => {
-    const chapter = props.workspace.chapters.find(item => item.number === value)
+    const chapter = props.workspace.chapters.find(item => item.chapterIndex === value)
     if (chapter) rangeEnd.value = chapter.id
   }
 })
-const firstChapterNumber = computed(() => props.workspace.chapters[0]?.number || 1)
-const lastChapterNumber = computed(() => props.workspace.chapters.at(-1)?.number || 1)
+const firstChapterIndex = computed(() => props.workspace.chapters[0]?.chapterIndex || 1)
+const lastChapterIndex = computed(() =>
+  props.workspace.chapters.at(-1)?.chapterIndex || 1
+)
 
 const startIndex = computed(() =>
   props.workspace.chapters.findIndex(chapter => chapter.id === rangeStart.value)
@@ -47,7 +53,7 @@ const running = computed(() => props.workspace.status === 'running')
   <section aria-labelledby="novel-info-heading" class="w-full">
     <div class="mb-3 flex items-center justify-between">
       <h2 class="font-semibold text-highlighted">
-        Start translation chapter by range
+        Start translation chapters by index
       </h2>
       <UButton
         class="ml-auto"
@@ -88,25 +94,27 @@ const running = computed(() => props.workspace.status === 'running')
       </div>
 
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
-        <UFormField label="Chapter from" required>
+        <UFormField label="Chapter Index From" required>
           <UInputNumber
-            v-model="rangeStartNumber"
-            :min="firstChapterNumber"
-            :max="lastChapterNumber"
+            v-model="rangeStartChapterIndex"
+            :min="firstChapterIndex"
+            :max="lastChapterIndex"
             :step="1"
             :disabled="running"
             class="w-full"
           />
         </UFormField>
         <UFormField
-          label="Chapter to"
+          label="Chapter Index To"
           required
-          :error="rangeInvalid ? 'Choose a chapter after the starting chapter.' : undefined"
+          :error="rangeInvalid
+            ? 'Choose a chapter index after the starting chapter index.'
+            : undefined"
         >
           <UInputNumber
-            v-model="rangeEndNumber"
-            :min="firstChapterNumber"
-            :max="lastChapterNumber"
+            v-model="rangeEndChapterIndex"
+            :min="firstChapterIndex"
+            :max="lastChapterIndex"
             :step="1"
             :disabled="running"
             class="w-full"
@@ -144,6 +152,7 @@ const running = computed(() => props.workspace.status === 'running')
 
       <p class="text-xs text-muted">
         {{ selectedCount }} {{ selectedCount === 1 ? 'chapter' : 'chapters' }} selected for this translation run.
+        Chapter indexes follow novel order and include additional chapters.
       </p>
     </div>
   </section>

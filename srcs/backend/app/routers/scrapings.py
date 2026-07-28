@@ -210,7 +210,7 @@ def start_scraping_route(
     id: str,
     body: ScrapingStartRequest,
 ) -> ScrapingDetailResponse:
-    """Queue the eligible tasks in an inclusive parsed chapter-number range."""
+    """Queue eligible tasks in an inclusive one-based manifest index range."""
 
     del session_user
     scraping = repository_scraping.get(id)
@@ -225,8 +225,8 @@ def start_scraping_route(
             queued = repository_scraping.queue_tasks(
                 scraping.id,
                 scraping.created_by,
-                chapter_from=body.chapter_from,
-                chapter_to=body.chapter_to,
+                chapter_index_from=body.chapter_index_from,
+                chapter_index_to=body.chapter_index_to,
                 force=body.force,
                 etag=scraping.etag,
             )

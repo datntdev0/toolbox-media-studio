@@ -63,6 +63,7 @@ export interface TranslationProgress {
 
 export interface TranslationChapter {
   id: string
+  chapterIndex: number
   number: number
   title: string
   status: TranslationChapterStatus

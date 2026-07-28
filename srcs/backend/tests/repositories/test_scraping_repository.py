@@ -84,8 +84,8 @@ def test_queue_claim_stop_and_progress_are_task_scoped() -> None:
     queued = repository.queue_tasks(
         scraping.id,
         scraping.created_by,
-        chapter_from=1,
-        chapter_to=2,
+        chapter_index_from=1,
+        chapter_index_to=2,
         force=False,
         etag=scraping.etag,
     )
@@ -122,14 +122,38 @@ def test_queue_claim_stop_and_progress_are_task_scoped() -> None:
     assert stopped.progress.created == 1
 
 
+def test_queue_range_uses_manifest_index_and_includes_additional_chapters() -> None:
+    repository = InMemoryScrapingRepository()
+    candidate = _scraping()
+    additional = _task(2)
+    additional.title = "Side Story"
+    additional.chapter_number = None
+    candidate.tasks.append(additional)
+    candidate.progress = ScrapingProgress.from_tasks(candidate.tasks)
+    scraping = repository.create_or_merge(candidate).scraping
+
+    queued = repository.queue_tasks(
+        scraping.id,
+        scraping.created_by,
+        chapter_index_from=2,
+        chapter_index_to=2,
+        force=False,
+        etag=scraping.etag,
+    )
+
+    assert [task.id for task in queued.tasks] == [additional.id]
+    assert queued.tasks[0].chapter_number is None
+    assert queued.tasks[0].manifest_index == 1
+
+
 def test_force_requeues_active_tasks_and_missing_range_is_rejected() -> None:
     repository = InMemoryScrapingRepository()
     scraping = repository.create_or_merge(_scraping()).scraping
     queued = repository.queue_tasks(
         scraping.id,
         scraping.created_by,
-        chapter_from=1,
-        chapter_to=1,
+        chapter_index_from=1,
+        chapter_index_to=1,
         force=False,
         etag=scraping.etag,
     )
@@ -144,8 +168,8 @@ def test_force_requeues_active_tasks_and_missing_range_is_rejected() -> None:
     forced = repository.queue_tasks(
         scraping.id,
         scraping.created_by,
-        chapter_from=1,
-        chapter_to=1,
+        chapter_index_from=1,
+        chapter_index_to=1,
         force=True,
         etag=claimed.etag,
     )
@@ -156,8 +180,8 @@ def test_force_requeues_active_tasks_and_missing_range_is_rejected() -> None:
         repository.queue_tasks(
             scraping.id,
             scraping.created_by,
-            chapter_from=99,
-            chapter_to=100,
+            chapter_index_from=99,
+            chapter_index_to=100,
             force=False,
             etag=forced.scraping.etag,
         )

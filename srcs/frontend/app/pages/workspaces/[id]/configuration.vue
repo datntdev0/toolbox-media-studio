@@ -46,6 +46,7 @@ async function loadWorkspace() {
 
     loadedWorkspace.chapters = novel.chapters.map((chapter, index) => ({
       id: chapter.id,
+      chapterIndex: chapter.manifestIndex + 1,
       number: chapter.chapterNumber ?? index + 1,
       title: chapter.title,
       status: 'not_started',

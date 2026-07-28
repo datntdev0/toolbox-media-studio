@@ -53,8 +53,8 @@ def test_handler_processes_only_the_queued_message_task() -> None:
     queued = scrapings.queue_tasks(
         scraping.id,
         scraping.created_by,
-        chapter_from=1,
-        chapter_to=1,
+        chapter_index_from=1,
+        chapter_index_to=1,
         force=False,
         etag=scraping.etag,
     )
@@ -86,8 +86,8 @@ def test_handler_skips_created_and_duplicate_completed_messages() -> None:
     queued = scrapings.queue_tasks(
         scraping.id,
         scraping.created_by,
-        chapter_from=1,
-        chapter_to=1,
+        chapter_index_from=1,
+        chapter_index_to=1,
         force=False,
         etag=scraping.etag,
     )
@@ -109,8 +109,8 @@ def test_existing_result_completes_without_fetching_when_refetch_is_false() -> N
     queued = scrapings.queue_tasks(
         scraping.id,
         scraping.created_by,
-        chapter_from=1,
-        chapter_to=1,
+        chapter_index_from=1,
+        chapter_index_to=1,
         force=False,
         etag=scraping.etag,
     )
@@ -135,8 +135,8 @@ def test_refetch_bypasses_existing_result_and_overwrites_content() -> None:
     queued = scrapings.queue_tasks(
         scraping.id,
         scraping.created_by,
-        chapter_from=1,
-        chapter_to=1,
+        chapter_index_from=1,
+        chapter_index_to=1,
         force=False,
         etag=scraping.etag,
     )
@@ -171,8 +171,8 @@ def test_failed_refetch_preserves_previous_result_availability() -> None:
     queued = scrapings.queue_tasks(
         scraping.id,
         scraping.created_by,
-        chapter_from=1,
-        chapter_to=1,
+        chapter_index_from=1,
+        chapter_index_to=1,
         force=False,
         etag=scraping.etag,
     )

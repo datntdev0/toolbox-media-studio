@@ -3721,10 +3721,10 @@ export interface IScrapingResultResponse {
     [key: string]: any;
 }
 
-/** Task range accepted by PATCH /api/scrapings/{id}/start. */
+/** One-based manifest range accepted by PATCH /api/scrapings/{id}/start. */
 export class ScrapingStartRequest implements IScrapingStartRequest {
-    chapterFrom!: number;
-    chapterTo!: number;
+    chapterIndexFrom!: number;
+    chapterIndexTo!: number;
     refetch?: boolean;
     force?: boolean;
 
@@ -3743,8 +3743,8 @@ export class ScrapingStartRequest implements IScrapingStartRequest {
 
     init(_data?: any) {
         if (_data) {
-            this.chapterFrom = _data["chapterFrom"];
-            this.chapterTo = _data["chapterTo"];
+            this.chapterIndexFrom = _data["chapterIndexFrom"];
+            this.chapterIndexTo = _data["chapterIndexTo"];
             this.refetch = _data["refetch"] !== undefined ? _data["refetch"] : false;
             this.force = _data["force"] !== undefined ? _data["force"] : false;
         }
@@ -3759,18 +3759,18 @@ export class ScrapingStartRequest implements IScrapingStartRequest {
 
     toJSON(data?: any) {
         data = typeof data === 'object' ? data : {};
-        data["chapterFrom"] = this.chapterFrom;
-        data["chapterTo"] = this.chapterTo;
+        data["chapterIndexFrom"] = this.chapterIndexFrom;
+        data["chapterIndexTo"] = this.chapterIndexTo;
         data["refetch"] = this.refetch;
         data["force"] = this.force;
         return data;
     }
 }
 
-/** Task range accepted by PATCH /api/scrapings/{id}/start. */
+/** One-based manifest range accepted by PATCH /api/scrapings/{id}/start. */
 export interface IScrapingStartRequest {
-    chapterFrom: number;
-    chapterTo: number;
+    chapterIndexFrom: number;
+    chapterIndexTo: number;
     refetch?: boolean;
     force?: boolean;
 }

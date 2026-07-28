@@ -131,19 +131,21 @@ class ScrapingCreateRequest(BaseModel):
 
 
 class ScrapingStartRequest(BaseModel):
-    """Task range accepted by PATCH /api/scrapings/{id}/start."""
+    """One-based manifest range accepted by PATCH /api/scrapings/{id}/start."""
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    chapter_from: int = Field(ge=1, alias="chapterFrom")
-    chapter_to: int = Field(ge=1, alias="chapterTo")
+    chapter_index_from: int = Field(ge=1, alias="chapterIndexFrom")
+    chapter_index_to: int = Field(ge=1, alias="chapterIndexTo")
     refetch: bool = False
     force: bool = False
 
     @model_validator(mode="after")
     def validate_chapter_range(self) -> ScrapingStartRequest:
-        if self.chapter_from > self.chapter_to:
-            raise ValueError("chapterFrom must be less than or equal to chapterTo")
+        if self.chapter_index_from > self.chapter_index_to:
+            raise ValueError(
+                "chapterIndexFrom must be less than or equal to chapterIndexTo"
+            )
         return self
 
 

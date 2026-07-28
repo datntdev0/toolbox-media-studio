@@ -63,8 +63,8 @@ const startError = ref('')
 const rangeInitializedFor = ref('')
 const selectedDetailTab = ref('overview')
 const startState = reactive({
-  chapterFrom: 1,
-  chapterTo: 1,
+  chapterIndexFrom: 1,
+  chapterIndexTo: 1,
   refetch: false,
   force: false
 })
@@ -80,21 +80,18 @@ const activityMeta = computed(() => detail.value
 
 const sortedTasks = computed(() => [...(detail.value?.tasks || [])]
   .sort((a, b) => a.manifestIndex - b.manifestIndex))
-const numberedTasks = computed(() => sortedTasks.value.filter(
-  task => parsedChapterNumber(task) !== null
-))
 const hasUnnumberedTasks = computed(
-  () => numberedTasks.value.length !== sortedTasks.value.length
+  () => sortedTasks.value.some(task => parsedChapterNumber(task) === null)
 )
 const startValidationError = computed(() => {
-  if (!Number.isInteger(startState.chapterFrom) || startState.chapterFrom < 1) {
-    return 'Chapter from must be a positive whole number.'
+  if (!Number.isInteger(startState.chapterIndexFrom) || startState.chapterIndexFrom < 1) {
+    return 'Chapter index from must be a positive whole number.'
   }
-  if (!Number.isInteger(startState.chapterTo) || startState.chapterTo < 1) {
-    return 'Chapter to must be a positive whole number.'
+  if (!Number.isInteger(startState.chapterIndexTo) || startState.chapterIndexTo < 1) {
+    return 'Chapter index to must be a positive whole number.'
   }
-  if (startState.chapterFrom > startState.chapterTo) {
-    return 'Chapter from must be less than or equal to chapter to.'
+  if (startState.chapterIndexFrom > startState.chapterIndexTo) {
+    return 'Chapter index from must be less than or equal to chapter index to.'
   }
   return ''
 })
@@ -301,12 +298,11 @@ async function loadDetail(background = false) {
 
 function initializeChapterRange(response: ScrapingDetailResponse) {
   if (rangeInitializedFor.value === response.id) return
-  const numbers = (response.tasks || [])
-    .map(parsedChapterNumber)
-    .filter((number): number is number => number !== null)
-  if (numbers.length) {
-    startState.chapterFrom = Math.min(...numbers)
-    startState.chapterTo = Math.max(...numbers)
+  if (response.tasks?.length) {
+    startState.chapterIndexFrom = 1
+    startState.chapterIndexTo = Math.max(
+      ...response.tasks.map(task => task.manifestIndex + 1)
+    )
   }
   rangeInitializedFor.value = response.id
 }
@@ -315,11 +311,10 @@ async function startTasks() {
   startError.value = startValidationError.value
   if (startError.value || !detail.value) return
   const expectedQueuedCount = (detail.value.tasks || []).filter((task) => {
-    const chapterNumber = parsedChapterNumber(task)
+    const chapterIndex = task.manifestIndex + 1
     if (
-      chapterNumber === null
-      || chapterNumber < startState.chapterFrom
-      || chapterNumber > startState.chapterTo
+      chapterIndex < startState.chapterIndexFrom
+      || chapterIndex > startState.chapterIndexTo
     ) {
       return false
     }
@@ -332,8 +327,8 @@ async function startTasks() {
     const response = await scrapings.start_scraping(
       props.scrapingId,
       new ScrapingStartRequest({
-        chapterFrom: startState.chapterFrom,
-        chapterTo: startState.chapterTo,
+        chapterIndexFrom: startState.chapterIndexFrom,
+        chapterIndexTo: startState.chapterIndexTo,
         refetch: startState.refetch,
         force: startState.force
       })
@@ -344,7 +339,7 @@ async function startTasks() {
     toast.add({
       title: expectedQueuedCount > 0 ? 'Chapter tasks queued' : 'No new tasks queued',
       description: expectedQueuedCount > 0
-        ? `Queued chapters ${startState.chapterFrom}–${startState.chapterTo}.`
+        ? `Queued chapter indexes ${startState.chapterIndexFrom}–${startState.chapterIndexTo}.`
         : 'The selected tasks are already queued or running.',
       icon: expectedQueuedCount > 0 ? 'lucide:play' : 'lucide:info',
       color: expectedQueuedCount > 0 ? 'success' : 'neutral'
@@ -540,23 +535,31 @@ function resultFor(taskId: string) {
             role="tabpanel"
             aria-label="Overview"
           >
-            <UPageCard title="Start scraping chapter by range" variant="subtle">
+            <UPageCard title="Start scraping chapters by index" variant="subtle">
               <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
-                <UFormField label="Chapter from" name="chapterFrom" required>
+                <UFormField
+                  label="Chapter Index From"
+                  name="chapterIndexFrom"
+                  required
+                >
                   <UInputNumber
-                    v-model="startState.chapterFrom"
+                    v-model="startState.chapterIndexFrom"
                     :min="1"
                     :step="1"
-                    :disabled="starting || stopping || !numberedTasks.length"
+                    :disabled="starting || stopping || !sortedTasks.length"
                     class="w-full"
                   />
                 </UFormField>
-                <UFormField label="Chapter to" name="chapterTo" required>
+                <UFormField
+                  label="Chapter Index To"
+                  name="chapterIndexTo"
+                  required
+                >
                   <UInputNumber
-                    v-model="startState.chapterTo"
+                    v-model="startState.chapterIndexTo"
                     :min="1"
                     :step="1"
-                    :disabled="starting || stopping || !numberedTasks.length"
+                    :disabled="starting || stopping || !sortedTasks.length"
                     class="w-full"
                   />
                 </UFormField>
@@ -565,7 +568,7 @@ function resultFor(taskId: string) {
                     label="Start"
                     icon="lucide:play"
                     :loading="starting"
-                    :disabled="stopping || !numberedTasks.length || Boolean(startValidationError)"
+                    :disabled="stopping || !sortedTasks.length || Boolean(startValidationError)"
                     @click="startTasks"
                   />
                   <UButton
@@ -605,10 +608,11 @@ function resultFor(taskId: string) {
                 :description="startError || startValidationError"
               />
               <p v-else-if="hasUnnumberedTasks" class="mt-4 text-xs text-muted">
-                Chapters without a parsed number remain visible in Chapters but cannot be selected by range.
+                Chapter indexes follow the source order, so additional chapters without a parsed
+                chapter number are included in the selected range.
               </p>
-              <p v-else-if="!numberedTasks.length" class="mt-4 text-xs text-muted">
-                This manifest has no numbered chapters to start.
+              <p v-else-if="!sortedTasks.length" class="mt-4 text-xs text-muted">
+                This manifest has no chapters to start.
               </p>
             </UPageCard>
 
@@ -764,6 +768,12 @@ function resultFor(taskId: string) {
                     <div class="min-w-0 flex-1 text-left">
                       <p class="truncate">
                         {{ item.label }}
+                      </p>
+                      <p class="truncate text-xs text-muted">
+                        Chapter index {{ item.task.manifestIndex + 1 }}
+                        <template v-if="parsedChapterNumber(item.task) === null">
+                          · Additional chapter
+                        </template>
                       </p>
                       <p v-if="item.task.lastError" class="truncate text-xs text-error">
                         {{ String(item.task.lastError) }}

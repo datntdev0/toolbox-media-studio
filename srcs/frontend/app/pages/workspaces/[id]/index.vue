@@ -50,6 +50,7 @@ async function loadWorkspace() {
       const translationChapter = translationChapters.get(sourceChapter.id)
       return {
         id: sourceChapter.id,
+        chapterIndex: sourceChapter.manifestIndex + 1,
         number: sourceChapter.chapterNumber ?? index + 1,
         title: sourceChapter.title,
         status: translationChapter?.status ?? 'not_started',
