@@ -166,8 +166,8 @@ export class UsersClient {
 
     /**
      * List Users Route
-     * @param limit (optional)
-     * @param continuationToken (optional)
+     * @param limit (optional) 
+     * @param continuationToken (optional) 
      * @return Successful Response
      */
     list_users(limit: number | undefined, continuationToken: Continuationtoken | undefined): Promise<UserListResponse> {
@@ -425,8 +425,8 @@ export class NovelsClient {
 
     /**
      * List Novels Route
-     * @param limit (optional)
-     * @param continuationToken (optional)
+     * @param limit (optional) 
+     * @param continuationToken (optional) 
      * @return Successful Response
      */
     list_novels(limit: number | undefined, continuationToken: Anonymous | undefined): Promise<NovelListResponse> {
@@ -829,7 +829,7 @@ export class NovelsClient {
     }
 }
 
-export class WorkspacesClient {
+export class TranslationsClient {
     private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
     private baseUrl: string;
     protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
@@ -840,11 +840,11 @@ export class WorkspacesClient {
     }
 
     /**
-     * Create Workspace Route
+     * Create Translation Route
      * @return Successful Response
      */
-    create_workspace(body: WorkspaceCreateRequest): Promise<WorkspaceResponse> {
-        let url_ = this.baseUrl + "/api/workspaces";
+    create_translation(body: TranslationCreateRequest): Promise<TranslationResponse> {
+        let url_ = this.baseUrl + "/api/translations";
         url_ = url_.replace(/[?&]$/, "");
 
         const content_ = JSON.stringify(body);
@@ -859,18 +859,18 @@ export class WorkspacesClient {
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processCreate_workspace(_response);
+            return this.processCreate_translation(_response);
         });
     }
 
-    protected processCreate_workspace(response: Response): Promise<WorkspaceResponse> {
+    protected processCreate_translation(response: Response): Promise<TranslationResponse> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 201) {
             return response.text().then((_responseText) => {
             let result201: any = null;
             let resultData201 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
-            result201 = WorkspaceResponse.fromJS(resultData201);
+            result201 = TranslationResponse.fromJS(resultData201);
             return result201;
             });
         } else if (status === 422) {
@@ -885,22 +885,17 @@ export class WorkspacesClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<WorkspaceResponse>(null as any);
+        return Promise.resolve<TranslationResponse>(null as any);
     }
 
     /**
-     * List Workspaces Route
-     * @param kind (optional)
-     * @param limit (optional)
-     * @param continuationToken (optional)
+     * List Translations Route
+     * @param limit (optional) 
+     * @param continuationToken (optional) 
      * @return Successful Response
      */
-    list_workspaces(kind: Kind | undefined, limit: number | undefined, continuationToken: Anonymous2 | undefined): Promise<WorkspaceListResponse> {
-        let url_ = this.baseUrl + "/api/workspaces?";
-        if (kind === null)
-            throw new globalThis.Error("The parameter 'kind' cannot be null.");
-        else if (kind !== undefined)
-            url_ += "kind=" + encodeURIComponent("" + kind) + "&";
+    list_translations(limit: number | undefined, continuationToken: Anonymous2 | undefined): Promise<TranslationListResponse> {
+        let url_ = this.baseUrl + "/api/translations?";
         if (limit === null)
             throw new globalThis.Error("The parameter 'limit' cannot be null.");
         else if (limit !== undefined)
@@ -919,18 +914,18 @@ export class WorkspacesClient {
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processList_workspaces(_response);
+            return this.processList_translations(_response);
         });
     }
 
-    protected processList_workspaces(response: Response): Promise<WorkspaceListResponse> {
+    protected processList_translations(response: Response): Promise<TranslationListResponse> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
             let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
-            result200 = WorkspaceListResponse.fromJS(resultData200);
+            result200 = TranslationListResponse.fromJS(resultData200);
             return result200;
             });
         } else if (status === 422) {
@@ -945,15 +940,15 @@ export class WorkspacesClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<WorkspaceListResponse>(null as any);
+        return Promise.resolve<TranslationListResponse>(null as any);
     }
 
     /**
-     * Get Workspace Route
+     * Get Translation Route
      * @return Successful Response
      */
-    get_workspace(id: string): Promise<WorkspaceResponse> {
-        let url_ = this.baseUrl + "/api/workspaces/{id}";
+    get_translation(id: string): Promise<TranslationResponse> {
+        let url_ = this.baseUrl + "/api/translations/{id}";
         if (id === undefined || id === null)
             throw new globalThis.Error("The parameter 'id' must be defined.");
         url_ = url_.replace("{id}", encodeURIComponent("" + id));
@@ -967,18 +962,18 @@ export class WorkspacesClient {
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processGet_workspace(_response);
+            return this.processGet_translation(_response);
         });
     }
 
-    protected processGet_workspace(response: Response): Promise<WorkspaceResponse> {
+    protected processGet_translation(response: Response): Promise<TranslationResponse> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
             let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
-            result200 = WorkspaceResponse.fromJS(resultData200);
+            result200 = TranslationResponse.fromJS(resultData200);
             return result200;
             });
         } else if (status === 422) {
@@ -993,15 +988,15 @@ export class WorkspacesClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<WorkspaceResponse>(null as any);
+        return Promise.resolve<TranslationResponse>(null as any);
     }
 
     /**
-     * Update Workspace Route
+     * Update Translation Route
      * @return Successful Response
      */
-    update_workspace(id: string, body: WorkspaceUpdateRequest): Promise<WorkspaceResponse> {
-        let url_ = this.baseUrl + "/api/workspaces/{id}";
+    update_translation(id: string, body: TranslationUpdateRequest): Promise<TranslationResponse> {
+        let url_ = this.baseUrl + "/api/translations/{id}";
         if (id === undefined || id === null)
             throw new globalThis.Error("The parameter 'id' must be defined.");
         url_ = url_.replace("{id}", encodeURIComponent("" + id));
@@ -1019,18 +1014,18 @@ export class WorkspacesClient {
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processUpdate_workspace(_response);
+            return this.processUpdate_translation(_response);
         });
     }
 
-    protected processUpdate_workspace(response: Response): Promise<WorkspaceResponse> {
+    protected processUpdate_translation(response: Response): Promise<TranslationResponse> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
             let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
-            result200 = WorkspaceResponse.fromJS(resultData200);
+            result200 = TranslationResponse.fromJS(resultData200);
             return result200;
             });
         } else if (status === 422) {
@@ -1045,15 +1040,15 @@ export class WorkspacesClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<WorkspaceResponse>(null as any);
+        return Promise.resolve<TranslationResponse>(null as any);
     }
 
     /**
-     * Delete Workspace Route
+     * Delete Translation Route
      * @return Successful Response
      */
-    delete_workspace(id: string): Promise<void> {
-        let url_ = this.baseUrl + "/api/workspaces/{id}";
+    delete_translation(id: string): Promise<void> {
+        let url_ = this.baseUrl + "/api/translations/{id}";
         if (id === undefined || id === null)
             throw new globalThis.Error("The parameter 'id' must be defined.");
         url_ = url_.replace("{id}", encodeURIComponent("" + id));
@@ -1066,11 +1061,11 @@ export class WorkspacesClient {
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processDelete_workspace(_response);
+            return this.processDelete_translation(_response);
         });
     }
 
-    protected processDelete_workspace(response: Response): Promise<void> {
+    protected processDelete_translation(response: Response): Promise<void> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 204) {
@@ -1143,7 +1138,7 @@ export class CrawlersClient {
 
     /**
      * Get Crawler Metadata Route
-     * @param cache (optional)
+     * @param cache (optional) 
      * @return Successful Response
      */
     get_crawler_metadata(id: string, url: string, cache: boolean | undefined): Promise<CrawlerMetadataResponse> {
@@ -1200,7 +1195,7 @@ export class CrawlersClient {
 
     /**
      * Get Crawler Chapter Route
-     * @param cache (optional)
+     * @param cache (optional) 
      * @return Successful Response
      */
     get_crawler_chapter(id: string, url: string, cache: boolean | undefined): Promise<CrawlerChapterContentResponse> {
@@ -1317,9 +1312,9 @@ export class ScrapingsClient {
 
     /**
      * List Scrapings Route
-     * @param limit (optional)
-     * @param continuationToken (optional)
-     * @param search (optional)
+     * @param limit (optional) 
+     * @param continuationToken (optional) 
+     * @param search (optional) 
      * @return Successful Response
      */
     list_scrapings(limit: number | undefined, continuationToken: Anonymous3 | undefined, search: Search | undefined): Promise<ScrapingListResponse> {
@@ -1525,14 +1520,14 @@ export class ScrapingsClient {
 
     /**
      * Update Scraping Route
-     * @param title (optional)
-     * @param author (optional)
-     * @param category (optional)
-     * @param updatedDate (optional)
-     * @param protagonists (optional)
-     * @param description (optional)
-     * @param coverImage (optional)
-     * @param clearCoverImage (optional)
+     * @param title (optional) 
+     * @param author (optional) 
+     * @param category (optional) 
+     * @param updatedDate (optional) 
+     * @param protagonists (optional) 
+     * @param description (optional) 
+     * @param coverImage (optional) 
+     * @param clearCoverImage (optional) 
      * @return Successful Response
      */
     update_scraping(id: string, title: string | undefined, author: Author | undefined, category: Category | undefined, updatedDate: Updateddate | undefined, protagonists: Protagonists | undefined, description: Description | undefined, coverImage: Coverimage | undefined, clearCoverImage: boolean | undefined): Promise<ScrapingDetailResponse> {
@@ -4009,6 +4004,372 @@ export interface ITokenResponse {
     [key: string]: any;
 }
 
+/** AI configuration saved with a translation. */
+export class TranslationConfigurationRequest implements ITranslationConfigurationRequest {
+    providerId!: string;
+    modelId!: string;
+    globalPrompt!: string;
+
+    constructor(data?: ITranslationConfigurationRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.providerId = _data["providerId"];
+            this.modelId = _data["modelId"];
+            this.globalPrompt = _data["globalPrompt"];
+        }
+    }
+
+    static fromJS(data: any): TranslationConfigurationRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new TranslationConfigurationRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["providerId"] = this.providerId;
+        data["modelId"] = this.modelId;
+        data["globalPrompt"] = this.globalPrompt;
+        return data;
+    }
+}
+
+/** AI configuration saved with a translation. */
+export interface ITranslationConfigurationRequest {
+    providerId: string;
+    modelId: string;
+    globalPrompt: string;
+}
+
+/** Persisted AI configuration for a translation. */
+export class TranslationConfigurationResponse implements ITranslationConfigurationResponse {
+    providerId!: string;
+    modelId!: string;
+    globalPrompt!: string;
+
+    [key: string]: any;
+
+    constructor(data?: ITranslationConfigurationResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.providerId = _data["providerId"];
+            this.modelId = _data["modelId"];
+            this.globalPrompt = _data["globalPrompt"];
+        }
+    }
+
+    static fromJS(data: any): TranslationConfigurationResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new TranslationConfigurationResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["providerId"] = this.providerId;
+        data["modelId"] = this.modelId;
+        data["globalPrompt"] = this.globalPrompt;
+        return data;
+    }
+}
+
+/** Persisted AI configuration for a translation. */
+export interface ITranslationConfigurationResponse {
+    providerId: string;
+    modelId: string;
+    globalPrompt: string;
+
+    [key: string]: any;
+}
+
+/** Payload for creating a translation. */
+export class TranslationCreateRequest implements ITranslationCreateRequest {
+    name!: string;
+    novelId!: string;
+    targetLanguage!: string;
+
+    constructor(data?: ITranslationCreateRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.name = _data["name"];
+            this.novelId = _data["novelId"];
+            this.targetLanguage = _data["targetLanguage"];
+        }
+    }
+
+    static fromJS(data: any): TranslationCreateRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new TranslationCreateRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["name"] = this.name;
+        data["novelId"] = this.novelId;
+        data["targetLanguage"] = this.targetLanguage;
+        return data;
+    }
+}
+
+/** Payload for creating a translation. */
+export interface ITranslationCreateRequest {
+    name: string;
+    novelId: string;
+    targetLanguage: string;
+}
+
+/** Paged translation list response. */
+export class TranslationListResponse implements ITranslationListResponse {
+    items!: TranslationResponse[];
+    continuationToken?: ContinuationToken3;
+
+    [key: string]: any;
+
+    constructor(data?: ITranslationListResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+        if (!data) {
+            this.items = [];
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            if (Array.isArray(_data["items"])) {
+                this.items = [] as any;
+                for (let item of _data["items"])
+                    this.items!.push(TranslationResponse.fromJS(item));
+            }
+            this.continuationToken = _data["continuationToken"];
+        }
+    }
+
+    static fromJS(data: any): TranslationListResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new TranslationListResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        if (Array.isArray(this.items)) {
+            data["items"] = [];
+            for (let item of this.items)
+                data["items"].push(item ? item.toJSON() : undefined as any);
+        }
+        data["continuationToken"] = this.continuationToken;
+        return data;
+    }
+}
+
+/** Paged translation list response. */
+export interface ITranslationListResponse {
+    items: TranslationResponse[];
+    continuationToken?: ContinuationToken3;
+
+    [key: string]: any;
+}
+
+/** Translation payload enriched with the current bound novel. */
+export class TranslationResponse implements ITranslationResponse {
+    id!: string;
+    name!: string;
+    novelId!: string;
+    targetLanguage!: string;
+    configuration?: Configuration;
+    status!: TranslationStatus;
+    novel?: Novel;
+    createdAt!: Date;
+    updatedAt!: Date;
+    etag?: Etag6;
+
+    [key: string]: any;
+
+    constructor(data?: ITranslationResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.id = _data["id"];
+            this.name = _data["name"];
+            this.novelId = _data["novelId"];
+            this.targetLanguage = _data["targetLanguage"];
+            this.configuration = _data["configuration"];
+            this.status = _data["status"];
+            this.novel = _data["novel"];
+            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
+            this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
+            this.etag = _data["etag"];
+        }
+    }
+
+    static fromJS(data: any): TranslationResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new TranslationResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["id"] = this.id;
+        data["name"] = this.name;
+        data["novelId"] = this.novelId;
+        data["targetLanguage"] = this.targetLanguage;
+        data["configuration"] = this.configuration;
+        data["status"] = this.status;
+        data["novel"] = this.novel;
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
+        data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
+        data["etag"] = this.etag;
+        return data;
+    }
+}
+
+/** Translation payload enriched with the current bound novel. */
+export interface ITranslationResponse {
+    id: string;
+    name: string;
+    novelId: string;
+    targetLanguage: string;
+    configuration?: Configuration;
+    status: TranslationStatus;
+    novel?: Novel;
+    createdAt: Date;
+    updatedAt: Date;
+    etag?: Etag6;
+
+    [key: string]: any;
+}
+
+/** Translation lifecycle and processing states. */
+export enum TranslationStatus {
+    Needs_setup = "needs_setup",
+    Ready = "ready",
+    Running = "running",
+    Completed = "completed",
+    Stopped = "stopped",
+    Failed = "failed",
+    Deleted = "deleted",
+}
+
+/** Editable translation values. */
+export class TranslationUpdateRequest implements ITranslationUpdateRequest {
+    name!: string;
+    novelId!: string;
+    targetLanguage!: string;
+    configuration!: Configuration2;
+    etag?: Etag7;
+
+    constructor(data?: ITranslationUpdateRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.name = _data["name"];
+            this.novelId = _data["novelId"];
+            this.targetLanguage = _data["targetLanguage"];
+            this.configuration = _data["configuration"];
+            this.etag = _data["etag"];
+        }
+    }
+
+    static fromJS(data: any): TranslationUpdateRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new TranslationUpdateRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["name"] = this.name;
+        data["novelId"] = this.novelId;
+        data["targetLanguage"] = this.targetLanguage;
+        data["configuration"] = this.configuration;
+        data["etag"] = this.etag;
+        return data;
+    }
+}
+
+/** Editable translation values. */
+export interface ITranslationUpdateRequest {
+    name: string;
+    novelId: string;
+    targetLanguage: string;
+    configuration: Configuration2;
+    etag?: Etag7;
+}
+
 /** Payload for creating a user. */
 export class UserCreateRequest implements IUserCreateRequest {
     email!: string;
@@ -4082,7 +4443,7 @@ export interface IUserCreateRequest {
 /** Paged response for listing users. */
 export class UserListResponse implements IUserListResponse {
     items!: UserResponse[];
-    continuationToken?: ContinuationToken3;
+    continuationToken?: ContinuationToken4;
 
     [key: string]: any;
 
@@ -4139,7 +4500,7 @@ export class UserListResponse implements IUserListResponse {
 /** Paged response for listing users. */
 export interface IUserListResponse {
     items: UserResponse[];
-    continuationToken?: ContinuationToken3;
+    continuationToken?: ContinuationToken4;
 
     [key: string]: any;
 }
@@ -4153,7 +4514,7 @@ export class UserResponse implements IUserResponse {
     status!: UserStatus;
     createdAt!: Date;
     updatedAt!: Date;
-    etag?: Etag6;
+    etag?: Etag8;
 
     [key: string]: any;
 
@@ -4217,7 +4578,7 @@ export interface IUserResponse {
     status: UserStatus;
     createdAt: Date;
     updatedAt: Date;
-    etag?: Etag6;
+    etag?: Etag8;
 
     [key: string]: any;
 }
@@ -4241,7 +4602,7 @@ export class UserUpdateRequest implements IUserUpdateRequest {
     displayName?: DisplayName3;
     role?: Role;
     status?: Status2;
-    etag?: Etag7;
+    etag?: Etag9;
 
     [key: string]: any;
 
@@ -4296,7 +4657,7 @@ export interface IUserUpdateRequest {
     displayName?: DisplayName3;
     role?: Role;
     status?: Status2;
-    etag?: Etag7;
+    etag?: Etag9;
 
     [key: string]: any;
 }
@@ -4374,275 +4735,6 @@ export interface IValidationError {
     ctx?: any;
 
     [key: string]: any;
-}
-
-/** Payload for creating a workspace. */
-export class WorkspaceCreateRequest implements IWorkspaceCreateRequest {
-    name!: string;
-    kind!: WorkspaceKind;
-    novelId!: string;
-    targetLanguage!: string;
-
-    constructor(data?: IWorkspaceCreateRequest) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            this.name = _data["name"];
-            this.kind = _data["kind"];
-            this.novelId = _data["novelId"];
-            this.targetLanguage = _data["targetLanguage"];
-        }
-    }
-
-    static fromJS(data: any): WorkspaceCreateRequest {
-        data = typeof data === 'object' ? data : {};
-        let result = new WorkspaceCreateRequest();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        data["name"] = this.name;
-        data["kind"] = this.kind;
-        data["novelId"] = this.novelId;
-        data["targetLanguage"] = this.targetLanguage;
-        return data;
-    }
-}
-
-/** Payload for creating a workspace. */
-export interface IWorkspaceCreateRequest {
-    name: string;
-    kind: WorkspaceKind;
-    novelId: string;
-    targetLanguage: string;
-}
-
-/** Supported workspace project kinds. */
-export enum WorkspaceKind {
-    Translation = "translation",
-    Audio = "audio",
-    Video = "video",
-}
-
-/** Paged workspace list response. */
-export class WorkspaceListResponse implements IWorkspaceListResponse {
-    items!: WorkspaceResponse[];
-    continuationToken?: ContinuationToken4;
-
-    [key: string]: any;
-
-    constructor(data?: IWorkspaceListResponse) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-        if (!data) {
-            this.items = [];
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-            if (Array.isArray(_data["items"])) {
-                this.items = [] as any;
-                for (let item of _data["items"])
-                    this.items!.push(WorkspaceResponse.fromJS(item));
-            }
-            this.continuationToken = _data["continuationToken"];
-        }
-    }
-
-    static fromJS(data: any): WorkspaceListResponse {
-        data = typeof data === 'object' ? data : {};
-        let result = new WorkspaceListResponse();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        if (Array.isArray(this.items)) {
-            data["items"] = [];
-            for (let item of this.items)
-                data["items"].push(item ? item.toJSON() : undefined as any);
-        }
-        data["continuationToken"] = this.continuationToken;
-        return data;
-    }
-}
-
-/** Paged workspace list response. */
-export interface IWorkspaceListResponse {
-    items: WorkspaceResponse[];
-    continuationToken?: ContinuationToken4;
-
-    [key: string]: any;
-}
-
-/** Workspace payload enriched with the current bound novel. */
-export class WorkspaceResponse implements IWorkspaceResponse {
-    id!: string;
-    name!: string;
-    kind!: WorkspaceKind;
-    novelId!: string;
-    targetLanguage!: string;
-    status!: WorkspaceStatus;
-    novel?: Novel;
-    createdAt!: Date;
-    updatedAt!: Date;
-    etag?: Etag8;
-
-    [key: string]: any;
-
-    constructor(data?: IWorkspaceResponse) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-            this.id = _data["id"];
-            this.name = _data["name"];
-            this.kind = _data["kind"];
-            this.novelId = _data["novelId"];
-            this.targetLanguage = _data["targetLanguage"];
-            this.status = _data["status"];
-            this.novel = _data["novel"];
-            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
-            this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
-            this.etag = _data["etag"];
-        }
-    }
-
-    static fromJS(data: any): WorkspaceResponse {
-        data = typeof data === 'object' ? data : {};
-        let result = new WorkspaceResponse();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        data["id"] = this.id;
-        data["name"] = this.name;
-        data["kind"] = this.kind;
-        data["novelId"] = this.novelId;
-        data["targetLanguage"] = this.targetLanguage;
-        data["status"] = this.status;
-        data["novel"] = this.novel;
-        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
-        data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
-        data["etag"] = this.etag;
-        return data;
-    }
-}
-
-/** Workspace payload enriched with the current bound novel. */
-export interface IWorkspaceResponse {
-    id: string;
-    name: string;
-    kind: WorkspaceKind;
-    novelId: string;
-    targetLanguage: string;
-    status: WorkspaceStatus;
-    novel?: Novel;
-    createdAt: Date;
-    updatedAt: Date;
-    etag?: Etag8;
-
-    [key: string]: any;
-}
-
-/** Workspace lifecycle and processing states. */
-export enum WorkspaceStatus {
-    Needs_setup = "needs_setup",
-    Ready = "ready",
-    Running = "running",
-    Completed = "completed",
-    Stopped = "stopped",
-    Failed = "failed",
-    Deleted = "deleted",
-}
-
-/** Editable workspace values. */
-export class WorkspaceUpdateRequest implements IWorkspaceUpdateRequest {
-    name!: string;
-    novelId!: string;
-    targetLanguage!: string;
-    etag?: Etag9;
-
-    constructor(data?: IWorkspaceUpdateRequest) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            this.name = _data["name"];
-            this.novelId = _data["novelId"];
-            this.targetLanguage = _data["targetLanguage"];
-            this.etag = _data["etag"];
-        }
-    }
-
-    static fromJS(data: any): WorkspaceUpdateRequest {
-        data = typeof data === 'object' ? data : {};
-        let result = new WorkspaceUpdateRequest();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        data["name"] = this.name;
-        data["novelId"] = this.novelId;
-        data["targetLanguage"] = this.targetLanguage;
-        data["etag"] = this.etag;
-        return data;
-    }
-}
-
-/** Editable workspace values. */
-export interface IWorkspaceUpdateRequest {
-    name: string;
-    novelId: string;
-    targetLanguage: string;
-    etag?: Etag9;
 }
 
 export class Continuationtoken implements IContinuationtoken {
@@ -4729,50 +4821,6 @@ export class Anonymous implements IAnonymous {
 }
 
 export interface IAnonymous {
-
-    [key: string]: any;
-}
-
-export class Kind implements IKind {
-
-    [key: string]: any;
-
-    constructor(data?: IKind) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Kind {
-        data = typeof data === 'object' ? data : {};
-        let result = new Kind();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IKind {
 
     [key: string]: any;
 }
@@ -7505,6 +7553,270 @@ export interface ICompletedAt {
     [key: string]: any;
 }
 
+export class ContinuationToken3 implements IContinuationToken3 {
+
+    [key: string]: any;
+
+    constructor(data?: IContinuationToken3) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): ContinuationToken3 {
+        data = typeof data === 'object' ? data : {};
+        let result = new ContinuationToken3();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IContinuationToken3 {
+
+    [key: string]: any;
+}
+
+export class Configuration implements IConfiguration {
+
+    [key: string]: any;
+
+    constructor(data?: IConfiguration) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Configuration {
+        data = typeof data === 'object' ? data : {};
+        let result = new Configuration();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IConfiguration {
+
+    [key: string]: any;
+}
+
+export class Novel implements INovel {
+
+    [key: string]: any;
+
+    constructor(data?: INovel) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Novel {
+        data = typeof data === 'object' ? data : {};
+        let result = new Novel();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface INovel {
+
+    [key: string]: any;
+}
+
+export class Etag6 implements IEtag6 {
+
+    [key: string]: any;
+
+    constructor(data?: IEtag6) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Etag6 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Etag6();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IEtag6 {
+
+    [key: string]: any;
+}
+
+export class Configuration2 implements IConfiguration2 {
+
+    [key: string]: any;
+
+    constructor(data?: IConfiguration2) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Configuration2 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Configuration2();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IConfiguration2 {
+
+    [key: string]: any;
+}
+
+export class Etag7 implements IEtag7 {
+
+    [key: string]: any;
+
+    constructor(data?: IEtag7) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Etag7 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Etag7();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IEtag7 {
+
+    [key: string]: any;
+}
+
 export class DisplayName implements IDisplayName {
 
     [key: string]: any;
@@ -7549,11 +7861,11 @@ export interface IDisplayName {
     [key: string]: any;
 }
 
-export class ContinuationToken3 implements IContinuationToken3 {
+export class ContinuationToken4 implements IContinuationToken4 {
 
     [key: string]: any;
 
-    constructor(data?: IContinuationToken3) {
+    constructor(data?: IContinuationToken4) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -7571,9 +7883,9 @@ export class ContinuationToken3 implements IContinuationToken3 {
         }
     }
 
-    static fromJS(data: any): ContinuationToken3 {
+    static fromJS(data: any): ContinuationToken4 {
         data = typeof data === 'object' ? data : {};
-        let result = new ContinuationToken3();
+        let result = new ContinuationToken4();
         result.init(data);
         return result;
     }
@@ -7588,7 +7900,7 @@ export class ContinuationToken3 implements IContinuationToken3 {
     }
 }
 
-export interface IContinuationToken3 {
+export interface IContinuationToken4 {
 
     [key: string]: any;
 }
@@ -7637,11 +7949,11 @@ export interface IDisplayName2 {
     [key: string]: any;
 }
 
-export class Etag6 implements IEtag6 {
+export class Etag8 implements IEtag8 {
 
     [key: string]: any;
 
-    constructor(data?: IEtag6) {
+    constructor(data?: IEtag8) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -7659,9 +7971,9 @@ export class Etag6 implements IEtag6 {
         }
     }
 
-    static fromJS(data: any): Etag6 {
+    static fromJS(data: any): Etag8 {
         data = typeof data === 'object' ? data : {};
-        let result = new Etag6();
+        let result = new Etag8();
         result.init(data);
         return result;
     }
@@ -7676,7 +7988,7 @@ export class Etag6 implements IEtag6 {
     }
 }
 
-export interface IEtag6 {
+export interface IEtag8 {
 
     [key: string]: any;
 }
@@ -7857,11 +8169,11 @@ export interface IStatus2 {
     [key: string]: any;
 }
 
-export class Etag7 implements IEtag7 {
+export class Etag9 implements IEtag9 {
 
     [key: string]: any;
 
-    constructor(data?: IEtag7) {
+    constructor(data?: IEtag9) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -7879,9 +8191,9 @@ export class Etag7 implements IEtag7 {
         }
     }
 
-    static fromJS(data: any): Etag7 {
+    static fromJS(data: any): Etag9 {
         data = typeof data === 'object' ? data : {};
-        let result = new Etag7();
+        let result = new Etag9();
         result.init(data);
         return result;
     }
@@ -7896,7 +8208,7 @@ export class Etag7 implements IEtag7 {
     }
 }
 
-export interface IEtag7 {
+export interface IEtag9 {
 
     [key: string]: any;
 }
@@ -7941,182 +8253,6 @@ export class Loc implements ILoc {
 }
 
 export interface ILoc {
-
-    [key: string]: any;
-}
-
-export class ContinuationToken4 implements IContinuationToken4 {
-
-    [key: string]: any;
-
-    constructor(data?: IContinuationToken4) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): ContinuationToken4 {
-        data = typeof data === 'object' ? data : {};
-        let result = new ContinuationToken4();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IContinuationToken4 {
-
-    [key: string]: any;
-}
-
-export class Novel implements INovel {
-
-    [key: string]: any;
-
-    constructor(data?: INovel) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Novel {
-        data = typeof data === 'object' ? data : {};
-        let result = new Novel();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface INovel {
-
-    [key: string]: any;
-}
-
-export class Etag8 implements IEtag8 {
-
-    [key: string]: any;
-
-    constructor(data?: IEtag8) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Etag8 {
-        data = typeof data === 'object' ? data : {};
-        let result = new Etag8();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IEtag8 {
-
-    [key: string]: any;
-}
-
-export class Etag9 implements IEtag9 {
-
-    [key: string]: any;
-
-    constructor(data?: IEtag9) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Etag9 {
-        data = typeof data === 'object' ? data : {};
-        let result = new Etag9();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IEtag9 {
 
     [key: string]: any;
 }

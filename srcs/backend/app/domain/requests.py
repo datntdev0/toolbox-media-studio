@@ -7,8 +7,8 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, model_validator
 
 from app.domain.novels import Novel, NovelStatus
+from app.domain.translations import Translation, TranslationConfiguration, TranslationStatus
 from app.domain.users import User, UserRole, UserStatus
-from app.domain.workspaces import Workspace, WorkspaceKind, WorkspaceStatus
 
 NonBlankStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
@@ -88,25 +88,35 @@ class NovelUpdateRequest(BaseModel):
         return self
 
 
-class WorkspaceCreateRequest(BaseModel):
-    """Payload for creating a workspace."""
+class TranslationConfigurationRequest(BaseModel):
+    """AI configuration saved with a translation."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    provider_id: NonBlankStr = Field(alias="providerId")
+    model_id: NonBlankStr = Field(alias="modelId")
+    global_prompt: NonBlankStr = Field(alias="globalPrompt")
+
+
+class TranslationCreateRequest(BaseModel):
+    """Payload for creating a translation."""
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     name: NonBlankStr
-    kind: WorkspaceKind
     novel_id: NonBlankStr = Field(alias="novelId")
     target_language: NonBlankStr = Field(alias="targetLanguage")
 
 
-class WorkspaceUpdateRequest(BaseModel):
-    """Editable workspace values."""
+class TranslationUpdateRequest(BaseModel):
+    """Editable translation values."""
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     name: NonBlankStr
     novel_id: NonBlankStr = Field(alias="novelId")
     target_language: NonBlankStr = Field(alias="targetLanguage")
+    configuration: TranslationConfigurationRequest | None
     etag: str | None = None
 
 
@@ -151,19 +161,36 @@ def to_novel_entity(body: NovelCreateRequest, created_by: str) -> Novel:
     )
 
 
-def to_workspace_entity(body: WorkspaceCreateRequest, created_by: str) -> Workspace:
-    """Convert a WorkspaceCreateRequest to a Workspace entity."""
+def to_translation_entity(
+    body: TranslationCreateRequest,
+    created_by: str,
+) -> Translation:
+    """Convert a TranslationCreateRequest to a Translation entity."""
 
     now = datetime.now(UTC)
-    return Workspace(
+    return Translation(
         id=str(uuid4()),
         name=body.name.strip(),
-        kind=body.kind,
         novel_id=body.novel_id,
         target_language=body.target_language.strip(),
-        status=WorkspaceStatus.NEEDS_SETUP,
+        configuration=None,
+        status=TranslationStatus.NEEDS_SETUP,
         created_by=created_by,
         created_at=now,
         updated_by=created_by,
         updated_at=now,
+    )
+
+
+def to_translation_configuration(
+    body: TranslationConfigurationRequest | None,
+) -> TranslationConfiguration | None:
+    """Convert an optional configuration request to its domain representation."""
+
+    if body is None:
+        return None
+    return TranslationConfiguration(
+        provider_id=body.provider_id.strip(),
+        model_id=body.model_id.strip(),
+        global_prompt=body.global_prompt.strip(),
     )

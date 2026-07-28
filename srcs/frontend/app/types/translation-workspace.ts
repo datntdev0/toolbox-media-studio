@@ -42,15 +42,15 @@ export interface TranslationProviderOption {
   models: TranslationModelOption[]
 }
 
-export interface TranslationConfiguration {
+export interface TranslationConfigurationInput {
   providerId: string
-  providerName: string
   modelId: string
-  modelName: string
   globalPrompt: string
-  previewChapterId: string
-  previewParagraphs: string[]
-  previewGeneratedAt: string
+}
+
+export interface TranslationConfiguration extends TranslationConfigurationInput {
+  providerName: string
+  modelName: string
 }
 
 export interface TranslationProgress {
@@ -86,7 +86,7 @@ export interface TranslationWorkspace {
   etag: string | null
 }
 
-export interface WorkspaceNovelApiRecord {
+export interface TranslationNovelApiRecord {
   id: string
   title: string
   coverImageUrl?: string | null
@@ -94,20 +94,20 @@ export interface WorkspaceNovelApiRecord {
   chapterCount?: number
 }
 
-export interface WorkspaceApiRecord {
+export interface TranslationApiRecord {
   id: string
   name: string
-  kind: 'translation' | 'audio' | 'video'
   novelId: string
   targetLanguage: string
+  configuration?: TranslationConfigurationInput | null
   status: TranslationWorkspaceStatus
-  novel?: WorkspaceNovelApiRecord | null
+  novel?: TranslationNovelApiRecord | null
   createdAt: string
   updatedAt: string
   etag?: string | null
 }
 
-export interface WorkspaceListApiRecord {
-  items: WorkspaceApiRecord[]
+export interface TranslationListApiRecord {
+  items: TranslationApiRecord[]
   continuationToken?: string | null
 }

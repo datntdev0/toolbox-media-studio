@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { NovelResponse } from '~~/shared/api-services/srv-core.client'
 import type {
-  TranslationWorkspace,
-  WorkspaceApiRecord
+  TranslationApiRecord,
+  TranslationWorkspace
 } from '~/types/translation-workspace'
 import { SUPPORTED_LANGUAGES, resolveLanguage } from '~/constants/supported-languages'
 
@@ -10,7 +10,7 @@ const props = defineProps<{
   workspace: TranslationWorkspace
   novels: NovelResponse[]
 }>()
-const emit = defineEmits<{ updated: [workspace: WorkspaceApiRecord] }>()
+const emit = defineEmits<{ updated: [workspace: TranslationApiRecord] }>()
 const open = defineModel<boolean>('open', { default: false })
 const toast = useToast()
 const submitting = ref(false)
@@ -47,6 +47,13 @@ async function submit() {
       name: workspaceName,
       novelId: selectedNovelId.value,
       targetLanguage: selectedLanguageCode.value,
+      configuration: props.workspace.configuration
+        ? {
+            providerId: props.workspace.configuration.providerId,
+            modelId: props.workspace.configuration.modelId,
+            globalPrompt: props.workspace.configuration.globalPrompt
+          }
+        : null,
       etag: props.workspace.etag
     })
     emit('updated', workspace)

@@ -24,17 +24,18 @@ from app.repositories.cosmosdb.cosmos_scraping_repository import (
 from app.repositories.cosmosdb.cosmos_scraping_result_repository import (
     build_cosmos_scraping_result_repository,
 )
-from app.repositories.cosmosdb.cosmos_user_repository import build_cosmos_user_repository
-from app.repositories.cosmosdb.cosmos_workspace_repository import (
-    build_cosmos_workspace_repository,
+from app.repositories.cosmosdb.cosmos_translation_repository import (
+    build_cosmos_translation_repository,
 )
+from app.repositories.cosmosdb.cosmos_user_repository import build_cosmos_user_repository
 from app.repositories.novel_chapter_repository import NovelChapterRepository
 from app.repositories.novel_repository import NovelRepository
 from app.repositories.scraping_repository import ScrapingRepository
 from app.repositories.scraping_result_repository import ScrapingResultRepository
+from app.repositories.translation_repository import TranslationRepository
 from app.repositories.user_repository import UserRepository
-from app.repositories.workspace_repository import WorkspaceRepository
 from app.services.novel_binding_service import NovelBindingService
+from app.services.translation_service import TranslationService
 
 log_manager = LogManager() # Singleton instance of Logger
 config = AppConfig() # Singleton instance of AppConfig
@@ -44,7 +45,7 @@ repository_user = build_cosmos_user_repository(config)
 repository_novel = build_cosmos_novel_repository(config)
 repository_scraping = build_cosmos_scraping_repository(config)
 repository_scraping_result = build_cosmos_scraping_result_repository(config)
-repository_workspace = build_cosmos_workspace_repository(config)
+repository_translation = build_cosmos_translation_repository(config)
 # Lazily constructed so existing API/test setups that do not use novel chapters
 # do not require the new Cosmos container.
 repository_novel_chapter: NovelChapterRepository | None = None
@@ -74,9 +75,9 @@ LogManagerDep = Annotated[LogManager, Depends(lambda: log_manager)]
 
 RepositoryUserDep = Annotated[UserRepository, Depends(lambda: repository_user)]
 RepositoryNovelDep = Annotated[NovelRepository, Depends(lambda: repository_novel)]
-RepositoryWorkspaceDep = Annotated[
-    WorkspaceRepository,
-    Depends(lambda: repository_workspace),
+RepositoryTranslationDep = Annotated[
+    TranslationRepository,
+    Depends(lambda: repository_translation),
 ]
 RepositoryScrapingDep = Annotated[
     ScrapingRepository,
@@ -104,6 +105,10 @@ def _get_novel_binding_service() -> NovelBindingService:
     )
 
 
+def _get_translation_service() -> TranslationService:
+    return TranslationService(repository_translation, repository_novel)
+
+
 RepositoryNovelChapterDep = Annotated[
     NovelChapterRepository,
     Depends(_get_novel_chapter_repository),
@@ -111,6 +116,10 @@ RepositoryNovelChapterDep = Annotated[
 ServiceNovelBindingDep = Annotated[
     NovelBindingService,
     Depends(_get_novel_binding_service),
+]
+ServiceTranslationDep = Annotated[
+    TranslationService,
+    Depends(_get_translation_service),
 ]
 
 ProviderCacheDep = Annotated[CacheProvider, Depends(lambda: provider_cache)]

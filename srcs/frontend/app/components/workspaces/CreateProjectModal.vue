@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { NovelResponse } from '~~/shared/api-services/srv-core.client'
-import type { WorkspaceApiRecord } from '~/types/translation-workspace'
+import type { TranslationApiRecord } from '~/types/translation-workspace'
 import { SUPPORTED_LANGUAGES, resolveLanguage } from '~/constants/supported-languages'
 
 const props = defineProps<{ novels: NovelResponse[] }>()
-const emit = defineEmits<{ created: [workspace: WorkspaceApiRecord] }>()
+const emit = defineEmits<{ created: [workspace: TranslationApiRecord] }>()
 const open = defineModel<boolean>('open', { default: false })
 const router = useRouter()
 const toast = useToast()

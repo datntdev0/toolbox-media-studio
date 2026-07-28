@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import type { TranslationWorkspace } from '~/types/translation-workspace'
+import type {
+  TranslationConfigurationInput,
+  TranslationWorkspace
+} from '~/types/translation-workspace'
+import {
+  DEFAULT_TRANSLATION_PROMPT,
+  translationProviders
+} from '~/utils/translation-workspace-fixtures'
 
 definePageMeta({
   title: 'Translation configuration',
@@ -10,6 +17,7 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const previewValid = ref(true)
+const saving = ref(false)
 const loading = ref(true)
 const loadError = ref<unknown>()
 const workspaceId = computed(() => String(route.params.id || ''))
@@ -18,6 +26,12 @@ const previewChapterId = computed(() => {
   return typeof value === 'string' ? value : ''
 })
 const workspace = ref<TranslationWorkspace | null>(null)
+const defaultProvider = translationProviders[0]!
+const configuration = ref<TranslationConfigurationInput>({
+  providerId: defaultProvider.id,
+  modelId: defaultProvider.models[0]!.id,
+  globalPrompt: DEFAULT_TRANSLATION_PROMPT
+})
 
 async function loadWorkspace() {
   loading.value = true
@@ -53,6 +67,13 @@ async function loadWorkspace() {
     }
 
     workspace.value = loadedWorkspace
+    if (loadedWorkspace.configuration) {
+      configuration.value = {
+        providerId: loadedWorkspace.configuration.providerId,
+        modelId: loadedWorkspace.configuration.modelId,
+        globalPrompt: loadedWorkspace.configuration.globalPrompt
+      }
+    }
   } catch (cause) {
     loadError.value = cause
     workspace.value = null
@@ -77,14 +98,34 @@ async function backToWorkspace() {
 }
 
 async function save() {
-  if (!previewValid.value) return
-  toast.add({
-    title: 'Configuration reviewed',
-    description: 'This prototype does not persist provider or prompt changes.',
-    color: 'success',
-    icon: 'lucide:circle-check'
-  })
-  await backToWorkspace()
+  if (!previewValid.value || !workspace.value) return
+  saving.value = true
+  try {
+    const updated = await useTranslationWorkspaceApi().update(workspace.value.id, {
+      name: workspace.value.name,
+      novelId: workspace.value.novelId,
+      targetLanguage: workspace.value.targetLanguage.code,
+      configuration: configuration.value,
+      etag: workspace.value.etag
+    })
+    workspace.value = normalizeTranslationWorkspace(updated)
+    toast.add({
+      title: 'Configuration saved',
+      description: 'The AI provider, model, and translation prompt are ready to use.',
+      color: 'success',
+      icon: 'lucide:circle-check'
+    })
+    await backToWorkspace()
+  } catch (cause) {
+    toast.add({
+      title: 'Unable to save configuration',
+      description: cause instanceof Error ? cause.message : 'Please try again.',
+      color: 'error',
+      icon: 'lucide:circle-alert'
+    })
+  } finally {
+    saving.value = false
+  }
 }
 </script>
 
@@ -107,6 +148,7 @@ async function save() {
             label="Save configuration"
             icon="lucide:save"
             :disabled="!previewValid || !workspace"
+            :loading="saving"
             @click="save"
           />
         </template>
@@ -118,6 +160,7 @@ async function save() {
 
       <WorkspacesConfigurationPreview
         v-else-if="workspace"
+        v-model:configuration="configuration"
         v-model:preview-valid="previewValid"
         :workspace="workspace"
         :preview-chapter-id="previewChapterId"

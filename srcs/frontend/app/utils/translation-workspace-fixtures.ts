@@ -138,7 +138,7 @@ function makeChapters(
   }))
 }
 
-const defaultPrompt = `You are a professional literary translator. Translate faithfully while preserving names, dialogue, tone, paragraph breaks, and narrative intent. Return only the translated chapter text.`
+export const DEFAULT_TRANSLATION_PROMPT = `You are a professional literary translator. Translate faithfully while preserving names, dialogue, tone, paragraph breaks, and narrative intent. Return only the translated chapter text.`
 
 export const translationWorkspaces: TranslationWorkspace[] = [
   {
@@ -156,10 +156,7 @@ export const translationWorkspaces: TranslationWorkspace[] = [
       providerName: 'OpenAI',
       modelId: 'gpt-5-mini',
       modelName: 'GPT-5 mini',
-      globalPrompt: defaultPrompt,
-      previewChapterId: 'chapter-1',
-      previewParagraphs: vietnameseParagraphs,
-      previewGeneratedAt: '2026-07-27T08:30:00Z'
+      globalPrompt: DEFAULT_TRANSLATION_PROMPT
     },
     chapters: makeChapters(vietnameseParagraphs, [
       'translated',
@@ -188,10 +185,7 @@ export const translationWorkspaces: TranslationWorkspace[] = [
       providerName: 'Anthropic',
       modelId: 'claude-sonnet',
       modelName: 'Claude Sonnet',
-      globalPrompt: defaultPrompt,
-      previewChapterId: 'chapter-1',
-      previewParagraphs: englishParagraphs,
-      previewGeneratedAt: '2026-07-24T11:00:00Z'
+      globalPrompt: DEFAULT_TRANSLATION_PROMPT
     },
     chapters: makeChapters(englishParagraphs, [
       'translated',
@@ -220,13 +214,7 @@ export const translationWorkspaces: TranslationWorkspace[] = [
       providerName: 'Google',
       modelId: 'gemini-pro',
       modelName: 'Gemini Pro',
-      globalPrompt: defaultPrompt,
-      previewChapterId: 'chapter-1',
-      previewParagraphs: [
-        'Lorsque la septième cloche sonna, Jian ouvrit les yeux sous un plafond d’engrenages de laiton.',
-        'Une lettre portant son propre sceau reposait sur le bureau. L’encre était encore humide.'
-      ],
-      previewGeneratedAt: '2026-07-26T07:15:00Z'
+      globalPrompt: DEFAULT_TRANSLATION_PROMPT
     },
     chapters: makeChapters([], [
       'not_started',
@@ -254,10 +242,7 @@ export const translationWorkspaces: TranslationWorkspace[] = [
       providerName: 'OpenAI',
       modelId: 'gpt-5-mini',
       modelName: 'GPT-5 mini',
-      globalPrompt: defaultPrompt,
-      previewChapterId: 'chapter-1',
-      previewParagraphs: ['일곱 번째 종이 울리자 지안은 황동 톱니바퀴로 뒤덮인 천장 아래에서 눈을 떴다.'],
-      previewGeneratedAt: '2026-07-22T08:00:00Z'
+      globalPrompt: DEFAULT_TRANSLATION_PROMPT
     },
     chapters: makeChapters(['번역된 예시 단락입니다.'], [
       'translated',

@@ -203,7 +203,7 @@ function showPrototypeAction(action: 'start' | 'stop') {
         <UButton
           label="Workspaces"
           icon="lucide:arrow-left"
-          to="/workspaces"
+          to="/workspaces/translations"
           color="neutral"
           variant="ghost"
           size="sm"
@@ -227,7 +227,7 @@ function showPrototypeAction(action: 'start' | 'stop') {
       :actions="[{
         label: 'Back to Workspaces',
         icon: 'lucide:arrow-left',
-        to: '/workspaces'
+        to: '/workspaces/translations'
       }]"
     />
 

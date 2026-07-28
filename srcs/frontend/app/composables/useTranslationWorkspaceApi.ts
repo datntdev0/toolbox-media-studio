@@ -1,15 +1,15 @@
 import type {
+  TranslationApiRecord,
+  TranslationConfigurationInput,
   TranslationWorkspace,
-  TranslationWorkspaceStatus,
-  WorkspaceApiRecord
+  TranslationWorkspaceStatus
 } from '~/types/translation-workspace'
 import { resolveLanguage } from '~/constants/supported-languages'
+import { translationProviders } from '~/utils/translation-workspace-fixtures'
 import {
-  type Kind,
-  WorkspaceCreateRequest,
-  WorkspaceKind,
-  type WorkspaceResponse,
-  WorkspaceUpdateRequest
+  TranslationCreateRequest,
+  type TranslationResponse,
+  TranslationUpdateRequest
 } from '~~/shared/api-services/srv-core.client'
 
 const statuses = new Set<TranslationWorkspaceStatus>([
@@ -21,9 +21,12 @@ const statuses = new Set<TranslationWorkspaceStatus>([
   'failed'
 ])
 
-export function normalizeTranslationWorkspace(record: WorkspaceApiRecord): TranslationWorkspace {
+export function normalizeTranslationWorkspace(record: TranslationApiRecord): TranslationWorkspace {
   const novel = record.novel
   const total = Number(novel?.chapterCount || 0)
+  const configuration = record.configuration
+  const provider = translationProviders.find(item => item.id === configuration?.providerId)
+  const model = provider?.models.find(item => item.id === configuration?.modelId)
   return {
     id: record.id,
     name: record.name,
@@ -34,31 +37,33 @@ export function normalizeTranslationWorkspace(record: WorkspaceApiRecord): Trans
     targetLanguage: resolveLanguage(record.targetLanguage),
     status: statuses.has(record.status) ? record.status : 'needs_setup',
     progress: { total, translated: 0, queued: 0, running: 0, failed: 0 },
-    configuration: null,
+    configuration: configuration
+      ? {
+          ...configuration,
+          providerName: provider?.label || configuration.providerId,
+          modelName: model?.label || configuration.modelId
+        }
+      : null,
     chapters: [],
     updatedAt: record.updatedAt,
     etag: record.etag || null
   }
 }
 
-function toApiRecord(response: WorkspaceResponse): WorkspaceApiRecord {
-  return response.toJSON() as unknown as WorkspaceApiRecord
+function toApiRecord(response: TranslationResponse): TranslationApiRecord {
+  return response.toJSON() as unknown as TranslationApiRecord
 }
 
 export function useTranslationWorkspaceApi() {
-  const { workspaces } = useApiClient()
+  const { translations } = useApiClient()
   return {
     async list() {
-      const response = await workspaces.list_workspaces(
-        WorkspaceKind.Translation as unknown as Kind,
-        50,
-        undefined
-      )
+      const response = await translations.list_translations(50, undefined)
       return response.items.map(item => normalizeTranslationWorkspace(toApiRecord(item)))
     },
     async get(id: string) {
       return normalizeTranslationWorkspace(
-        toApiRecord(await workspaces.get_workspace(id))
+        toApiRecord(await translations.get_translation(id))
       )
     },
     async create(body: {
@@ -66,11 +71,8 @@ export function useTranslationWorkspaceApi() {
       novelId: string
       targetLanguage: string
     }) {
-      const response = await workspaces.create_workspace(
-        new WorkspaceCreateRequest({
-          ...body,
-          kind: WorkspaceKind.Translation
-        })
+      const response = await translations.create_translation(
+        new TranslationCreateRequest(body)
       )
       return toApiRecord(response)
     },
@@ -80,20 +82,22 @@ export function useTranslationWorkspaceApi() {
         name: string
         novelId: string
         targetLanguage: string
+        configuration: TranslationConfigurationInput | null
         etag?: string | null
       }
     ) {
-      const response = await workspaces.update_workspace(
+      const response = await translations.update_translation(
         id,
-        new WorkspaceUpdateRequest({
+        new TranslationUpdateRequest({
           ...body,
+          configuration: body.configuration as never,
           etag: body.etag as never
         })
       )
       return toApiRecord(response)
     },
     async delete(id: string) {
-      return workspaces.delete_workspace(id)
+      return translations.delete_translation(id)
     }
   }
 }

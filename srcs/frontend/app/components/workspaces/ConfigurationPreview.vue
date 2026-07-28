@@ -1,23 +1,38 @@
 <script setup lang="ts">
-import type { TranslationWorkspace } from '~/types/translation-workspace'
+import type {
+  TranslationConfigurationInput,
+  TranslationWorkspace
+} from '~/types/translation-workspace'
 import { translationProviders } from '~/utils/translation-workspace-fixtures'
 
 const props = defineProps<{
   workspace: TranslationWorkspace
   previewChapterId?: string
 }>()
+const configuration = defineModel<TranslationConfigurationInput>('configuration', {
+  required: true
+})
 const previewValid = defineModel<boolean>('previewValid', { default: true })
 const toast = useToast()
 
-const providerId = ref(props.workspace.configuration?.providerId || translationProviders[0]!.id)
-const modelId = ref(
-  props.workspace.configuration?.modelId
-  || translationProviders[0]!.models[0]!.id
-)
-const prompt = ref(
-  props.workspace.configuration?.globalPrompt
-  || 'You are a professional literary translator. Preserve names, dialogue, tone, paragraph breaks, and narrative intent. Return only the translated chapter text.'
-)
+const providerId = computed({
+  get: () => configuration.value.providerId,
+  set: (providerId: string) => {
+    configuration.value = { ...configuration.value, providerId }
+  }
+})
+const modelId = computed({
+  get: () => configuration.value.modelId,
+  set: (modelId: string) => {
+    configuration.value = { ...configuration.value, modelId }
+  }
+})
+const prompt = computed({
+  get: () => configuration.value.globalPrompt,
+  set: (globalPrompt: string) => {
+    configuration.value = { ...configuration.value, globalPrompt }
+  }
+})
 
 const providerItems = translationProviders.map(provider => ({
   label: provider.label,
@@ -37,20 +52,13 @@ const previewChapter = computed(() =>
   props.workspace.chapters.find(chapter =>
     chapter.id === props.previewChapterId
   )
-  || props.workspace.chapters.find(chapter =>
-    chapter.id === props.workspace.configuration?.previewChapterId
-  )
   || props.workspace.chapters.find(chapter => chapter.originalParagraphs.length)
   || props.workspace.chapters[0]
 )
-const previewParagraphs = computed(() =>
-  props.workspace.configuration?.previewParagraphs.length
-    ? props.workspace.configuration.previewParagraphs
-    : [
-        `[${props.workspace.targetLanguage.label} preview] When the seventh bell sounded, the chapter began beneath a ceiling of quiet brass gears.`,
-        'This fixed sample demonstrates the translation preview layout without contacting an AI provider.'
-      ]
-)
+const previewParagraphs = computed(() => [
+  `[${props.workspace.targetLanguage.label} preview] When the seventh bell sounded, the chapter began beneath a ceiling of quiet brass gears.`,
+  'This fixed sample demonstrates the translation preview layout without contacting an AI provider.'
+])
 
 watch([providerId, modelId, prompt], () => {
   previewValid.value = false

@@ -5,8 +5,12 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.novels import Novel, NovelBinding, NovelChapter, NovelStatus, NovelSyncResult
+from app.domain.translations import (
+    TranslationConfiguration,
+    TranslationStatus,
+    TranslationView,
+)
 from app.domain.users import User, UserRole, UserStatus
-from app.domain.workspaces import Workspace, WorkspaceKind, WorkspaceStatus
 
 
 class TokenResponse(BaseModel):
@@ -125,29 +129,39 @@ class NovelSyncResponse(BaseModel):
     changes: NovelSyncChangesResponse
 
 
-class WorkspaceResponse(BaseModel):
-    """Workspace payload enriched with the current bound novel."""
+class TranslationConfigurationResponse(BaseModel):
+    """Persisted AI configuration for a translation."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    provider_id: str = Field(alias="providerId")
+    model_id: str = Field(alias="modelId")
+    global_prompt: str = Field(alias="globalPrompt")
+
+
+class TranslationResponse(BaseModel):
+    """Translation payload enriched with the current bound novel."""
 
     model_config = ConfigDict(populate_by_name=True)
 
     id: str
     name: str
-    kind: WorkspaceKind
     novel_id: str = Field(alias="novelId")
     target_language: str = Field(alias="targetLanguage")
-    status: WorkspaceStatus
+    configuration: TranslationConfigurationResponse | None = None
+    status: TranslationStatus
     novel: NovelResponse | None = None
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
     etag: str | None = None
 
 
-class WorkspaceListResponse(BaseModel):
-    """Paged workspace list response."""
+class TranslationListResponse(BaseModel):
+    """Paged translation list response."""
 
     model_config = ConfigDict(populate_by_name=True)
 
-    items: list[WorkspaceResponse]
+    items: list[TranslationResponse]
     continuation_token: str | None = Field(default=None, alias="continuationToken")
 
 
@@ -238,23 +252,33 @@ def to_novel_sync_response(result: NovelSyncResult) -> NovelSyncResponse:
     )
 
 
-def to_workspace_response(
-    workspace: Workspace,
-    novel: Novel | None,
-) -> WorkspaceResponse:
-    """Convert a workspace and its live novel reference to an API response."""
+def to_translation_response(view: TranslationView) -> TranslationResponse:
+    """Convert an enriched translation to an API response."""
 
-    return WorkspaceResponse(
-        id=workspace.id,
-        name=workspace.name,
-        kind=workspace.kind,
-        novel_id=workspace.novel_id,
-        target_language=workspace.target_language,
-        status=workspace.status,
-        novel=to_novel_response(novel) if novel is not None else None,
-        created_at=workspace.created_at,
-        updated_at=workspace.updated_at,
-        etag=workspace.etag,
+    translation = view.translation
+    return TranslationResponse(
+        id=translation.id,
+        name=translation.name,
+        novelId=translation.novel_id,
+        targetLanguage=translation.target_language,
+        configuration=to_translation_configuration_response(translation.configuration),
+        status=translation.status,
+        novel=to_novel_response(view.novel) if view.novel is not None else None,
+        createdAt=translation.created_at,
+        updatedAt=translation.updated_at,
+        etag=translation.etag,
+    )
+
+
+def to_translation_configuration_response(
+    configuration: TranslationConfiguration | None,
+) -> TranslationConfigurationResponse | None:
+    if configuration is None:
+        return None
+    return TranslationConfigurationResponse(
+        providerId=configuration.provider_id,
+        modelId=configuration.model_id,
+        globalPrompt=configuration.global_prompt,
     )
 
 
