@@ -43,15 +43,24 @@ async function loadWorkspace() {
     const requestedChapter = novel.chapters.find(chapter =>
       chapter.id === previewChapterId.value
     )
+    const translationChapters = new Map(
+      loadedWorkspace.chapters.map(chapter => [chapter.id, chapter])
+    )
 
     loadedWorkspace.chapters = novel.chapters.map((chapter, index) => ({
       id: chapter.id,
       chapterIndex: chapter.manifestIndex + 1,
       number: chapter.chapterNumber ?? index + 1,
       title: chapter.title,
-      status: 'not_started',
+      status: translationChapters.get(chapter.id)?.status || 'not_started',
       originalParagraphs: [],
-      translatedParagraphs: []
+      translatedParagraphs: [],
+      attempts: translationChapters.get(chapter.id)?.attempts || 0,
+      lastError: translationChapters.get(chapter.id)?.lastError || null,
+      resultAvailable: translationChapters.get(chapter.id)?.resultAvailable || false,
+      sourceUpdated: translationChapters.get(chapter.id)?.sourceUpdated || false,
+      sourceRemoved: translationChapters.get(chapter.id)?.sourceRemoved
+        || chapter.sourceRemoved
     }))
 
     if (requestedChapter?.contentAvailable) {

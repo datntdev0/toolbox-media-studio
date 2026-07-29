@@ -9,6 +9,8 @@ const props = defineProps<{
   workspace: TranslationWorkspace
   chapter: TranslationChapter
   translationAvailable: boolean
+  translationLoading: boolean
+  translationLoadError: boolean
   originalLoading: boolean
   originalLoadError: boolean
   canPrevious: boolean
@@ -56,6 +58,12 @@ watch(() => props.chapter.id, () => {
   draft.value = localTranslation.value.join('\n\n')
   viewMode.value = 'original'
 }, { immediate: true })
+
+watch(() => props.chapter.translatedParagraphs, (paragraphs) => {
+  if (editing.value) return
+  localTranslation.value = [...paragraphs]
+  draft.value = localTranslation.value.join('\n\n')
+})
 
 function startEdit() {
   draft.value = localTranslation.value.join('\n\n')
@@ -241,6 +249,13 @@ defineExpose({ confirmDiscard, focusChapters })
                 variant="subtle"
                 :ui="chapter.status === 'translating' ? { leadingIcon: 'animate-spin' } : undefined"
               />
+              <UBadge
+                v-if="chapter.sourceUpdated"
+                label="Source updated"
+                icon="lucide:refresh-cw"
+                color="warning"
+                variant="subtle"
+              />
             </div>
             <p class="mt-0.5 truncate text-xs text-muted">
               Chapter {{ chapter.number }} · {{ chapter.title }}
@@ -291,6 +306,28 @@ defineExpose({ confirmDiscard, focusChapters })
             </div>
           </div>
 
+          <div
+            v-if="translationLoading && !localTranslation.length"
+            class="mx-auto w-full max-w-3xl space-y-4 p-8 sm:p-12"
+            aria-label="Loading translated chapter content"
+          >
+            <USkeleton v-for="index in 10" :key="index" class="h-4" />
+          </div>
+
+          <div
+            v-else-if="translationLoadError"
+            class="flex min-h-96 flex-1 items-center justify-center p-6"
+          >
+            <UAlert
+              class="max-w-lg"
+              color="error"
+              variant="subtle"
+              icon="lucide:database-zap"
+              title="Unable to load translated content"
+              description="This task reports an available result, but its stored content could not be opened."
+            />
+          </div>
+
           <article
             v-else-if="localTranslation.length"
             :lang="workspace.targetLanguage.code"
@@ -300,23 +337,6 @@ defineExpose({ confirmDiscard, focusChapters })
               {{ paragraph }}
             </p>
           </article>
-
-          <div
-            v-else-if="!translationAvailable"
-            class="flex min-h-96 flex-1 items-center justify-center p-6"
-          >
-            <UEmpty
-              icon="lucide:languages"
-              title="Translation has not started"
-              description="Configure this workspace before chapter translation data becomes available."
-              :actions="[{
-                label: 'Configure workspace',
-                icon: 'lucide:settings-2',
-                onClick: () => emit('configure')
-              }]"
-              size="lg"
-            />
-          </div>
 
           <div
             v-else-if="chapter.status === 'translating'"
@@ -340,17 +360,48 @@ defineExpose({ confirmDiscard, focusChapters })
               variant="subtle"
               icon="lucide:circle-x"
               title="Translation failed"
-              description="The provider could not translate this chapter. It can be included in a later retry range or entered manually."
+              :description="chapter.lastError
+                ? `The translation failed: ${chapter.lastError}`
+                : 'The provider could not translate this chapter. It can be included in a later retry range.'"
+            />
+          </div>
+
+          <div
+            v-else-if="chapter.status === 'queued'"
+            class="flex min-h-96 flex-1 items-center justify-center p-6"
+          >
+            <UEmpty
+              icon="lucide:clock-3"
+              title="Queued for translation"
+              description="This chapter is waiting for the current translation run."
+              size="lg"
+            />
+          </div>
+
+          <div
+            v-else-if="chapter.status === 'unavailable'"
+            class="flex min-h-96 flex-1 items-center justify-center p-6"
+          >
+            <UEmpty
+              icon="lucide:file-clock"
+              title="Source chapter removed"
+              description="Sync again if the source chapter reappears in the connected novel."
+              size="lg"
             />
           </div>
 
           <div v-else class="flex min-h-96 flex-1 items-center justify-center p-6">
             <UEmpty
-              :icon="chapter.status === 'queued' ? 'lucide:clock-3' : 'lucide:languages'"
-              :title="chapter.status === 'queued' ? 'Queued for translation' : 'No translation yet'"
-              :description="chapter.status === 'queued'
-                ? 'This chapter is waiting for the current translation run.'
-                : 'Translate this chapter range or add the translated content manually.'"
+              icon="lucide:languages"
+              :title="translationAvailable ? 'No translated paragraphs' : 'Translation has not started'"
+              description="Select a chapter range above and start a translation run."
+              :actions="workspace.configuration
+                ? undefined
+                : [{
+                  label: 'Configure workspace',
+                  icon: 'lucide:settings-2',
+                  onClick: () => emit('configure')
+                }]"
               size="lg"
             />
           </div>

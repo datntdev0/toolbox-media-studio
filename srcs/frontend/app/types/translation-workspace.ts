@@ -55,6 +55,7 @@ export interface TranslationConfiguration extends TranslationConfigurationInput 
 
 export interface TranslationProgress {
   total: number
+  created: number
   translated: number
   queued: number
   running: number
@@ -69,6 +70,11 @@ export interface TranslationChapter {
   status: TranslationChapterStatus
   originalParagraphs: string[]
   translatedParagraphs: string[]
+  attempts: number
+  lastError: string | null
+  resultAvailable: boolean
+  sourceUpdated: boolean
+  sourceRemoved: boolean
 }
 
 export interface TranslationWorkspace {
@@ -106,6 +112,40 @@ export interface TranslationApiRecord {
   createdAt: string
   updatedAt: string
   etag?: string | null
+}
+
+export interface TranslationTaskApiRecord {
+  id: string
+  title: string
+  chapterNumber?: number | null
+  manifestIndex: number
+  status: 'created' | 'queued' | 'running' | 'completed' | 'failed'
+  attempts: number
+  lastError?: string | null
+  resultAvailable: boolean
+  completedAt?: string | null
+  sourceChapterUpdatedAt: string
+  sourceUpdated: boolean
+  sourceRemoved: boolean
+}
+
+export interface TranslationDetailApiRecord extends TranslationApiRecord {
+  progress: {
+    total: number
+    created: number
+    queued: number
+    running: number
+    completed: number
+    failed: number
+  }
+  tasks?: TranslationTaskApiRecord[]
+}
+
+export interface TranslationSyncChanges {
+  added: number
+  refreshed: number
+  preserved: number
+  removed: number
 }
 
 export interface TranslationListApiRecord {

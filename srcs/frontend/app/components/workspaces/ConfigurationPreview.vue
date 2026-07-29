@@ -162,7 +162,7 @@ function generatePreview() {
       </UPageCard>
     </div>
 
-    <UPageCard class="overflow-hidden lg:col-span-7" variant="naked" :ui="{ header: 'mb-4 w-full' }">
+    <UPageCard class="overflow-hidden lg:col-span-7" variant="naked" :ui="{ header: 'mb-4 w-full', body: 'w-full' }">
       <template #header>
         <div class="flex w-full items-start gap-3">
           <div class="min-w-0 flex-1">

@@ -23,9 +23,11 @@ const overscan = 3
 const filterItems = [
   { label: 'All statuses', value: 'all' },
   { label: 'Not started', value: 'not_started' },
+  { label: 'Queued', value: 'queued' },
   { label: 'In progress', value: 'translating' },
   { label: 'Translated', value: 'translated' },
   { label: 'Manually edited', value: 'manually_edited' },
+  { label: 'Source unavailable', value: 'unavailable' },
   { label: 'Failed', value: 'failed' }
 ]
 
@@ -138,6 +140,9 @@ watch(open, async (isOpen) => {
                     :class="chapter.status === 'translating' ? 'animate-spin' : ''"
                   />
                   {{ chapterStatusMeta[chapter.status].shortLabel }}
+                  <span v-if="chapter.sourceUpdated" class="text-warning">
+                    · Source updated
+                  </span>
                 </span>
               </span>
               <UIcon

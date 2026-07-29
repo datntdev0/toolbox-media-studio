@@ -1,52 +1,64 @@
 <script setup lang="ts">
 import type { TranslationWorkspace } from '~/types/translation-workspace'
 
-const props = defineProps<{ workspace: TranslationWorkspace }>()
+const props = withDefaults(defineProps<{
+  workspace: TranslationWorkspace
+  syncing?: boolean
+  starting?: boolean
+  stopping?: boolean
+}>(), {
+  syncing: false,
+  starting: false,
+  stopping: false
+})
 const rangeStart = defineModel<string>('rangeStart', { required: true })
 const rangeEnd = defineModel<string>('rangeEnd', { required: true })
+const refetch = defineModel<boolean>('refetch', { default: false })
+const force = defineModel<boolean>('force', { default: false })
 
 const emit = defineEmits<{
   configure: []
+  sync: []
   start: []
   stop: []
 }>()
 
+const availableChapters = computed(() =>
+  props.workspace.chapters.filter(chapter => !chapter.sourceRemoved)
+)
 const rangeStartChapterIndex = computed<number | undefined>({
-  get: () => props.workspace.chapters.find(
+  get: () => availableChapters.value.find(
     chapter => chapter.id === rangeStart.value
   )?.chapterIndex,
   set: (value) => {
-    const chapter = props.workspace.chapters.find(item => item.chapterIndex === value)
+    const chapter = availableChapters.value.find(item => item.chapterIndex === value)
     if (chapter) rangeStart.value = chapter.id
   }
 })
 const rangeEndChapterIndex = computed<number | undefined>({
-  get: () => props.workspace.chapters.find(
+  get: () => availableChapters.value.find(
     chapter => chapter.id === rangeEnd.value
   )?.chapterIndex,
   set: (value) => {
-    const chapter = props.workspace.chapters.find(item => item.chapterIndex === value)
+    const chapter = availableChapters.value.find(item => item.chapterIndex === value)
     if (chapter) rangeEnd.value = chapter.id
   }
 })
-const firstChapterIndex = computed(() => props.workspace.chapters[0]?.chapterIndex || 1)
+const firstChapterIndex = computed(() => availableChapters.value[0]?.chapterIndex || 1)
 const lastChapterIndex = computed(() =>
-  props.workspace.chapters.at(-1)?.chapterIndex || 1
+  availableChapters.value.at(-1)?.chapterIndex || 1
 )
 
 const startIndex = computed(() =>
-  props.workspace.chapters.findIndex(chapter => chapter.id === rangeStart.value)
+  availableChapters.value.findIndex(chapter => chapter.id === rangeStart.value)
 )
 const endIndex = computed(() =>
-  props.workspace.chapters.findIndex(chapter => chapter.id === rangeEnd.value)
+  availableChapters.value.findIndex(chapter => chapter.id === rangeEnd.value)
 )
 const rangeInvalid = computed(() =>
   startIndex.value < 0 || endIndex.value < startIndex.value
 )
-const selectedCount = computed(() =>
-  rangeInvalid.value ? 0 : endIndex.value - startIndex.value + 1
-)
-const running = computed(() => props.workspace.status === 'running')
+const busy = computed(() => props.syncing || props.starting || props.stopping)
 </script>
 
 <template>
@@ -55,15 +67,27 @@ const running = computed(() => props.workspace.status === 'running')
       <h2 class="font-semibold text-highlighted">
         Start translation chapters by index
       </h2>
-      <UButton
-        class="ml-auto"
-        label="Configure AI"
-        icon="lucide:settings-2"
-        color="neutral"
-        variant="soft"
-        size="sm"
-        @click="emit('configure')"
-      />
+      <div class="ml-auto flex items-center gap-2">
+        <UButton
+          label="Sync chapters"
+          icon="lucide:refresh-cw"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          :loading="syncing"
+          :disabled="busy"
+          @click="emit('sync')"
+        />
+        <UButton
+          label="Configure AI"
+          icon="lucide:settings-2"
+          color="neutral"
+          variant="soft"
+          size="sm"
+          :disabled="busy"
+          @click="emit('configure')"
+        />
+      </div>
     </div>
 
     <div
@@ -100,7 +124,7 @@ const running = computed(() => props.workspace.status === 'running')
             :min="firstChapterIndex"
             :max="lastChapterIndex"
             :step="1"
-            :disabled="running"
+            :disabled="busy || !availableChapters.length"
             class="w-full"
           />
         </UFormField>
@@ -116,7 +140,7 @@ const running = computed(() => props.workspace.status === 'running')
             :min="firstChapterIndex"
             :max="lastChapterIndex"
             :step="1"
-            :disabled="running"
+            :disabled="busy || !availableChapters.length"
             class="w-full"
           />
         </UFormField>
@@ -125,7 +149,8 @@ const running = computed(() => props.workspace.status === 'running')
             label="Start"
             icon="lucide:play"
             size="sm"
-            :disabled="running || rangeInvalid"
+            :loading="starting"
+            :disabled="busy || rangeInvalid || !availableChapters.length"
             @click="emit('start')"
           />
           <UButton
@@ -134,26 +159,27 @@ const running = computed(() => props.workspace.status === 'running')
             color="neutral"
             variant="soft"
             size="sm"
-            :disabled="!running || workspace.progress.queued === 0"
+            :loading="stopping"
+            :disabled="busy || workspace.progress.queued === 0"
             @click="emit('stop')"
           />
         </div>
       </div>
 
-      <div class="space-y-1.5">
-        <div class="flex justify-between gap-3 text-xs text-muted">
-          <span>Translation progress</span>
-          <span class="tabular-nums">
-            {{ workspace.progress.translated }} / {{ workspace.progress.total }} chapters
-          </span>
-        </div>
-        <UProgress :model-value="workspace.progress.translated" :max="Math.max(workspace.progress.total, 1)" size="xs" />
+      <div class="flex flex-wrap gap-x-5 gap-y-2">
+        <UCheckbox
+          v-model="refetch"
+          label="Refetch existing results"
+          description="Regenerate translated chapters and source-updated content."
+          :disabled="busy"
+        />
+        <UCheckbox
+          v-model="force"
+          label="Force queued or running tasks"
+          description="Republish tasks already claimed by a run."
+          :disabled="busy"
+        />
       </div>
-
-      <p class="text-xs text-muted">
-        {{ selectedCount }} {{ selectedCount === 1 ? 'chapter' : 'chapters' }} selected for this translation run.
-        Chapter indexes follow novel order and include additional chapters.
-      </p>
     </div>
   </section>
 </template>

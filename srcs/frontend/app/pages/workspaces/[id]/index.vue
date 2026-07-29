@@ -3,7 +3,10 @@ import type {
   TranslationChapter,
   TranslationWorkspace
 } from '~/types/translation-workspace'
-import type { NovelChapterContent } from '~/types/novel-workspace'
+import type {
+  NovelChapterContent,
+  NovelWorkspace
+} from '~/types/novel-workspace'
 
 definePageMeta({
   title: 'Translation workspace',
@@ -13,52 +16,88 @@ definePageMeta({
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const translationApi = useTranslationWorkspaceApi()
+const novelApi = useNovelWorkspaceApi()
 const loading = ref(true)
 const loadError = ref<unknown>()
 const workspace = ref<TranslationWorkspace | null>(null)
-const translationChapterIds = ref(new Set<string>())
 const sourceContentChapterIds = ref(new Set<string>())
 const originalLoading = ref(false)
 const originalLoadError = ref(false)
+const translationLoading = ref(false)
+const translationLoadError = ref(false)
+const syncing = ref(false)
+const starting = ref(false)
+const stopping = ref(false)
 const chaptersOpen = ref(false)
 const rangeStart = ref('')
 const rangeEnd = ref('')
+const refetch = ref(false)
+const force = ref(false)
 const comparisonRef = ref<{
   confirmDiscard: () => Promise<boolean>
   focusChapters: () => void
 } | null>(null)
+let realtimeRefreshTimer: ReturnType<typeof setTimeout> | undefined
 
 const workspaceId = computed(() => String(route.params.id || ''))
+
+function applyWorkspace(
+  nextWorkspace: TranslationWorkspace,
+  novel?: NovelWorkspace
+) {
+  const currentChapters = new Map(
+    (workspace.value?.chapters || []).map(chapter => [chapter.id, chapter])
+  )
+
+  if (novel) {
+    sourceContentChapterIds.value = new Set(
+      novel.chapters
+        .filter(chapter => chapter.contentAvailable && !chapter.sourceRemoved)
+        .map(chapter => chapter.id)
+    )
+  }
+
+  nextWorkspace.chapters = nextWorkspace.chapters.map((chapter) => {
+    const current = currentChapters.get(chapter.id)
+    const sourceBecameUpdated = chapter.sourceUpdated && !current?.sourceUpdated
+    return {
+      ...chapter,
+      originalParagraphs: sourceBecameUpdated
+        ? []
+        : current?.originalParagraphs || [],
+      translatedParagraphs: chapter.resultAvailable
+        ? current?.translatedParagraphs || []
+        : []
+    }
+  })
+  workspace.value = nextWorkspace
+
+  const availableChapters = nextWorkspace.chapters.filter(chapter => !chapter.sourceRemoved)
+  if (!availableChapters.some(chapter => chapter.id === rangeStart.value)) {
+    rangeStart.value = availableChapters[0]?.id || ''
+  }
+  if (!availableChapters.some(chapter => chapter.id === rangeEnd.value)) {
+    rangeEnd.value = availableChapters.at(-1)?.id || ''
+  }
+
+  const selectedExists = nextWorkspace.chapters.some(
+    chapter => chapter.id === selectedChapterId.value
+  )
+  if ((!selectedChapterId.value || !selectedExists) && nextWorkspace.chapters[0]) {
+    void router.replace({
+      query: { ...route.query, chapter: nextWorkspace.chapters[0].id }
+    })
+  }
+}
 
 async function loadWorkspace() {
   loading.value = true
   loadError.value = undefined
   try {
-    const loadedWorkspace = await useTranslationWorkspaceApi().get(workspaceId.value)
-    const novel = await useNovelWorkspaceApi().getNovel(loadedWorkspace.novelId)
-    const translationChapters = new Map(
-      loadedWorkspace.chapters.map(chapter => [chapter.id, chapter])
-    )
-
-    translationChapterIds.value = new Set(translationChapters.keys())
-    sourceContentChapterIds.value = new Set(
-      novel.chapters
-        .filter(chapter => chapter.contentAvailable)
-        .map(chapter => chapter.id)
-    )
-    loadedWorkspace.chapters = novel.chapters.map((sourceChapter, index) => {
-      const translationChapter = translationChapters.get(sourceChapter.id)
-      return {
-        id: sourceChapter.id,
-        chapterIndex: sourceChapter.manifestIndex + 1,
-        number: sourceChapter.chapterNumber ?? index + 1,
-        title: sourceChapter.title,
-        status: translationChapter?.status ?? 'not_started',
-        originalParagraphs: [],
-        translatedParagraphs: translationChapter?.translatedParagraphs ?? []
-      }
-    })
-    workspace.value = loadedWorkspace
+    const loadedWorkspace = await translationApi.get(workspaceId.value)
+    const novel = await novelApi.getNovel(loadedWorkspace.novelId)
+    applyWorkspace(loadedWorkspace, novel)
   } catch (cause) {
     loadError.value = cause
     workspace.value = null
@@ -82,9 +121,7 @@ const selectedChapter = computed(() =>
     : workspace.value?.chapters[0] || null
 )
 const translationAvailable = computed(() =>
-  selectedChapter.value
-    ? translationChapterIds.value.has(selectedChapter.value.id)
-    : false
+  Boolean(selectedChapter.value?.resultAvailable)
 )
 
 function applyOriginalContent(chapter: TranslationChapter, content: NovelChapterContent) {
@@ -94,7 +131,11 @@ function applyOriginalContent(chapter: TranslationChapter, content: NovelChapter
     .filter(Boolean)
 }
 
-watch(() => selectedChapter.value?.id, async (chapterId) => {
+watch([
+  () => selectedChapter.value?.id,
+  () => selectedChapter.value?.sourceUpdated,
+  () => selectedChapter.value?.sourceRemoved
+], async ([chapterId]) => {
   originalLoading.value = false
   originalLoadError.value = false
   if (!chapterId || !workspace.value) return
@@ -108,7 +149,7 @@ watch(() => selectedChapter.value?.id, async (chapterId) => {
 
   originalLoading.value = true
   try {
-    const content = await useNovelWorkspaceApi().getChapter(workspace.value.novelId, chapterId)
+    const content = await novelApi.getChapter(workspace.value.novelId, chapterId)
     if (selectedChapter.value?.id === chapterId) {
       applyOriginalContent(chapter, content)
     }
@@ -123,22 +164,40 @@ watch(() => selectedChapter.value?.id, async (chapterId) => {
   }
 }, { immediate: true })
 
+watch([
+  () => selectedChapter.value?.id,
+  () => selectedChapter.value?.resultAvailable,
+  () => selectedChapter.value?.status
+], async ([chapterId, resultAvailable]) => {
+  translationLoading.value = false
+  translationLoadError.value = false
+  if (!chapterId || !resultAvailable || !workspace.value) return
+
+  const chapter = workspace.value.chapters.find(item => item.id === chapterId)
+  if (!chapter) return
+
+  translationLoading.value = true
+  try {
+    const paragraphs = await translationApi.getResult(workspaceId.value, chapterId)
+    if (selectedChapter.value?.id === chapterId) {
+      chapter.translatedParagraphs = paragraphs
+    }
+  } catch {
+    if (selectedChapter.value?.id === chapterId) {
+      translationLoadError.value = true
+    }
+  } finally {
+    if (selectedChapter.value?.id === chapterId) {
+      translationLoading.value = false
+    }
+  }
+}, { immediate: true })
+
 useHead(() => ({
   title: workspace.value
     ? `${workspace.value.name} · ${workspace.value.targetLanguage.label}`
     : 'Translation workspace'
 }))
-
-watch(workspace, (value) => {
-  if (!value?.chapters.length) return
-  rangeStart.value = value.chapters[0]!.id
-  rangeEnd.value = value.chapters[value.chapters.length - 1]!.id
-  if (!selectedChapterId.value) {
-    void router.replace({
-      query: { ...route.query, chapter: value.chapters[0]!.id }
-    })
-  }
-}, { immediate: true })
 
 watch(chaptersOpen, (value, previous) => {
   if (!value && previous) {
@@ -177,21 +236,121 @@ async function openConfiguration() {
   })
 }
 
-function showPrototypeAction(action: 'start' | 'stop') {
-  toast.add(action === 'start'
-    ? {
-        title: 'Static translation run',
-        description: 'The selected range is ready for review; no background job was started.',
-        color: 'neutral',
-        icon: 'lucide:play'
-      }
-    : {
-        title: 'Static queued state',
-        description: 'No queued chapters were changed in this prototype.',
-        color: 'neutral',
-        icon: 'lucide:square'
-      })
+async function refreshWorkspace() {
+  try {
+    applyWorkspace(await translationApi.get(workspaceId.value))
+  } catch {
+    // Keep the current workspace visible when a background refresh races another update.
+  }
 }
+
+async function syncChapters() {
+  if (syncing.value) return
+  syncing.value = true
+  try {
+    const result = await translationApi.sync(workspaceId.value)
+    applyWorkspace(result.workspace)
+    try {
+      applyWorkspace(
+        result.workspace,
+        await novelApi.getNovel(result.workspace.novelId)
+      )
+    } catch {
+      // The task manifest is already current; source availability can refresh next load.
+    }
+    const changes = result.changes
+    toast.add({
+      title: 'Chapter tasks synchronized',
+      description: `${changes.added} added, ${changes.refreshed} refreshed, ${changes.removed} removed, and ${changes.preserved} preserved.`,
+      color: 'success',
+      icon: 'lucide:refresh-cw'
+    })
+  } catch {
+    toast.add({
+      title: 'Unable to sync chapter tasks',
+      description: 'The translation or connected novel may have changed. Try again.',
+      color: 'error',
+      icon: 'lucide:circle-alert'
+    })
+  } finally {
+    syncing.value = false
+  }
+}
+
+async function startTranslation() {
+  if (!workspace.value || starting.value) return
+  const from = workspace.value.chapters.find(chapter => chapter.id === rangeStart.value)
+  const to = workspace.value.chapters.find(chapter => chapter.id === rangeEnd.value)
+  if (!from || !to || from.chapterIndex > to.chapterIndex) return
+
+  starting.value = true
+  try {
+    applyWorkspace(await translationApi.start(workspaceId.value, {
+      chapterIndexFrom: from.chapterIndex,
+      chapterIndexTo: to.chapterIndex,
+      refetch: refetch.value,
+      force: force.value
+    }))
+    toast.add({
+      title: 'Translation tasks queued',
+      description: `Chapters ${from.chapterIndex}–${to.chapterIndex} were submitted to the translation queue.`,
+      color: 'success',
+      icon: 'lucide:play'
+    })
+  } catch {
+    await refreshWorkspace()
+    toast.add({
+      title: 'Unable to publish translation tasks',
+      description: 'Queued state was preserved. Enable Force to retry tasks that were already queued.',
+      color: 'error',
+      icon: 'lucide:circle-alert'
+    })
+  } finally {
+    starting.value = false
+  }
+}
+
+async function stopTranslation() {
+  if (stopping.value) return
+  stopping.value = true
+  try {
+    applyWorkspace(await translationApi.stop(workspaceId.value))
+    toast.add({
+      title: 'Queued translations stopped',
+      description: 'Queued chapters were reset. A chapter already running will finish normally.',
+      color: 'success',
+      icon: 'lucide:square'
+    })
+  } catch {
+    await refreshWorkspace()
+    toast.add({
+      title: 'Unable to stop queued translations',
+      description: 'The workspace changed while the stop request was being applied.',
+      color: 'error',
+      icon: 'lucide:circle-alert'
+    })
+  } finally {
+    stopping.value = false
+  }
+}
+
+type TranslationUpdatedPayload = {
+  translationId: string
+  taskId?: string
+}
+
+useRealtime().onMessage<TranslationUpdatedPayload>('translation.updated', ({ payload }) => {
+  if (payload.translationId !== workspaceId.value) return
+  if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer)
+  realtimeRefreshTimer = setTimeout(() => {
+    realtimeRefreshTimer = undefined
+    void refreshWorkspace()
+  }, 200)
+})
+
+onBeforeUnmount(() => {
+  if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer)
+})
 </script>
 
 <template>
@@ -295,6 +454,35 @@ function showPrototypeAction(action: 'start' | 'stop') {
                   </dd>
                 </div>
               </dl>
+              <div class="space-y-1.5 pt-2">
+                <div class="flex justify-between gap-3 text-xs text-muted">
+                  <span>Translation progress</span>
+                  <span class="tabular-nums">
+                    {{ workspace.progress.translated }} / {{ workspace.progress.total }} chapters
+                  </span>
+                </div>
+                <UProgress
+                  :model-value="workspace.progress.translated"
+                  :max="Math.max(workspace.progress.total, 1)"
+                  size="xs"
+                />
+                <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+                  <span class="inline-flex items-center gap-1.5">
+                    <UIcon name="lucide:clock-3" class="size-3.5" />
+                    <span class="tabular-nums">{{ workspace.progress.queued }}</span>
+                    queued
+                  </span>
+                  <span class="inline-flex items-center gap-1.5">
+                    <UIcon
+                      name="lucide:loader-circle"
+                      class="size-3.5"
+                      :class="workspace.progress.running ? 'animate-spin' : undefined"
+                    />
+                    <span class="tabular-nums">{{ workspace.progress.running }}</span>
+                    running
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -304,10 +492,16 @@ function showPrototypeAction(action: 'start' | 'stop') {
         <WorkspacesRunToolbar
           v-model:range-start="rangeStart"
           v-model:range-end="rangeEnd"
+          v-model:refetch="refetch"
+          v-model:force="force"
           :workspace="workspace"
+          :syncing="syncing"
+          :starting="starting"
+          :stopping="stopping"
           @configure="openConfiguration"
-          @start="showPrototypeAction('start')"
-          @stop="showPrototypeAction('stop')"
+          @sync="syncChapters"
+          @start="startTranslation"
+          @stop="stopTranslation"
         />
       </template>
     </UDashboardToolbar>
@@ -318,6 +512,8 @@ function showPrototypeAction(action: 'start' | 'stop') {
       :workspace="workspace"
       :chapter="selectedChapter"
       :translation-available="translationAvailable"
+      :translation-loading="translationLoading"
+      :translation-load-error="translationLoadError"
       :original-loading="originalLoading"
       :original-load-error="originalLoadError"
       :can-previous="selectedIndex > 0"

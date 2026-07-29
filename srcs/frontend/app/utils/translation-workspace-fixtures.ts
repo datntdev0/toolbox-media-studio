@@ -135,7 +135,14 @@ function makeChapters(
         ),
     translatedParagraphs: ['translated', 'manually_edited'].includes(statuses[index] || '')
       ? translated
-      : []
+      : [],
+    attempts: ['translated', 'manually_edited', 'failed'].includes(statuses[index] || '')
+      ? 1
+      : 0,
+    lastError: statuses[index] === 'failed' ? 'Mock provider request failed' : null,
+    resultAvailable: ['translated', 'manually_edited'].includes(statuses[index] || ''),
+    sourceUpdated: false,
+    sourceRemoved: statuses[index] === 'unavailable'
   }))
 }
 
@@ -151,7 +158,7 @@ export const translationWorkspaces: TranslationWorkspace[] = [
     sourceLanguage: chinese,
     targetLanguage: vietnamese,
     status: 'running',
-    progress: { total: 7, translated: 2, queued: 1, running: 1, failed: 1 },
+    progress: { total: 7, created: 2, translated: 2, queued: 1, running: 1, failed: 1 },
     configuration: {
       providerId: 'openai',
       providerName: 'OpenAI',
@@ -180,7 +187,7 @@ export const translationWorkspaces: TranslationWorkspace[] = [
     sourceLanguage: chinese,
     targetLanguage: english,
     status: 'completed',
-    progress: { total: 7, translated: 7, queued: 0, running: 0, failed: 0 },
+    progress: { total: 7, created: 0, translated: 7, queued: 0, running: 0, failed: 0 },
     configuration: {
       providerId: 'anthropic',
       providerName: 'Anthropic',
@@ -209,7 +216,7 @@ export const translationWorkspaces: TranslationWorkspace[] = [
     sourceLanguage: english,
     targetLanguage: french,
     status: 'ready',
-    progress: { total: 6, translated: 0, queued: 0, running: 0, failed: 0 },
+    progress: { total: 6, created: 6, translated: 0, queued: 0, running: 0, failed: 0 },
     configuration: {
       providerId: 'google',
       providerName: 'Google',
@@ -237,7 +244,7 @@ export const translationWorkspaces: TranslationWorkspace[] = [
     sourceLanguage: chinese,
     targetLanguage: korean,
     status: 'failed',
-    progress: { total: 6, translated: 2, queued: 0, running: 0, failed: 2 },
+    progress: { total: 6, created: 2, translated: 2, queued: 0, running: 0, failed: 2 },
     configuration: {
       providerId: 'openai',
       providerName: 'OpenAI',
@@ -265,7 +272,7 @@ export const translationWorkspaces: TranslationWorkspace[] = [
     sourceLanguage: chinese,
     targetLanguage: japanese,
     status: 'needs_setup',
-    progress: { total: 6, translated: 0, queued: 0, running: 0, failed: 0 },
+    progress: { total: 6, created: 6, translated: 0, queued: 0, running: 0, failed: 0 },
     configuration: null,
     chapters: makeChapters([], [
       'not_started',
