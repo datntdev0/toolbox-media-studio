@@ -120,6 +120,25 @@ class TranslationUpdateRequest(BaseModel):
     etag: str | None = None
 
 
+class TranslationStartRequest(BaseModel):
+    """One-based manifest range accepted by translation start."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    chapter_index_from: int = Field(ge=1, alias="chapterIndexFrom")
+    chapter_index_to: int = Field(ge=1, alias="chapterIndexTo")
+    refetch: bool = False
+    force: bool = False
+
+    @model_validator(mode="after")
+    def validate_chapter_range(self) -> "TranslationStartRequest":
+        if self.chapter_index_from > self.chapter_index_to:
+            raise ValueError(
+                "chapterIndexFrom must be less than or equal to chapterIndexTo"
+            )
+        return self
+
+
 def to_user_entity(body: UserCreateRequest) -> User:
     """Convert a UserCreateRequest to a User entity."""
 

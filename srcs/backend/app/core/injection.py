@@ -11,6 +11,7 @@ from app.core.logging import LogManager
 from app.core.realtime import RealtimeHub
 from app.events.sample_handler import SampleQueueListener
 from app.events.scraping_handler import ScrapingQueueListener
+from app.events.translation_handler import TranslationQueueListener
 from app.providers.blob_storage_provider import PublicBlobProvider, build_public_blob_provider
 from app.providers.cache_provider import CacheProvider, build_cosmos_cache_provider
 from app.providers.proxy_service_provider import ProxyProvider, build_proxy_provider
@@ -27,12 +28,16 @@ from app.repositories.cosmosdb.cosmos_scraping_result_repository import (
 from app.repositories.cosmosdb.cosmos_translation_repository import (
     build_cosmos_translation_repository,
 )
+from app.repositories.cosmosdb.cosmos_translation_result_repository import (
+    build_cosmos_translation_result_repository,
+)
 from app.repositories.cosmosdb.cosmos_user_repository import build_cosmos_user_repository
 from app.repositories.novel_chapter_repository import NovelChapterRepository
 from app.repositories.novel_repository import NovelRepository
 from app.repositories.scraping_repository import ScrapingRepository
 from app.repositories.scraping_result_repository import ScrapingResultRepository
 from app.repositories.translation_repository import TranslationRepository
+from app.repositories.translation_result_repository import TranslationResultRepository
 from app.repositories.user_repository import UserRepository
 from app.services.novel_binding_service import NovelBindingService
 from app.services.translation_service import TranslationService
@@ -46,6 +51,7 @@ repository_novel = build_cosmos_novel_repository(config)
 repository_scraping = build_cosmos_scraping_repository(config)
 repository_scraping_result = build_cosmos_scraping_result_repository(config)
 repository_translation = build_cosmos_translation_repository(config)
+repository_translation_result = build_cosmos_translation_result_repository(config)
 # Lazily constructed so existing API/test setups that do not use novel chapters
 # do not require the new Cosmos container.
 repository_novel_chapter: NovelChapterRepository | None = None
@@ -79,6 +85,10 @@ RepositoryTranslationDep = Annotated[
     TranslationRepository,
     Depends(lambda: repository_translation),
 ]
+RepositoryTranslationResultDep = Annotated[
+    TranslationResultRepository,
+    Depends(lambda: repository_translation_result),
+]
 RepositoryScrapingDep = Annotated[
     ScrapingRepository,
     Depends(lambda: repository_scraping),
@@ -106,7 +116,22 @@ def _get_novel_binding_service() -> NovelBindingService:
 
 
 def _get_translation_service() -> TranslationService:
-    return TranslationService(repository_translation, repository_novel)
+    return TranslationService(
+        repository_translation,
+        repository_novel,
+        _get_novel_chapter_repository(),
+        repository_translation_result,
+    )
+
+
+queue_listener_translation = TranslationQueueListener(
+    logger=log_manager.getLogger("queue.translations"),
+    translation_repository=repository_translation,
+    translation_result_repository=repository_translation_result,
+    novel_chapter_repository=_get_novel_chapter_repository(),
+    realtime_hub=realtime_hub,
+    workers=1,
+)
 
 
 RepositoryNovelChapterDep = Annotated[

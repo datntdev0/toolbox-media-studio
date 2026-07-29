@@ -8,7 +8,10 @@ import pytest
 from app.domain.translations import (
     Translation,
     TranslationConfiguration,
+    TranslationProgress,
     TranslationStatus,
+    TranslationTask,
+    TranslationTaskStatus,
 )
 from app.repositories.cosmosdb.cosmos_translation_repository import (
     TRANSLATIONS_CONTAINER_NAME,
@@ -53,6 +56,50 @@ def test_in_memory_repository_paginates_and_enforces_etags() -> None:
     first.name = "Changed"
     with pytest.raises(TranslationConflictError):
         repository.update(first, "stale")
+
+
+def test_in_memory_repository_queues_claims_completes_and_stops_tasks() -> None:
+    repository = InMemoryTranslationRepository()
+    translation = _translation("translation-1")
+    now = datetime.now(UTC)
+    translation.tasks = [
+        TranslationTask("chapter-1", "One", 1, 0, now),
+        TranslationTask("chapter-2", "Two", 2, 1, now),
+    ]
+    translation.progress = TranslationProgress.from_tasks(translation.tasks)
+    created = repository.create(translation)
+
+    queued = repository.queue_tasks(
+        created.id,
+        chapter_index_from=1,
+        chapter_index_to=2,
+        force=False,
+        etag=created.etag,
+    )
+    assert queued.translation.progress.queued == 2
+    claimed = repository.claim_task(
+        created.id,
+        "chapter-1",
+        etag=queued.translation.etag,
+    )
+    assert claimed is not None
+    assert claimed.progress.running == 1
+    completed = repository.update_task(
+        created.id,
+        "chapter-1",
+        TranslationTaskStatus.COMPLETED,
+        attempts=1,
+        error=None,
+        result_available=True,
+        completed_at=now,
+        source_chapter_updated_at=now,
+        clear_source_updated=True,
+        etag=claimed.etag,
+    )
+    stopped = repository.stop_queued_tasks(created.id, etag=completed.etag)
+    assert stopped.status == TranslationStatus.STOPPED
+    assert stopped.progress.completed == 1
+    assert stopped.progress.created == 1
 
 
 class _FakeContainer:

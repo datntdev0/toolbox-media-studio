@@ -12,6 +12,9 @@ from app.repositories.novel_repository import InMemoryNovelRepository
 from app.repositories.scraping_repository import InMemoryScrapingRepository
 from app.repositories.scraping_result_repository import InMemoryScrapingResultRepository
 from app.repositories.translation_repository import InMemoryTranslationRepository
+from app.repositories.translation_result_repository import (
+    InMemoryTranslationResultRepository,
+)
 from app.repositories.user_repository import InMemoryUserRepository
 
 TEST_ADMIN_EMAIL = "admin@example.com"
@@ -206,6 +209,13 @@ def translation_repository() -> InMemoryTranslationRepository:
 
 
 @pytest.fixture
+def translation_result_repository() -> InMemoryTranslationResultRepository:
+    """Shared in-memory translated chapter results."""
+
+    return InMemoryTranslationResultRepository()
+
+
+@pytest.fixture
 def novel_chapter_repository() -> InMemoryNovelChapterRepository:
     """Shared in-memory novel chapters for a test app instance."""
 
@@ -266,6 +276,7 @@ def client(
     user_repository: InMemoryUserRepository,
     novel_repository: InMemoryNovelRepository,
     translation_repository: InMemoryTranslationRepository,
+    translation_result_repository: InMemoryTranslationResultRepository,
     novel_chapter_repository: InMemoryNovelChapterRepository,
     scraping_repository: InMemoryScrapingRepository,
     scraping_result_repository: InMemoryScrapingResultRepository,
@@ -292,6 +303,16 @@ def client(
         lambda config: translation_repository,
     )
     monkeypatch.setattr(
+        "app.repositories.cosmosdb.cosmos_translation_result_repository."
+        "build_cosmos_translation_result_repository",
+        lambda config: translation_result_repository,
+    )
+    monkeypatch.setattr(
+        "app.repositories.cosmosdb.cosmos_novel_chapter_repository."
+        "build_cosmos_novel_chapter_repository",
+        lambda config: novel_chapter_repository,
+    )
+    monkeypatch.setattr(
         "app.repositories.cosmosdb.cosmos_scraping_repository.build_cosmos_scraping_repository",
         lambda config: scraping_repository,
     )
@@ -312,6 +333,7 @@ def client(
     service_provider.repository_user = user_repository
     service_provider.repository_novel = novel_repository
     service_provider.repository_translation = translation_repository
+    service_provider.repository_translation_result = translation_result_repository
     service_provider.repository_novel_chapter = novel_chapter_repository
     service_provider.repository_scraping = scraping_repository
     service_provider.repository_scraping_result = scraping_result_repository
@@ -321,10 +343,12 @@ def client(
     service_provider.queue_publisher = queue_publisher
     service_provider.queue_subscriber_sample = FakeQueueListener()
     service_provider.queue_listener_scraping = FakeQueueListener()
+    service_provider.queue_listener_translation = FakeQueueListener()
 
     main_module.repository_user = user_repository
     main_module.repository_novel = novel_repository
     main_module.repository_translation = translation_repository
+    main_module.repository_translation_result = translation_result_repository
     main_module.repository_scraping = scraping_repository
     main_module.repository_scraping_result = scraping_result_repository
     main_module.provider_cache = cache_provider
@@ -333,6 +357,7 @@ def client(
     main_module.queue_publisher = queue_publisher
     main_module.queue_subscriber_sample = FakeQueueListener()
     main_module.queue_listener_scraping = FakeQueueListener()
+    main_module.queue_listener_translation = FakeQueueListener()
 
     monkeypatch.setattr(health_router, "_check_cosmos", lambda logger, settings: True)
     monkeypatch.setattr(health_router, "_check_blob_storage", lambda logger, settings: True)

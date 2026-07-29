@@ -13,12 +13,18 @@ from app.domain.translations import (
     Translation,
     TranslationConfiguration,
     TranslationPage,
+    TranslationProgress,
+    TranslationQueueResult,
     TranslationStatus,
+    TranslationTask,
+    TranslationTaskStatus,
 )
 from app.repositories.translation_repository import (
+    TranslationChapterRangeError,
     TranslationConflictError,
     TranslationContinuationTokenError,
     TranslationNotFoundError,
+    reconcile_translation_status,
 )
 
 TRANSLATIONS_CONTAINER_NAME = "domain.translations"
@@ -117,6 +123,134 @@ class CosmosTranslationRepository:
         translation.updated_by = deleted_by
         self.update(translation, etag)
 
+    def queue_tasks(
+        self,
+        id: str,
+        *,
+        chapter_index_from: int,
+        chapter_index_to: int,
+        force: bool,
+        etag: str | None,
+    ) -> TranslationQueueResult:
+        translation = self._require(id)
+        self._check_etag(translation, etag)
+        matching = [
+            task
+            for task in translation.tasks
+            if not task.source_removed
+            and chapter_index_from <= task.manifest_index + 1 <= chapter_index_to
+        ]
+        if not matching:
+            raise TranslationChapterRangeError(
+                "No translation tasks match the requested chapter index range"
+            )
+        queued = [
+            task
+            for task in matching
+            if force
+            or task.status
+            not in {TranslationTaskStatus.QUEUED, TranslationTaskStatus.RUNNING}
+        ]
+        if not queued:
+            return TranslationQueueResult(translation=translation, tasks=[])
+        queued_ids = {task.id for task in queued}
+        for task in queued:
+            task.status = TranslationTaskStatus.QUEUED
+            task.last_error = None
+        translation.status = TranslationStatus.RUNNING
+        self._touch(translation)
+        updated = self.update(translation, etag or translation.etag)
+        return TranslationQueueResult(
+            translation=updated,
+            tasks=[task for task in updated.tasks if task.id in queued_ids],
+        )
+
+    def stop_queued_tasks(self, id: str, *, etag: str | None) -> Translation:
+        translation = self._require(id)
+        self._check_etag(translation, etag)
+        for task in translation.tasks:
+            if task.status == TranslationTaskStatus.QUEUED:
+                task.status = TranslationTaskStatus.CREATED
+        translation.progress = TranslationProgress.from_tasks(translation.tasks)
+        translation.status = TranslationStatus.STOPPED
+        translation.updated_at = datetime.now(UTC)
+        return self.update(translation, etag or translation.etag)
+
+    def claim_task(
+        self,
+        id: str,
+        task_id: str,
+        *,
+        etag: str | None,
+    ) -> Translation | None:
+        translation = self._require(id)
+        self._check_etag(translation, etag)
+        task = self._require_task(translation, task_id)
+        if (
+            translation.status == TranslationStatus.STOPPED
+            or task.source_removed
+            or task.status != TranslationTaskStatus.QUEUED
+        ):
+            return None
+        task.status = TranslationTaskStatus.RUNNING
+        task.attempts += 1
+        task.last_error = None
+        self._touch(translation)
+        return self.update(translation, etag or translation.etag)
+
+    def update_task(
+        self,
+        id: str,
+        task_id: str,
+        status: TranslationTaskStatus,
+        *,
+        attempts: int,
+        error: str | None,
+        result_available: bool,
+        completed_at: datetime | None,
+        source_chapter_updated_at: datetime | None,
+        clear_source_updated: bool,
+        etag: str | None,
+    ) -> Translation:
+        translation = self._require(id)
+        self._check_etag(translation, etag)
+        task = self._require_task(translation, task_id)
+        task.status = status
+        task.attempts = max(task.attempts, attempts)
+        task.last_error = error
+        task.result_available = result_available
+        task.completed_at = completed_at
+        if source_chapter_updated_at is not None:
+            task.source_chapter_updated_at = source_chapter_updated_at
+        if clear_source_updated:
+            task.source_updated = False
+        self._touch(translation)
+        return self.update(translation, etag or translation.etag)
+
+    def _require(self, id: str) -> Translation:
+        translation = self.get_by_id(id)
+        if translation is None:
+            raise TranslationNotFoundError
+        return translation
+
+    @staticmethod
+    def _require_task(translation: Translation, task_id: str) -> TranslationTask:
+        task = next((item for item in translation.tasks if item.id == task_id), None)
+        if task is None:
+            raise TranslationNotFoundError
+        return task
+
+    @staticmethod
+    def _check_etag(translation: Translation, etag: str | None) -> None:
+        if etag is not None and translation.etag != etag:
+            raise TranslationConflictError("Translation has changed")
+
+    @staticmethod
+    def _touch(translation: Translation) -> None:
+        translation.progress = TranslationProgress.from_tasks(translation.tasks)
+        translation.updated_at = datetime.now(UTC)
+        translation.status = reconcile_translation_status(translation)
+
     @staticmethod
     def _serialize(translation: Translation) -> dict[str, Any]:
         return {
@@ -126,6 +260,8 @@ class CosmosTranslationRepository:
             "targetLanguage": translation.target_language,
             "configuration": _serialize_configuration(translation.configuration),
             "status": translation.status.value,
+            "tasks": [_serialize_task(task) for task in translation.tasks],
+            "progress": _serialize_progress(translation.progress),
             "createdBy": translation.created_by,
             "createdAt": translation.created_at.isoformat(),
             "updatedBy": translation.updated_by,
@@ -149,6 +285,11 @@ class CosmosTranslationRepository:
             created_at=datetime.fromisoformat(cast(str, item["createdAt"])),
             updated_by=cast(str, item["updatedBy"]),
             updated_at=datetime.fromisoformat(cast(str, item["updatedAt"])),
+            tasks=[
+                _deserialize_task(task)
+                for task in cast(list[dict[str, Any]], item.get("tasks", []))
+            ],
+            progress=_deserialize_progress(item.get("progress")),
             deleted_at=_optional_datetime(item.get("deletedAt")),
             deleted_by=cast(str | None, item.get("deletedBy")),
             etag=cast(str | None, item.get("_etag")),
@@ -192,3 +333,65 @@ def _optional_datetime(value: Any) -> datetime | None:
     if value is None:
         return None
     return datetime.fromisoformat(cast(str, value))
+
+
+def _serialize_task(task: TranslationTask) -> dict[str, Any]:
+    return {
+        "id": task.id,
+        "title": task.title,
+        "chapterNumber": task.chapter_number,
+        "manifestIndex": task.manifest_index,
+        "sourceChapterUpdatedAt": task.source_chapter_updated_at.isoformat(),
+        "status": task.status.value,
+        "attempts": task.attempts,
+        "lastError": task.last_error,
+        "resultAvailable": task.result_available,
+        "completedAt": task.completed_at.isoformat() if task.completed_at else None,
+        "sourceUpdated": task.source_updated,
+        "sourceRemoved": task.source_removed,
+    }
+
+
+def _deserialize_task(item: dict[str, Any]) -> TranslationTask:
+    return TranslationTask(
+        id=cast(str, item["id"]),
+        title=cast(str, item["title"]),
+        chapter_number=cast(int | None, item.get("chapterNumber")),
+        manifest_index=cast(int, item["manifestIndex"]),
+        source_chapter_updated_at=datetime.fromisoformat(
+            cast(str, item["sourceChapterUpdatedAt"])
+        ),
+        status=TranslationTaskStatus(
+            cast(str, item.get("status", TranslationTaskStatus.CREATED.value))
+        ),
+        attempts=cast(int, item.get("attempts", 0)),
+        last_error=cast(str | None, item.get("lastError")),
+        result_available=cast(bool, item.get("resultAvailable", False)),
+        completed_at=_optional_datetime(item.get("completedAt")),
+        source_updated=cast(bool, item.get("sourceUpdated", False)),
+        source_removed=cast(bool, item.get("sourceRemoved", False)),
+    )
+
+
+def _serialize_progress(progress: TranslationProgress) -> dict[str, int]:
+    return {
+        "total": progress.total,
+        "created": progress.created,
+        "queued": progress.queued,
+        "running": progress.running,
+        "completed": progress.completed,
+        "failed": progress.failed,
+    }
+
+
+def _deserialize_progress(value: Any) -> TranslationProgress:
+    if not isinstance(value, dict):
+        return TranslationProgress()
+    return TranslationProgress(
+        total=int(value.get("total", 0)),
+        created=int(value.get("created", 0)),
+        queued=int(value.get("queued", 0)),
+        running=int(value.get("running", 0)),
+        completed=int(value.get("completed", 0)),
+        failed=int(value.get("failed", 0)),
+    )

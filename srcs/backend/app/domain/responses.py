@@ -7,7 +7,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.domain.novels import Novel, NovelBinding, NovelChapter, NovelStatus, NovelSyncResult
 from app.domain.translations import (
     TranslationConfiguration,
+    TranslationProgress,
     TranslationStatus,
+    TranslationSyncResult,
+    TranslationTask,
+    TranslationTaskStatus,
     TranslationView,
 )
 from app.domain.users import User, UserRole, UserStatus
@@ -156,6 +160,59 @@ class TranslationResponse(BaseModel):
     etag: str | None = None
 
 
+class TranslationProgressResponse(BaseModel):
+    """Translation task rollup."""
+
+    total: int
+    created: int
+    queued: int
+    running: int
+    completed: int
+    failed: int
+
+
+class TranslationTaskResponse(BaseModel):
+    """One embedded translation task."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    title: str
+    chapter_number: int | None = Field(default=None, alias="chapterNumber")
+    manifest_index: int = Field(alias="manifestIndex")
+    status: TranslationTaskStatus
+    attempts: int
+    last_error: str | None = Field(default=None, alias="lastError")
+    result_available: bool = Field(alias="resultAvailable")
+    completed_at: datetime | None = Field(default=None, alias="completedAt")
+    source_chapter_updated_at: datetime = Field(alias="sourceChapterUpdatedAt")
+    source_updated: bool = Field(alias="sourceUpdated")
+    source_removed: bool = Field(alias="sourceRemoved")
+
+
+class TranslationDetailResponse(TranslationResponse):
+    """Translation information with its task manifest."""
+
+    progress: TranslationProgressResponse
+    tasks: list[TranslationTaskResponse] = Field(default_factory=list)
+
+
+class TranslationSyncChangesResponse(BaseModel):
+    """Task manifest changes returned by translation sync."""
+
+    added: int
+    refreshed: int
+    preserved: int
+    removed: int
+
+
+class TranslationSyncResponse(BaseModel):
+    """Translation sync result."""
+
+    translation: TranslationDetailResponse
+    changes: TranslationSyncChangesResponse
+
+
 class TranslationListResponse(BaseModel):
     """Paged translation list response."""
 
@@ -259,14 +316,70 @@ def to_translation_response(view: TranslationView) -> TranslationResponse:
     return TranslationResponse(
         id=translation.id,
         name=translation.name,
-        novelId=translation.novel_id,
-        targetLanguage=translation.target_language,
+        novel_id=translation.novel_id,
+        target_language=translation.target_language,
         configuration=to_translation_configuration_response(translation.configuration),
         status=translation.status,
         novel=to_novel_response(view.novel) if view.novel is not None else None,
-        createdAt=translation.created_at,
-        updatedAt=translation.updated_at,
+        created_at=translation.created_at,
+        updated_at=translation.updated_at,
         etag=translation.etag,
+    )
+
+
+def to_translation_detail_response(
+    view: TranslationView,
+) -> TranslationDetailResponse:
+    base = to_translation_response(view)
+    translation = view.translation
+    return TranslationDetailResponse(
+        **base.model_dump(),
+        progress=_to_translation_progress_response(translation.progress),
+        tasks=[_to_translation_task_response(task) for task in translation.tasks],
+    )
+
+
+def to_translation_sync_response(
+    result: TranslationSyncResult,
+) -> TranslationSyncResponse:
+    return TranslationSyncResponse(
+        translation=to_translation_detail_response(result.view),
+        changes=TranslationSyncChangesResponse(
+            added=result.changes.added,
+            refreshed=result.changes.refreshed,
+            preserved=result.changes.preserved,
+            removed=result.changes.removed,
+        ),
+    )
+
+
+def _to_translation_progress_response(
+    progress: TranslationProgress,
+) -> TranslationProgressResponse:
+    return TranslationProgressResponse(
+        total=progress.total,
+        created=progress.created,
+        queued=progress.queued,
+        running=progress.running,
+        completed=progress.completed,
+        failed=progress.failed,
+    )
+
+
+def _to_translation_task_response(task: TranslationTask) -> TranslationTaskResponse:
+    return TranslationTaskResponse(
+        id=task.id,
+        title=task.title,
+        chapter_number=task.chapter_number,
+        manifest_index=task.manifest_index,
+        status=task.status,
+        attempts=task.attempts,
+        last_error=task.last_error,
+        result_available=task.result_available,
+        completed_at=task.completed_at,
+        source_chapter_updated_at=task.source_chapter_updated_at,
+        source_updated=task.source_updated,
+        source_removed=task.source_removed,
     )
 
 
@@ -276,9 +389,9 @@ def to_translation_configuration_response(
     if configuration is None:
         return None
     return TranslationConfigurationResponse(
-        providerId=configuration.provider_id,
-        modelId=configuration.model_id,
-        globalPrompt=configuration.global_prompt,
+        provider_id=configuration.provider_id,
+        model_id=configuration.model_id,
+        global_prompt=configuration.global_prompt,
     )
 
 
