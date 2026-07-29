@@ -20,6 +20,7 @@ dependencies = [
     "python-jose[cryptography]>=3.3",
     "python-multipart>=0.0.9",
     "httpx>=0.27",
+    "openai>=1.40",
     "beautifulsoup4>=4.12",
 ]
 
@@ -35,7 +36,6 @@ dev = [
 [tool.setuptools]
 packages = [
     "app",
-    "app.consumers",
     "app.core",
     "app.domain",
     "app.events",

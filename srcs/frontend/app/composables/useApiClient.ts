@@ -60,7 +60,7 @@ export function useApiClient() {
       const response = await http.fetch(`${baseUrl}/api/novels/${encodeURIComponent(id)}/cover`, {
         method: 'PUT',
         body,
-        headers: { 'Accept': 'application/json' }
+        headers: { Accept: 'application/json' }
       })
       if (!response.ok) throw new Error('Unable to upload novel cover')
       return NovelResponse.fromJS(await response.json())
@@ -68,6 +68,31 @@ export function useApiClient() {
     async deleteNovel(id: string) {
       const response = await http.fetch(`${baseUrl}/api/novels/${encodeURIComponent(id)}`, { method: 'DELETE' })
       if (!response.ok) throw new Error('Unable to delete novel')
+    },
+    async previewTranslation(body: {
+      provider: string
+      model: string
+      language: string
+      instruction: string
+      chapter: string
+    }) {
+      const response = await http.fetch(`${baseUrl}/api/translations/preview`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+      })
+      if (!response.ok) {
+        let message = 'Unable to generate translation preview'
+        try {
+          const error = await response.json() as { detail?: string | Array<{ msg?: string }> }
+          if (typeof error.detail === 'string') message = error.detail
+          else if (Array.isArray(error.detail)) message = error.detail.map(item => item.msg).filter(Boolean).join(', ') || message
+        } catch {
+          // Keep the generic message when the server did not return JSON.
+        }
+        throw new Error(message)
+      }
+      return await response.json() as { title: string, content: string[] }
     },
     async updateScraping(id: string, body: Record<string, unknown>) {
       const response = await http.fetch(`${baseUrl}/api/scrapings/${encodeURIComponent(id)}`, {
@@ -84,7 +109,7 @@ export function useApiClient() {
       const response = await http.fetch(`${baseUrl}/api/scrapings/${encodeURIComponent(id)}/cover`, {
         method: 'PUT',
         body,
-        headers: { 'Accept': 'application/json' }
+        headers: { Accept: 'application/json' }
       })
       if (!response.ok) throw new Error('Unable to upload scraping cover')
       return ScrapingDetailResponse.fromJS(await response.json())

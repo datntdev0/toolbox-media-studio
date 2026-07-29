@@ -8,12 +8,73 @@ from fastapi.testclient import TestClient
 from app.domain.novels import NovelChapter
 from app.domain.translation_results import TranslationResult
 from app.domain.translations import TranslationProgress, TranslationTaskStatus
+from app.providers.translation_provider import TranslationPreview
 from app.repositories.novel_chapter_repository import InMemoryNovelChapterRepository
 from app.repositories.translation_repository import InMemoryTranslationRepository
 from app.repositories.translation_result_repository import (
     InMemoryTranslationResultRepository,
 )
 from tests.conftest import TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD
+
+
+def test_translation_preview_uses_configured_provider(
+    client: TestClient,
+    monkeypatch: Any,
+    novel_chapter_repository: InMemoryNovelChapterRepository,
+) -> None:
+    headers = _headers(_login(client))
+    novel_chapter_repository.save(
+        _chapter("novel-1", "sha256:chapter-1", 0, content=["Hello world", "Goodbye world"])
+    )
+    captured: dict[str, Any] = {}
+
+    def fake_translate_preview(**kwargs: Any) -> str:
+        captured.update(kwargs)
+        return TranslationPreview(title="Bonjour le monde", content=["Bonjour le monde"])
+
+    monkeypatch.setattr("app.routers.translations.translate_preview", fake_translate_preview)
+    response = client.post(
+        "/api/translations/preview",
+        headers=headers,
+        json={
+            "provider": "foundry",
+            "model": "gpt-5-mini",
+            "language": "French",
+            "instruction": "Preserve the tone.",
+            "chapter": "sha256:chapter-1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "title": "Bonjour le monde",
+        "content": ["Bonjour le monde"],
+    }
+    assert captured["provider"] == "foundry"
+    assert captured["model"] == "gpt-5-mini"
+    assert captured["chapter_title"] == "Chapter 1"
+    assert captured["chapter_content"] == ["Hello world", "Goodbye world"]
+
+
+def test_translation_preview_rejects_unknown_provider(
+    client: TestClient,
+    novel_chapter_repository: InMemoryNovelChapterRepository,
+) -> None:
+    headers = _headers(_login(client))
+    novel_chapter_repository.save(_chapter("novel-1", "sha256:chapter-1", 0))
+    response = client.post(
+        "/api/translations/preview",
+        headers=headers,
+        json={
+            "provider": "unknown",
+            "model": "gpt-5-mini",
+            "language": "French",
+            "instruction": "Translate.",
+            "chapter": "sha256:chapter-1",
+        },
+    )
+
+    assert response.status_code == 422
 
 
 def _login(

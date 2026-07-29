@@ -42,6 +42,28 @@ export interface TranslationProviderOption {
   models: TranslationModelOption[]
 }
 
+export const translationProviders: TranslationProviderOption[] = [
+  {
+    id: 'foundry',
+    label: 'Built-in Microsoft Foundry',
+    icon: 'simple-icons:microsoft',
+    models: [
+      {
+        id: 'gpt-5-mini',
+        label: 'GPT-5 mini',
+        description: 'Balanced quality and throughput for chapter translation.'
+      },
+      {
+        id: 'gpt-5-nano',
+        label: 'GPT-5 nano',
+        description: 'Fast, economical translation for quick previews.'
+      }
+    ]
+  }
+]
+
+export const DEFAULT_TRANSLATION_PROMPT = 'You are a professional literary translator. Translate faithfully while preserving names, dialogue, tone, paragraph breaks, and narrative intent.'
+
 export interface TranslationConfigurationInput {
   providerId: string
   modelId: string

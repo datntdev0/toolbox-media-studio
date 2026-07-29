@@ -1,0 +1,52 @@
+"""Translation provider parsing tests."""
+
+import pytest
+
+from app.providers.translation_provider import (
+    TranslationProviderError,
+    parse_translation_output,
+)
+
+
+def test_parse_translation_output_extracts_title_and_paragraphs() -> None:
+    result = parse_translation_output(
+        """```text
+Title: The translated chapter
+Content:
+First paragraph.
+
+Second paragraph.
+```""",
+        fallback_title="Original title",
+    )
+
+    assert result.title == "The translated chapter"
+    assert result.content == ["First paragraph.", "Second paragraph."]
+
+
+def test_parse_translation_output_extracts_xml_title_and_content() -> None:
+    result = parse_translation_output(
+        """<title>Translated title</title>
+<content>First paragraph.
+
+Second paragraph.</content>""",
+        fallback_title="Original title",
+    )
+
+    assert result.title == "Translated title"
+    assert result.content == ["First paragraph.", "Second paragraph."]
+
+
+def test_parse_translation_output_uses_fallback_title_without_header() -> None:
+    result = parse_translation_output(
+        "Translated paragraph.",
+        fallback_title="Original title",
+    )
+
+    assert result.title == "Original title"
+    assert result.content == ["Translated paragraph."]
+
+
+def test_parse_translation_output_rejects_empty_content() -> None:
+    with pytest.raises(TranslationProviderError):
+        parse_translation_output("Title: Missing content\nContent:\n", fallback_title="Original")

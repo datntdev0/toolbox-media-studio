@@ -29,6 +29,12 @@ class FlareSolverrSettings:
     base_url: str
     default_max_timeout_ms: int
 
+
+@dataclass
+class AiFoundrySettings:
+    endpoint: str
+    api_key: str
+
 CACHE_TTL_DEFAULT = 3600
 CACHE_TTL_CRAWLER = 3600 * 24 * 30
 
@@ -76,4 +82,8 @@ class AppConfig:
         )
         self.public_blob_container: str = os.environ.get(
             "FAST_AZ_STORAGE_BLOB_PUBLIC_CONTAINER", "public"
+        )
+        self.ai_foundry: AiFoundrySettings = AiFoundrySettings(
+            endpoint=os.environ.get("FAST_AZURE_AI_FOUNDRY_ENDPOINT", ""),
+            api_key=os.environ.get("FAST_AZURE_AI_FOUNDRY_API_KEY", ""),
         )

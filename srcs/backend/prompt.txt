@@ -1,7 +1,0 @@
-Bối cảnh:
-- [Bối cảnh lịch sử] Câu chuyện diễn ra trong thời đại của Đại Ngu Vương Triều — một triều đại phong kiến đang dần suy yếu. Hoàng đế già nua nơi kinh thành Trường An đang ở những ngày tháng cuối đời, các hoàng tử tranh giành quyền lực quyết liệt. Trước đó hàng trăm năm, một triều đại cũ đã bị lật đổ; di thần của triều cũ mang họ Cơ (姬) — dòng máu hoàng tộc tiền triều — đã lập nên Ma Giáo, âm thầm mưu tính đại sự phục quốc. Triều đình Đại Ngu không thể tiêu diệt hoàn toàn Ma Giáo; những năm gần đây Ma Giáo ngày càng lớn mạnh khi triều đình suy yếu.
-- [Bối cảnh võ lâm] Thế giới này tôn sùng võ học. Võ giả được xếp hạng theo mười đẳng cấp, từ thấp đến cao là: Cửu phẩm, Bát phẩm, Thất phẩm, ... đến Nhất phẩm. Trên Nhất phẩm còn có cảnh giới Tông Sư — tầng cao nhất hiếm người đạt được. Nội công thâm hậu có thể chữa lành thương tật, và cũng có thể gây ra những loại độc đặc biệt.
-- [Bối cảnh địa lý] Yên Sơn thành là một thành trấn ở vùng Bắc Cương — nơi thời tiết khắc nghiệt, mùa đông lạnh giá và kéo dài. Dù điều kiện khó khăn, người dân nơi đây thuần phác và trọng nghĩa. Kinh thành Trường An cách xa phía Nam, là trung tâm quyền lực chính trị của Đại Ngu Vương Triều.
-
-Quy tắc:
-- Dùng từ Hán Việt đối với các tên riêng.

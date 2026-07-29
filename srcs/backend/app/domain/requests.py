@@ -139,6 +139,25 @@ class TranslationStartRequest(BaseModel):
         return self
 
 
+class TranslationPreviewRequest(BaseModel):
+    """Payload for translating one chapter synchronously."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: NonBlankStr
+    model: NonBlankStr
+    language: NonBlankStr
+    instruction: NonBlankStr
+    chapter: NonBlankStr
+
+
+class TranslationPreviewResponse(BaseModel):
+    """Translated text returned by a preview provider."""
+
+    title: NonBlankStr
+    content: list[NonBlankStr]
+
+
 def to_user_entity(body: UserCreateRequest) -> User:
     """Convert a UserCreateRequest to a User entity."""
 

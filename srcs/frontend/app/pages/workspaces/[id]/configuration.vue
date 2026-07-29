@@ -6,7 +6,7 @@ import type {
 import {
   DEFAULT_TRANSLATION_PROMPT,
   translationProviders
-} from '~/utils/translation-workspace-fixtures'
+} from '~/types/translation-workspace'
 
 definePageMeta({
   title: 'Translation configuration',
@@ -16,7 +16,7 @@ definePageMeta({
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
-const previewValid = ref(true)
+const previewValid = ref(false)
 const saving = ref(false)
 const loading = ref(true)
 const loadError = ref<unknown>()

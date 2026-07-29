@@ -35,6 +35,15 @@ class CosmosNovelChapterRepository:
             return None
         return self._deserialize(item)
 
+    def get_by_id(self, chapter_id: str) -> NovelChapter | None:
+        items = self._container.query_items(
+            query="SELECT TOP 1 * FROM c WHERE c.id = @chapter_id",
+            parameters=[{"name": "@chapter_id", "value": chapter_id}],
+            enable_cross_partition_query=True,
+        )
+        item = next(iter(items), None)
+        return self._deserialize(cast(dict[str, Any], item)) if item is not None else None
+
     def list(self, novel_id: str) -> NovelChapterPage:
         items = self._container.query_items(
             query=(

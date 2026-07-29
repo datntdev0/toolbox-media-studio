@@ -7,13 +7,17 @@ from fastapi import APIRouter, Body, HTTPException, Path, Query, Response, statu
 from app.core.injection import (
     PollingQueuePublisherDep,
     RealtimeHubDep,
+    RepositoryNovelChapterDep,
     RepositoryTranslationDep,
     RepositoryTranslationResultDep,
     ServiceTranslationDep,
+    config,
 )
 from app.core.security.authorization import SessionUser
 from app.domain.requests import (
     TranslationCreateRequest,
+    TranslationPreviewRequest,
+    TranslationPreviewResponse,
     TranslationStartRequest,
     TranslationUpdateRequest,
     to_translation_configuration,
@@ -38,6 +42,11 @@ from app.events.translation_handler import (
     build_translation_event,
     build_translation_updated_payload,
 )
+from app.providers.translation_provider import (
+    TranslationProviderError,
+    UnsupportedTranslationProviderError,
+    translate_preview,
+)
 from app.repositories.translation_repository import (
     TranslationChapterRangeError,
     TranslationConflictError,
@@ -51,6 +60,53 @@ from app.services.translation_service import (
 )
 
 router = APIRouter(prefix="/api/translations", tags=["translations"])
+
+
+@router.post(
+    "/preview",
+    response_model=TranslationPreviewResponse,
+    operation_id="preview_translation",
+)
+def preview_translation_route(
+    session_user: SessionUser,
+    repository_novel_chapter: RepositoryNovelChapterDep,
+    body: TranslationPreviewRequest,
+) -> TranslationPreviewResponse:
+    """Translate one chapter without creating or updating a translation project."""
+
+    del session_user
+    chapter = repository_novel_chapter.get_by_id(body.chapter)
+    if chapter is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Novel chapter not found",
+        )
+    if chapter.source_removed or not chapter.content_available:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Novel chapter content is unavailable",
+        )
+    try:
+        translated = translate_preview(
+            provider=body.provider,
+            model=body.model,
+            language=body.language,
+            instruction=body.instruction,
+            chapter_title=chapter.title,
+            chapter_content=chapter.content,
+            config=config,
+        )
+    except UnsupportedTranslationProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    except TranslationProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+    return TranslationPreviewResponse(title=translated.title, content=translated.content)
 
 
 @router.post(

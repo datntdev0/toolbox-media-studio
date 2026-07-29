@@ -3,7 +3,7 @@ import type {
   TranslationConfigurationInput,
   TranslationWorkspace
 } from '~/types/translation-workspace'
-import { translationProviders } from '~/utils/translation-workspace-fixtures'
+import { translationProviders } from '~/types/translation-workspace'
 
 const props = defineProps<{
   workspace: TranslationWorkspace
@@ -14,6 +14,11 @@ const configuration = defineModel<TranslationConfigurationInput>('configuration'
 })
 const previewValid = defineModel<boolean>('previewValid', { default: true })
 const toast = useToast()
+const { previewTranslation } = useApiClient()
+const previewLoading = ref(false)
+const previewError = ref<string | null>(null)
+const previewTitle = ref('')
+const previewParagraphs = ref<string[]>([])
 
 const providerId = computed({
   get: () => configuration.value.providerId,
@@ -55,13 +60,9 @@ const previewChapter = computed(() =>
   || props.workspace.chapters.find(chapter => chapter.originalParagraphs.length)
   || props.workspace.chapters[0]
 )
-const previewParagraphs = computed(() => [
-  `[${props.workspace.targetLanguage.label} preview] When the seventh bell sounded, the chapter began beneath a ceiling of quiet brass gears.`,
-  'This fixed sample demonstrates the translation preview layout without contacting an AI provider.'
-])
-
 watch([providerId, modelId, prompt], () => {
   previewValid.value = false
+  previewError.value = null
 })
 
 watch(providerId, () => {
@@ -69,14 +70,41 @@ watch(providerId, () => {
   if (nextModel) modelId.value = nextModel.id
 })
 
-function generatePreview() {
-  previewValid.value = true
-  toast.add({
-    title: 'Fixed preview restored',
-    description: 'No AI provider was contacted in this prototype.',
-    color: 'neutral',
-    icon: 'lucide:scan-text'
-  })
+async function generatePreview() {
+  const chapter = previewChapter.value
+  if (!chapter?.originalParagraphs.length) {
+    previewValid.value = false
+    previewError.value = 'The selected chapter has no source content to preview.'
+    return
+  }
+
+  previewLoading.value = true
+  previewError.value = null
+  try {
+    const response = await previewTranslation({
+      provider: providerId.value,
+      model: modelId.value,
+      language: props.workspace.targetLanguage.code,
+      instruction: prompt.value,
+      chapter: chapter.id
+    })
+    previewTitle.value = response.title
+    previewParagraphs.value = response.content
+    previewValid.value = true
+    toast.add({
+      title: 'Preview generated',
+      description: `${selectedProvider.value.label} translated Chapter ${chapter.number}.`,
+      color: 'success',
+      icon: 'lucide:scan-text'
+    })
+  } catch (error) {
+    previewValid.value = false
+    previewError.value = error instanceof Error
+      ? error.message
+      : 'The translation preview could not be generated.'
+  } finally {
+    previewLoading.value = false
+  }
 }
 </script>
 
@@ -127,6 +155,8 @@ function generatePreview() {
               label="Preview"
               icon="lucide:scan-text"
               color="primary"
+              :loading="previewLoading"
+              :disabled="previewLoading"
               class="ml-auto shrink-0"
               @click="generatePreview"
             />
@@ -200,10 +230,10 @@ function generatePreview() {
         <USeparator :ui="{ root: 'my-4' }" />
 
         <section class="min-h-0">
-          <div v-if="previewValid">
+          <div v-if="previewValid && !previewError">
             <h5 class="mb-2 flex items-center gap-2 text-muted font-medium">
               <UIcon name="lucide:circle-check" class="size-4 text-success" />
-              Preview generated from Chapter {{ previewChapter?.number }}
+              {{ previewTitle || `Preview generated from Chapter ${previewChapter?.number}` }}
             </h5>
             <article
               :lang="workspace.targetLanguage.code"
@@ -214,6 +244,16 @@ function generatePreview() {
               </p>
             </article>
           </div>
+
+          <UAlert
+            v-else-if="previewError"
+            color="error"
+            variant="subtle"
+            icon="lucide:triangle-alert"
+            title="Preview failed"
+            :description="previewError"
+            class="m-6"
+          />
 
           <div v-else class="flex min-h-full items-center justify-center p-6">
             <UEmpty

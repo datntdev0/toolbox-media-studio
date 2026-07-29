@@ -170,7 +170,7 @@ const busy = computed(() => props.syncing || props.starting || props.stopping)
         <UCheckbox
           v-model="refetch"
           label="Refetch existing results"
-          description="Regenerate translated chapters and source-updated content."
+          description="Regenerate translations for chapters."
           :disabled="busy"
         />
         <UCheckbox

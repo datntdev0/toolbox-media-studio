@@ -9,7 +9,7 @@ import type {
   TranslationWorkspaceStatus
 } from '~/types/translation-workspace'
 import { resolveLanguage } from '~/constants/supported-languages'
-import { translationProviders } from '~/utils/translation-workspace-fixtures'
+import { translationProviders } from '~/types/translation-workspace'
 import {
   TranslationCreateRequest,
   TranslationStartRequest,

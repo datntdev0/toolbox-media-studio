@@ -15,6 +15,8 @@ class NovelChapterRepository(Protocol):
 
     def get(self, novel_id: str, chapter_id: str) -> NovelChapter | None: ...
 
+    def get_by_id(self, chapter_id: str) -> NovelChapter | None: ...
+
     def list(self, novel_id: str) -> NovelChapterPage: ...
 
     def save(
@@ -45,6 +47,14 @@ class InMemoryNovelChapterRepository:
     def get(self, novel_id: str, chapter_id: str) -> NovelChapter | None:
         with self._lock:
             chapter = self._chapters.get((novel_id, chapter_id))
+            return deepcopy(chapter) if chapter is not None else None
+
+    def get_by_id(self, chapter_id: str) -> NovelChapter | None:
+        with self._lock:
+            chapter = next(
+                (chapter for (_, id), chapter in self._chapters.items() if id == chapter_id),
+                None,
+            )
             return deepcopy(chapter) if chapter is not None else None
 
     def list(self, novel_id: str) -> NovelChapterPage:
