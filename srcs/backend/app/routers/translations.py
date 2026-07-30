@@ -1,5 +1,7 @@
 """Translation-management routes."""
 
+import re
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Body, HTTPException, Path, Query, Response, status
@@ -33,10 +35,12 @@ from app.domain.responses import (
     to_translation_sync_response,
 )
 from app.domain.translation_results import (
+    TranslationResult,
     TranslationResultResponse,
+    TranslationResultUpdateRequest,
     to_translation_result_response,
 )
-from app.domain.translations import TranslationView
+from app.domain.translations import TranslationTaskStatus, TranslationView
 from app.events.translation_handler import (
     TRANSLATION_QUEUE_NAME,
     build_translation_event,
@@ -52,6 +56,7 @@ from app.repositories.translation_repository import (
     TranslationContinuationTokenError,
     TranslationNotFoundError,
 )
+from app.repositories.translation_result_repository import TranslationResultTooLargeError
 from app.services.translation_service import (
     TranslationNovelNotFoundError,
     TranslationResultDeleteError,
@@ -364,6 +369,130 @@ def get_translation_result_route(
             detail="Translation result is unavailable",
         )
     return to_translation_result_response(result)
+
+
+@router.put(
+    "/{id}/result/{taskId}",
+    response_model=TranslationResultResponse,
+    operation_id="update_translation_result",
+)
+def update_translation_result_route(
+    session_user: SessionUser,
+    repository_translation: RepositoryTranslationDep,
+    repository_translation_result: RepositoryTranslationResultDep,
+    id: str,
+    task_id: Annotated[str, Path(alias="taskId")],
+    body: Annotated[TranslationResultUpdateRequest, Body(...)],
+) -> TranslationResultResponse:
+    """Create or replace the manually edited result for one translation task."""
+
+    del session_user
+    translation = repository_translation.get_by_id(id)
+    if translation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Translation not found")
+    task = next((item for item in translation.tasks if item.id == task_id), None)
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Translation task not found",
+        )
+    if task.source_removed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Source chapter is unavailable",
+        )
+    if task.status in {TranslationTaskStatus.QUEUED, TranslationTaskStatus.RUNNING}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Translation task is currently processing",
+        )
+
+    paragraphs = _split_translation_content(body.content)
+    now = datetime.now(UTC)
+    try:
+        existing = repository_translation_result.get(translation.id, task.id)
+        result = repository_translation_result.upsert(
+            TranslationResult(
+                id=task.id,
+                translation_id=translation.id,
+                task_id=task.id,
+                title=existing.title if existing is not None else task.title,
+                chapter_number=(
+                    existing.chapter_number if existing is not None else task.chapter_number
+                ),
+                content=paragraphs,
+                created_at=existing.created_at if existing is not None else now,
+                updated_at=now,
+            )
+        )
+    except TranslationResultTooLargeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Translation result could not be saved",
+        ) from exc
+
+    for _ in range(3):
+        try:
+            repository_translation.update_task(
+                translation.id,
+                task.id,
+                TranslationTaskStatus.COMPLETED,
+                attempts=task.attempts,
+                error=None,
+                result_available=True,
+                completed_at=now,
+                source_chapter_updated_at=None,
+                clear_source_updated=True,
+                etag=translation.etag,
+            )
+            break
+        except TranslationConflictError:
+            latest = repository_translation.get_by_id(translation.id)
+            if latest is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Translation not found",
+                ) from None
+            translation = latest
+            task = next((item for item in translation.tasks if item.id == task_id), None)
+            if task is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Translation task not found",
+                ) from None
+            if task.source_removed:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Source chapter is unavailable",
+                ) from None
+            if task.status in {TranslationTaskStatus.QUEUED, TranslationTaskStatus.RUNNING}:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Translation task is currently processing",
+                ) from None
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Translation changed while the result was being saved",
+        )
+
+    return to_translation_result_response(result)
+
+
+def _split_translation_content(content: str) -> list[str]:
+    normalized = content.replace("\r\n", "\n").strip()
+    if not normalized:
+        return []
+    return [
+        paragraph.strip()
+        for paragraph in re.split(r"\n[ \t]*\n+", normalized)
+        if paragraph.strip()
+    ]
 
 
 @router.put("/{id}", response_model=TranslationResponse, operation_id="update_translation")

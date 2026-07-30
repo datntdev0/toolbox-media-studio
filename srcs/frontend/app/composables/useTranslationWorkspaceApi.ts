@@ -5,6 +5,7 @@ import type {
   TranslationDetailApiRecord,
   TranslationSyncChanges,
   TranslationTaskApiRecord,
+  TranslationResult,
   TranslationWorkspace,
   TranslationWorkspaceStatus
 } from '~/types/translation-workspace'
@@ -12,6 +13,7 @@ import { resolveLanguage } from '~/constants/supported-languages'
 import { translationProviders } from '~/types/translation-workspace'
 import {
   TranslationCreateRequest,
+  TranslationResultUpdateRequest,
   TranslationStartRequest,
   TranslationUpdateRequest
 } from '~~/shared/api-services/srv-core.client'
@@ -76,6 +78,7 @@ export function normalizeTranslationWorkspace(
         chapterIndex: task.manifestIndex + 1,
         number: task.chapterNumber ?? task.manifestIndex + 1,
         title: task.title,
+        translatedTitle: null,
         status: normalizeTaskStatus(task),
         originalParagraphs: [],
         translatedParagraphs: [],
@@ -172,7 +175,21 @@ export function useTranslationWorkspaceApi() {
     },
     async getResult(id: string, taskId: string) {
       const response = await translations.get_translation_result(id, taskId)
-      return (response.content || []).map(String)
+      return {
+        title: response.title,
+        content: (response.content || []).map(String)
+      } satisfies TranslationResult
+    },
+    async updateResult(id: string, taskId: string, content: string) {
+      const response = await translations.update_translation_result(
+        id,
+        taskId,
+        new TranslationResultUpdateRequest({ content })
+      )
+      return {
+        title: response.title,
+        content: (response.content || []).map(String)
+      } satisfies TranslationResult
     }
   }
 }

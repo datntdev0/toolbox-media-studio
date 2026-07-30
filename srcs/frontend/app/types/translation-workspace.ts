@@ -89,6 +89,7 @@ export interface TranslationChapter {
   chapterIndex: number
   number: number
   title: string
+  translatedTitle: string | null
   status: TranslationChapterStatus
   originalParagraphs: string[]
   translatedParagraphs: string[]
@@ -97,6 +98,11 @@ export interface TranslationChapter {
   resultAvailable: boolean
   sourceUpdated: boolean
   sourceRemoved: boolean
+}
+
+export interface TranslationResult {
+  title: string
+  content: string[]
 }
 
 export interface TranslationWorkspace {

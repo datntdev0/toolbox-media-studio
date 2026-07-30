@@ -51,6 +51,7 @@ async function loadWorkspace() {
       chapterIndex: chapter.manifestIndex + 1,
       number: chapter.chapterNumber ?? index + 1,
       title: chapter.title,
+      translatedTitle: translationChapters.get(chapter.id)?.translatedTitle || null,
       status: translationChapters.get(chapter.id)?.status || 'not_started',
       originalParagraphs: [],
       translatedParagraphs: [],

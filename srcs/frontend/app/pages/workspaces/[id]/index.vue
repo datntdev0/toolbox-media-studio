@@ -68,7 +68,10 @@ function applyWorkspace(
         : current?.originalParagraphs || [],
       translatedParagraphs: chapter.resultAvailable
         ? current?.translatedParagraphs || []
-        : []
+        : [],
+      translatedTitle: chapter.resultAvailable
+        ? current?.translatedTitle || null
+        : null
     }
   })
   workspace.value = nextWorkspace
@@ -178,9 +181,10 @@ watch([
 
   translationLoading.value = true
   try {
-    const paragraphs = await translationApi.getResult(workspaceId.value, chapterId)
+    const result = await translationApi.getResult(workspaceId.value, chapterId)
     if (selectedChapter.value?.id === chapterId) {
-      chapter.translatedParagraphs = paragraphs
+      chapter.translatedParagraphs = result.content
+      chapter.translatedTitle = result.title
     }
   } catch {
     if (selectedChapter.value?.id === chapterId) {
@@ -242,6 +246,24 @@ async function refreshWorkspace() {
   } catch {
     // Keep the current workspace visible when a background refresh races another update.
   }
+}
+
+async function saveTranslationContent(content: string) {
+  if (!workspace.value || !selectedChapter.value) {
+    throw new Error('Translation chapter is unavailable')
+  }
+  const chapterId = selectedChapter.value.id
+  const result = await translationApi.updateResult(workspaceId.value, chapterId, content)
+  const chapter = workspace.value.chapters.find(item => item.id === chapterId)
+  if (chapter) {
+    chapter.translatedParagraphs = result.content
+    chapter.translatedTitle = result.title
+    chapter.resultAvailable = true
+    chapter.status = 'translated'
+    chapter.lastError = null
+  }
+  await refreshWorkspace()
+  return result
 }
 
 async function syncChapters() {
@@ -514,6 +536,7 @@ onBeforeUnmount(() => {
       :translation-available="translationAvailable"
       :translation-loading="translationLoading"
       :translation-load-error="translationLoadError"
+      :save-translation="saveTranslationContent"
       :original-loading="originalLoading"
       :original-load-error="originalLoadError"
       :can-previous="selectedIndex > 0"

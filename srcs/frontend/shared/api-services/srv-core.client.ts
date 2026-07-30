@@ -896,6 +896,55 @@ export class TranslationsClient {
     }
 
     /**
+     * Preview Translation Route
+     * @return Successful Response
+     */
+    preview_translation(body: TranslationPreviewRequest): Promise<TranslationPreviewResponse> {
+        let url_ = this.baseUrl + "/api/translations/preview";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(body);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processPreview_translation(_response);
+        });
+    }
+
+    protected processPreview_translation(response: Response): Promise<TranslationPreviewResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = TranslationPreviewResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<TranslationPreviewResponse>(null as any);
+    }
+
+    /**
      * Create Translation Route
      * @return Successful Response
      */
@@ -1318,6 +1367,61 @@ export class TranslationsClient {
     }
 
     protected processGet_translation_result(response: Response): Promise<TranslationResultResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = TranslationResultResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<TranslationResultResponse>(null as any);
+    }
+
+    /**
+     * Update Translation Result Route
+     * @return Successful Response
+     */
+    update_translation_result(id: string, taskId: string, body: TranslationResultUpdateRequest): Promise<TranslationResultResponse> {
+        let url_ = this.baseUrl + "/api/translations/{id}/result/{taskId}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (taskId === undefined || taskId === null)
+            throw new globalThis.Error("The parameter 'taskId' must be defined.");
+        url_ = url_.replace("{taskId}", encodeURIComponent("" + taskId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(body);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processUpdate_translation_result(_response);
+        });
+    }
+
+    protected processUpdate_translation_result(response: Response): Promise<TranslationResultResponse> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
@@ -4362,6 +4466,125 @@ export interface ITranslationListResponse {
     [key: string]: any;
 }
 
+/** Payload for translating one chapter synchronously. */
+export class TranslationPreviewRequest implements ITranslationPreviewRequest {
+    provider!: string;
+    model!: string;
+    language!: string;
+    instruction!: string;
+    chapter!: string;
+
+    constructor(data?: ITranslationPreviewRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.provider = _data["provider"];
+            this.model = _data["model"];
+            this.language = _data["language"];
+            this.instruction = _data["instruction"];
+            this.chapter = _data["chapter"];
+        }
+    }
+
+    static fromJS(data: any): TranslationPreviewRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new TranslationPreviewRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["provider"] = this.provider;
+        data["model"] = this.model;
+        data["language"] = this.language;
+        data["instruction"] = this.instruction;
+        data["chapter"] = this.chapter;
+        return data;
+    }
+}
+
+/** Payload for translating one chapter synchronously. */
+export interface ITranslationPreviewRequest {
+    provider: string;
+    model: string;
+    language: string;
+    instruction: string;
+    chapter: string;
+}
+
+/** Translated text returned by a preview provider. */
+export class TranslationPreviewResponse implements ITranslationPreviewResponse {
+    title!: string;
+    content!: string[];
+
+    [key: string]: any;
+
+    constructor(data?: ITranslationPreviewResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+        if (!data) {
+            this.content = [];
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.title = _data["title"];
+            if (Array.isArray(_data["content"])) {
+                this.content = [] as any;
+                for (let item of _data["content"])
+                    this.content!.push(item);
+            }
+        }
+    }
+
+    static fromJS(data: any): TranslationPreviewResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new TranslationPreviewResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["title"] = this.title;
+        if (Array.isArray(this.content)) {
+            data["content"] = [];
+            for (let item of this.content)
+                data["content"].push(item);
+        }
+        return data;
+    }
+}
+
+/** Translated text returned by a preview provider. */
+export interface ITranslationPreviewResponse {
+    title: string;
+    content: string[];
+
+    [key: string]: any;
+}
+
 /** Translation task rollup. */
 export class TranslationProgressResponse implements ITranslationProgressResponse {
     total!: number;
@@ -4598,6 +4821,44 @@ export interface ITranslationResultResponse {
     updatedAt: Date;
 
     [key: string]: any;
+}
+
+/** Manual translated content supplied for one chapter task. */
+export class TranslationResultUpdateRequest implements ITranslationResultUpdateRequest {
+    content!: string;
+
+    constructor(data?: ITranslationResultUpdateRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.content = _data["content"];
+        }
+    }
+
+    static fromJS(data: any): TranslationResultUpdateRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new TranslationResultUpdateRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["content"] = this.content;
+        return data;
+    }
+}
+
+/** Manual translated content supplied for one chapter task. */
+export interface ITranslationResultUpdateRequest {
+    content: string;
 }
 
 /** One-based manifest range accepted by translation start. */

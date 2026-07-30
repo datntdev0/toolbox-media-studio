@@ -37,6 +37,14 @@ class TranslationResultResponse(BaseModel):
     updated_at: datetime = Field(alias="updatedAt")
 
 
+class TranslationResultUpdateRequest(BaseModel):
+    """Manual translated content supplied for one chapter task."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    content: str
+
+
 def to_translation_result_response(
     result: TranslationResult,
 ) -> TranslationResultResponse:

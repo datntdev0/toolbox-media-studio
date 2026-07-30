@@ -463,6 +463,50 @@ def test_translation_start_stop_and_result_workflow(
     assert result.json()["content"] == ["Copied source"]
 
 
+def test_translation_result_can_be_manually_added_and_edited(
+    client: TestClient,
+    novel_chapter_repository: InMemoryNovelChapterRepository,
+) -> None:
+    headers = _headers(_login(client))
+    novel = _create_novel(client, headers, "Manual Translation Novel")
+    novel_chapter_repository.save(_chapter(novel["id"], "chapter-1", 0))
+    translation = _create_translation(client, headers, novel["id"])
+
+    created = client.put(
+        f"/api/translations/{translation['id']}/result/chapter-1",
+        headers=headers,
+        json={"content": "First translated paragraph\n\nSecond translated paragraph"},
+    )
+
+    assert created.status_code == 200
+    assert created.json()["content"] == [
+        "First translated paragraph",
+        "Second translated paragraph",
+    ]
+
+    detail = client.get(f"/api/translations/{translation['id']}", headers=headers)
+    assert detail.status_code == 200
+    task = detail.json()["tasks"][0]
+    assert task["status"] == "completed"
+    assert task["resultAvailable"] is True
+    assert detail.json()["progress"]["completed"] == 1
+
+    edited = client.put(
+        f"/api/translations/{translation['id']}/result/chapter-1",
+        headers=headers,
+        json={"content": "Replacement translation"},
+    )
+    assert edited.status_code == 200
+    assert edited.json()["content"] == ["Replacement translation"]
+
+    fetched = client.get(
+        f"/api/translations/{translation['id']}/result/chapter-1",
+        headers=headers,
+    )
+    assert fetched.status_code == 200
+    assert fetched.json()["content"] == ["Replacement translation"]
+
+
 def test_translation_sync_preserves_results_and_marks_removed_sources(
     client: TestClient,
     novel_chapter_repository: InMemoryNovelChapterRepository,

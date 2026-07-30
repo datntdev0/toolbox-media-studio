@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {
   TranslationChapter,
+  TranslationResult,
   TranslationWorkspace
 } from '~/types/translation-workspace'
 import { chapterStatusMeta } from '~/utils/translation-workspaces'
@@ -11,6 +12,7 @@ const props = defineProps<{
   translationAvailable: boolean
   translationLoading: boolean
   translationLoadError: boolean
+  saveTranslation: (content: string) => Promise<TranslationResult>
   originalLoading: boolean
   originalLoadError: boolean
   canPrevious: boolean
@@ -26,7 +28,7 @@ const confirm = useConfirmDialog()
 const toast = useToast()
 const viewMode = ref<'original' | 'translation'>('original')
 const editing = ref(false)
-const savedLocally = ref(false)
+const saving = ref(false)
 const draft = ref('')
 const localTranslation = ref<string[]>([])
 const chaptersButtonRef = ref<{ $el?: HTMLElement } | null>(null)
@@ -40,24 +42,21 @@ const dirty = computed(() =>
   editing.value && draft.value !== localTranslation.value.join('\n\n')
 )
 const chapterStatus = computed(() =>
-  savedLocally.value
-    ? chapterStatusMeta.manually_edited
-    : chapterStatusMeta[props.chapter.status]
+  chapterStatusMeta[props.chapter.status]
 )
 const canEdit = computed(() =>
-  props.translationAvailable
-  && props.chapter.status !== 'unavailable'
-  && props.chapter.status !== 'translating'
+  !['unavailable', 'queued', 'translating'].includes(props.chapter.status)
   && props.chapter.originalParagraphs.length > 0
 )
 const originalCharacterCount = computed(() => formatCharacterCount(props.chapter.originalParagraphs))
 const translationCharacterCount = computed(() =>
   formatCharacterCount(editing.value ? draft.value : localTranslation.value)
 )
+const translatedChapterTitle = computed(() => props.chapter.translatedTitle || props.chapter.title)
 
 watch(() => props.chapter.id, () => {
   editing.value = false
-  savedLocally.value = false
+  saving.value = false
   localTranslation.value = [...props.chapter.translatedParagraphs]
   draft.value = localTranslation.value.join('\n\n')
   viewMode.value = 'original'
@@ -79,7 +78,7 @@ async function cancelEdit() {
   if (dirty.value) {
     const discard = await confirm({
       title: 'Discard translation changes?',
-      description: 'Your unsaved prototype edits will be lost.',
+      description: 'Your unsaved edits will be lost.',
       confirmLabel: 'Discard changes',
       confirmColor: 'error'
     })
@@ -93,25 +92,36 @@ async function confirmDiscard() {
   if (!dirty.value) return true
   return await confirm({
     title: 'Discard translation changes?',
-    description: 'Your unsaved prototype edits will be lost when you leave this chapter.',
+    description: 'Your unsaved edits will be lost when you leave this chapter.',
     confirmLabel: 'Discard changes',
     confirmColor: 'error'
   })
 }
 
-function saveEdit() {
-  localTranslation.value = draft.value
-    .split(/\n\s*\n/g)
-    .map(paragraph => paragraph.trim())
-    .filter(Boolean)
-  savedLocally.value = true
-  editing.value = false
-  toast.add({
-    title: 'Prototype edit applied',
-    description: 'This local preview is not persisted.',
-    color: 'success',
-    icon: 'lucide:circle-check'
-  })
+async function saveEdit() {
+  if (saving.value) return
+  saving.value = true
+  try {
+    const result = await props.saveTranslation(draft.value)
+    localTranslation.value = result.content
+    draft.value = localTranslation.value.join('\n\n')
+    editing.value = false
+    toast.add({
+      title: 'Translation saved',
+      description: 'The translated chapter content has been persisted.',
+      color: 'success',
+      icon: 'lucide:circle-check'
+    })
+  } catch {
+    toast.add({
+      title: 'Unable to save translation',
+      description: 'Your edits are still available. Try saving again.',
+      color: 'error',
+      icon: 'lucide:circle-alert'
+    })
+  } finally {
+    saving.value = false
+  }
 }
 
 function focusChapters() {
@@ -262,7 +272,7 @@ defineExpose({ confirmDiscard, focusChapters })
               />
             </div>
             <p class="mt-0.5 truncate text-xs text-muted">
-              Chapter {{ chapter.number }} · {{ chapter.title }} · {{ translationCharacterCount }} characters
+              Chapter {{ chapter.number }} · {{ translatedChapterTitle }} · {{ translationCharacterCount }} characters
             </p>
           </div>
           <UButton
@@ -285,7 +295,7 @@ defineExpose({ confirmDiscard, focusChapters })
               variant="subtle"
               icon="lucide:pencil-line"
               title="Editing translated copy"
-              description="Changes are kept only while this prototype screen remains open."
+              description="Save to store this chapter's translated content."
             />
             <UTextarea
               v-model="draft"
@@ -308,6 +318,8 @@ defineExpose({ confirmDiscard, focusChapters })
               <UButton
                 label="Save translation"
                 icon="lucide:save"
+                :loading="saving"
+                :disabled="saving"
                 @click="saveEdit"
               />
             </div>
