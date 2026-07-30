@@ -15,6 +15,10 @@ from app.events.translation_handler import TranslationQueueListener
 from app.providers.blob_storage_provider import PublicBlobProvider, build_public_blob_provider
 from app.providers.cache_provider import CacheProvider, build_cosmos_cache_provider
 from app.providers.proxy_service_provider import ProxyProvider, build_proxy_provider
+from app.providers.translation_service_provider import (
+    TranslationServiceProviderFactory,
+    build_translation_service_provider_factory,
+)
 from app.repositories.cosmosdb.cosmos_novel_chapter_repository import (
     build_cosmos_novel_chapter_repository,
 )
@@ -60,6 +64,7 @@ repository_novel_chapter: NovelChapterRepository | None = None
 provider_proxy = build_proxy_provider(config)
 provider_public_blob = build_public_blob_provider(config)
 provider_cache = build_cosmos_cache_provider(config)
+provider_translation_service_factory = build_translation_service_provider_factory(config)
 realtime_hub = RealtimeHub()
 
 # Queue publishers and subscribers can be registered
@@ -130,6 +135,7 @@ queue_listener_translation = TranslationQueueListener(
     translation_result_repository=repository_translation_result,
     novel_chapter_repository=_get_novel_chapter_repository(),
     realtime_hub=realtime_hub,
+    translation_service_provider_factory=provider_translation_service_factory,
     workers=1,
 )
 
@@ -149,6 +155,10 @@ ServiceTranslationDep = Annotated[
 
 ProviderCacheDep = Annotated[CacheProvider, Depends(lambda: provider_cache)]
 ProviderProxyDep = Annotated[ProxyProvider, Depends(lambda: provider_proxy)]
+ProviderTranslationServiceFactoryDep = Annotated[
+    TranslationServiceProviderFactory,
+    Depends(lambda: provider_translation_service_factory),
+]
 ProviderPublicBlobDep = Annotated[PublicBlobProvider, Depends(lambda: provider_public_blob)]
 PollingQueuePublisherDep = Annotated[PollingQueuePublisher, Depends(lambda: queue_publisher)]
 RealtimeHubDep = Annotated[RealtimeHub, Depends(lambda: realtime_hub)]

@@ -2,8 +2,11 @@
 
 import pytest
 
-from app.providers.translation_provider import (
-    TranslationProviderError,
+from app.providers.translation_service_provider import (
+    TranslationPreview,
+    TranslationServiceProviderError,
+    TranslationServiceProviderFactory,
+    UnsupportedTranslationServiceProviderError,
     parse_translation_output,
 )
 
@@ -48,5 +51,31 @@ def test_parse_translation_output_uses_fallback_title_without_header() -> None:
 
 
 def test_parse_translation_output_rejects_empty_content() -> None:
-    with pytest.raises(TranslationProviderError):
+    with pytest.raises(TranslationServiceProviderError):
         parse_translation_output("Title: Missing content\nContent:\n", fallback_title="Original")
+
+
+def test_factory_normalizes_and_selects_a_provider() -> None:
+    class FakeTranslationServiceProvider:
+        def translate(
+            self,
+            *,
+            model: str,
+            language: str,
+            instruction: str,
+            chapter_title: str,
+            chapter_content: list[str],
+        ) -> TranslationPreview:
+            raise NotImplementedError
+
+    provider = FakeTranslationServiceProvider()
+    factory = TranslationServiceProviderFactory({"foundry": provider})
+
+    assert factory.get(" FOUNDRY ") is provider
+
+
+def test_factory_rejects_an_unknown_provider() -> None:
+    factory = TranslationServiceProviderFactory({})
+
+    with pytest.raises(UnsupportedTranslationServiceProviderError):
+        factory.get("unknown")

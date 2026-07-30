@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import time
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from logging import Logger
@@ -14,6 +13,7 @@ from app.core.events.polling_queue_subscriber import PollingQueueSubscriber
 from app.core.realtime import RealtimeHub
 from app.domain.translation_results import TranslationResult
 from app.domain.translations import Translation, TranslationTask, TranslationTaskStatus
+from app.providers.translation_service_provider import TranslationServiceProviderFactory
 from app.repositories.novel_chapter_repository import NovelChapterRepository
 from app.repositories.translation_repository import (
     TranslationConflictError,
@@ -25,7 +25,6 @@ from app.repositories.translation_result_repository import TranslationResultRepo
 TRANSLATION_QUEUE_NAME = "translations"
 TRANSLATION_EVENT_TYPE = "translation.task.requested"
 TRANSLATION_EVENT_SCHEMA_VERSION = 1
-MOCK_TRANSLATION_DELAY_SECONDS = 30
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +56,7 @@ class TranslationEvent:
 
 
 class TranslationHandler(MessageHandler):
-    """Mock one queued chapter translation and persist its isolated result."""
+    """Translate one queued chapter and persist its isolated result."""
 
     def __init__(
         self,
@@ -66,14 +65,14 @@ class TranslationHandler(MessageHandler):
         translation_result_repository: TranslationResultRepository,
         novel_chapter_repository: NovelChapterRepository,
         realtime_hub: RealtimeHub,
-        sleeper: Callable[[float], None] = time.sleep,
+        translation_service_provider_factory: TranslationServiceProviderFactory,
     ) -> None:
         self._logger = logger
         self._translations = translation_repository
         self._results = translation_result_repository
         self._chapters = novel_chapter_repository
         self._realtime = realtime_hub
-        self._sleeper = sleeper
+        self._translation_service_provider_factory = translation_service_provider_factory
 
     def handle(self, message: QueueMessage) -> None:
         if message.content is None:
@@ -114,16 +113,28 @@ class TranslationHandler(MessageHandler):
                 chapter = self._chapters.get(claimed.novel_id, task.id)
                 if chapter is None or not chapter.content_available or chapter.source_removed:
                     raise ValueError("Source novel chapter content is unavailable")
-                self._sleeper(MOCK_TRANSLATION_DELAY_SECONDS)
+                configuration = claimed.configuration
+                if configuration is None:
+                    raise ValueError("Translation configuration is unavailable")
+                provider = self._translation_service_provider_factory.get(
+                    configuration.provider_id
+                )
+                translated = provider.translate(
+                    model=configuration.model_id,
+                    language=claimed.target_language,
+                    instruction=configuration.global_prompt,
+                    chapter_title=chapter.title,
+                    chapter_content=chapter.content,
+                )
                 now = datetime.now(UTC)
                 self._results.upsert(
                     TranslationResult(
                         id=task.id,
                         translation_id=claimed.id,
                         task_id=task.id,
-                        title=chapter.title,
+                        title=translated.title,
                         chapter_number=chapter.chapter_number,
-                        content=list(chapter.content),
+                        content=translated.content,
                         created_at=now,
                         updated_at=now,
                     )
@@ -229,7 +240,7 @@ class TranslationHandler(MessageHandler):
 
 
 class TranslationQueueListener(PollingQueueSubscriber):
-    """Queue listener configured with the mock translation handler."""
+    """Queue listener configured with the translation provider."""
 
     def __init__(
         self,
@@ -238,6 +249,7 @@ class TranslationQueueListener(PollingQueueSubscriber):
         translation_result_repository: TranslationResultRepository,
         novel_chapter_repository: NovelChapterRepository,
         realtime_hub: RealtimeHub,
+        translation_service_provider_factory: TranslationServiceProviderFactory,
         workers: int = 1,
     ) -> None:
         super().__init__(
@@ -249,6 +261,7 @@ class TranslationQueueListener(PollingQueueSubscriber):
                 translation_result_repository,
                 novel_chapter_repository,
                 realtime_hub,
+                translation_service_provider_factory,
             ),
             workers=workers,
         )

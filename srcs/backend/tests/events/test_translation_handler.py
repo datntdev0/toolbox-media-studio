@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 from logging import getLogger
+from typing import Any
 
 from app.core.events.message_handler import QueueMessage
 from app.core.realtime import RealtimeHub
@@ -16,10 +17,10 @@ from app.domain.translations import (
     TranslationTaskStatus,
 )
 from app.events.translation_handler import (
-    MOCK_TRANSLATION_DELAY_SECONDS,
     TranslationHandler,
     build_translation_event,
 )
+from app.providers.translation_service_provider import TranslationPreview
 from app.repositories.novel_chapter_repository import InMemoryNovelChapterRepository
 from app.repositories.translation_repository import InMemoryTranslationRepository
 from app.repositories.translation_result_repository import (
@@ -27,7 +28,7 @@ from app.repositories.translation_result_repository import (
 )
 
 
-def test_handler_copies_source_content_after_mock_delay() -> None:
+def test_handler_translates_source_content() -> None:
     now = datetime.now(UTC)
     translations = InMemoryTranslationRepository()
     results = InMemoryTranslationResultRepository()
@@ -64,7 +65,7 @@ def test_handler_copies_source_content_after_mock_delay() -> None:
             name="Vietnamese",
             novel_id="novel-1",
             target_language="vi",
-            configuration=TranslationConfiguration("mock", "copy", "Copy."),
+            configuration=TranslationConfiguration("openai", "gpt-5", "Translate faithfully."),
             status=TranslationStatus.READY,
             created_by="user-1",
             created_at=now,
@@ -81,14 +82,25 @@ def test_handler_copies_source_content_after_mock_delay() -> None:
         force=False,
         etag=created.etag,
     )
-    delays: list[float] = []
+    calls: list[dict[str, Any]] = []
+
+    class FakeTranslationServiceProvider:
+        def translate(self, **kwargs: Any) -> TranslationPreview:
+            calls.append(kwargs)
+            return TranslationPreview("Translated chapter", ["Translated paragraph"])
+
+    class FakeTranslationServiceProviderFactory:
+        def get(self, provider_id: str) -> FakeTranslationServiceProvider:
+            assert provider_id == "openai"
+            return FakeTranslationServiceProvider()
+
     handler = TranslationHandler(
         getLogger("test.translation"),
         translations,
         results,
         chapters,
         RealtimeHub(),
-        sleeper=delays.append,
+        FakeTranslationServiceProviderFactory(),
     )
 
     handler.handle(
@@ -102,10 +114,19 @@ def test_handler_copies_source_content_after_mock_delay() -> None:
         )
     )
 
-    assert delays == [MOCK_TRANSLATION_DELAY_SECONDS]
+    assert len(calls) == 1
+    call = calls[0]
+    assert call == {
+        "model": "gpt-5",
+        "language": "vi",
+        "instruction": "Translate faithfully.",
+        "chapter_title": "Chapter 1",
+        "chapter_content": ["First paragraph", "Second paragraph"],
+    }
     result = results.get(created.id, task.id)
     assert result is not None
-    assert result.content == ["First paragraph", "Second paragraph"]
+    assert result.title == "Translated chapter"
+    assert result.content == ["Translated paragraph"]
     completed = translations.get_by_id(created.id)
     assert completed is not None
     assert completed.tasks[0].status == TranslationTaskStatus.COMPLETED
@@ -162,13 +183,22 @@ def test_handler_reuses_existing_result_without_sleeping() -> None:
         force=False,
         etag=created.etag,
     )
+
+    class UnexpectedTranslationServiceProvider:
+        def translate(self, **_: Any) -> TranslationPreview:
+            raise AssertionError("unexpected translation")
+
+    class UnexpectedTranslationServiceProviderFactory:
+        def get(self, _: str) -> UnexpectedTranslationServiceProvider:
+            return UnexpectedTranslationServiceProvider()
+
     handler = TranslationHandler(
         getLogger("test.translation"),
         translations,
         results,
         chapters,
         RealtimeHub(),
-        sleeper=lambda _: (_ for _ in ()).throw(AssertionError("unexpected sleep")),
+        UnexpectedTranslationServiceProviderFactory(),
     )
 
     handler.handle(

@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from app.domain.novels import NovelChapter
 from app.domain.translation_results import TranslationResult
 from app.domain.translations import TranslationProgress, TranslationTaskStatus
-from app.providers.translation_provider import TranslationPreview
+from app.providers.translation_service_provider import TranslationPreview
 from app.repositories.novel_chapter_repository import InMemoryNovelChapterRepository
 from app.repositories.translation_repository import InMemoryTranslationRepository
 from app.repositories.translation_result_repository import (
@@ -28,11 +28,20 @@ def test_translation_preview_uses_configured_provider(
     )
     captured: dict[str, Any] = {}
 
-    def fake_translate_preview(**kwargs: Any) -> str:
-        captured.update(kwargs)
-        return TranslationPreview(title="Bonjour le monde", content=["Bonjour le monde"])
+    class FakeTranslationServiceProvider:
+        def translate(self, **kwargs: Any) -> TranslationPreview:
+            captured.update(kwargs)
+            return TranslationPreview(title="Bonjour le monde", content=["Bonjour le monde"])
 
-    monkeypatch.setattr("app.routers.translations.translate_preview", fake_translate_preview)
+    class FakeTranslationServiceProviderFactory:
+        def get(self, provider_id: str) -> FakeTranslationServiceProvider:
+            captured["provider"] = provider_id
+            return FakeTranslationServiceProvider()
+
+    monkeypatch.setattr(
+        "app.core.injection.provider_translation_service_factory",
+        FakeTranslationServiceProviderFactory(),
+    )
     response = client.post(
         "/api/translations/preview",
         headers=headers,
