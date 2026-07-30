@@ -5,13 +5,20 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, File, HTTPException, Path, Query, Response, UploadFile, status
 
-from app.core.injection import ProviderPublicBlobDep, RepositoryNovelDep, ServiceNovelBindingDep
+from app.core.injection import (
+    ProviderPublicBlobDep,
+    RepositoryNovelDep,
+    ServiceNovelBindingDep,
+    ServiceNovelLanguageDep,
+)
 from app.core.security.authorization import SessionUser
 from app.domain.novels import NovelBindRequest, NovelChapterUpdateRequest
 from app.domain.requests import NovelCreateRequest, NovelUpdateRequest, to_novel_entity
 from app.domain.responses import (
     NovelChapterContentResponse,
     NovelDetailResponse,
+    NovelLanguageListResponse,
+    NovelLanguageResponse,
     NovelListResponse,
     NovelResponse,
     NovelSyncResponse,
@@ -26,6 +33,10 @@ from app.services.novel_binding_service import (
     NovelBindingConcurrencyError,
     NovelBindingConflictError,
     NovelBindingNotFoundError,
+)
+from app.services.novel_language_service import (
+    NovelLanguageContentNotFoundError,
+    NovelLanguageNotFoundError,
 )
 
 router = APIRouter(prefix="/api/novels", tags=["novels"])
@@ -155,22 +166,55 @@ def sync_novel_route(
 
 
 @router.get(
+    "/{id}/languages",
+    response_model=NovelLanguageListResponse,
+    operation_id="list_novel_languages",
+)
+def list_novel_languages_route(
+    session_user: SessionUser,
+    service_novel_language: ServiceNovelLanguageDep,
+    id: str,
+) -> NovelLanguageListResponse:
+    """Return the original and unique translated languages for a novel."""
+
+    del session_user
+    try:
+        languages = service_novel_language.list_languages(id)
+    except NovelLanguageNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    return NovelLanguageListResponse(
+        items=[
+            NovelLanguageResponse(code=item.code, source_type=item.source_type)
+            for item in languages
+        ]
+    )
+
+
+@router.get(
     "/{id}/chapters/{chapterId}",
     response_model=NovelChapterContentResponse,
     operation_id="get_novel_chapter",
 )
 def get_novel_chapter_route(
     session_user: SessionUser,
-    binding_service: ServiceNovelBindingDep,
+    service_novel_language: ServiceNovelLanguageDep,
     id: str,
     chapter_id: Annotated[str, Path(alias="chapterId")],
+    language: Annotated[str | None, Query()] = None,
 ) -> NovelChapterContentResponse:
-    """Return a cloned chapter without applying an ownership constraint."""
+    """Return original or translated chapter content without ownership filtering."""
 
     del session_user
     try:
-        chapter, content = binding_service.get_chapter_content(id, chapter_id)
-    except NovelBindingNotFoundError as exc:
+        chapter, content = service_novel_language.get_chapter_content(
+            id,
+            chapter_id,
+            language,
+        )
+    except (NovelLanguageNotFoundError, NovelLanguageContentNotFoundError) as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),

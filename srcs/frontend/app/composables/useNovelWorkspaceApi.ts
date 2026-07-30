@@ -69,7 +69,9 @@ export function useNovelWorkspaceApi() {
     },
     async getChapter(novelId: string, chapterId: string) {
       const { novels } = useApiClient()
-      return normalizeChapterContent(await novels.get_novel_chapter(novelId, chapterId))
+      return normalizeChapterContent(
+        await novels.get_novel_chapter(novelId, chapterId, undefined)
+      )
     },
     async getScraping(id: string) {
       const { scrapings } = useApiClient()

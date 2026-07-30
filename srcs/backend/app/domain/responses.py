@@ -15,6 +15,11 @@ from app.domain.translations import (
     TranslationView,
 )
 from app.domain.users import User, UserRole, UserStatus
+from app.domain.workspaces import (
+    WorkspaceSourceType,
+    WorkspaceType,
+    WorkspaceView,
+)
 
 
 class TokenResponse(BaseModel):
@@ -115,6 +120,21 @@ class NovelChapterContentResponse(NovelChapterSummaryResponse):
     """One chapter with content represented as readable paragraphs."""
 
     content: list[str] = Field(default_factory=list)
+
+
+class NovelLanguageResponse(BaseModel):
+    """One original or translated language available for a novel."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    code: str
+    source_type: WorkspaceSourceType = Field(alias="sourceType")
+
+
+class NovelLanguageListResponse(BaseModel):
+    """All unique languages currently available for a novel."""
+
+    items: list[NovelLanguageResponse]
 
 
 class NovelSyncChangesResponse(BaseModel):
@@ -219,6 +239,40 @@ class TranslationListResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     items: list[TranslationResponse]
+    continuation_token: str | None = Field(default=None, alias="continuationToken")
+
+
+class WorkspaceResponse(BaseModel):
+    """Workspace payload enriched with live novel metadata."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    title: str
+    type: WorkspaceType
+    novel_id: str = Field(alias="novelId")
+    language: str
+    source_type: WorkspaceSourceType = Field(alias="sourceType")
+    source_available: bool = Field(alias="sourceAvailable")
+    chapter_count: int = Field(alias="chapterCount")
+    novel: NovelResponse | None = None
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")
+    etag: str | None = None
+
+
+class WorkspaceDetailResponse(WorkspaceResponse):
+    """Workspace payload including language-aware chapters."""
+
+    chapters: list[NovelChapterSummaryResponse] = Field(default_factory=list)
+
+
+class WorkspaceListResponse(BaseModel):
+    """Paged workspace list."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    items: list[WorkspaceResponse]
     continuation_token: str | None = Field(default=None, alias="continuationToken")
 
 
@@ -392,6 +446,35 @@ def to_translation_configuration_response(
         provider_id=configuration.provider_id,
         model_id=configuration.model_id,
         global_prompt=configuration.global_prompt,
+    )
+
+
+def to_workspace_response(view: WorkspaceView) -> WorkspaceResponse:
+    """Convert an enriched workspace to its list response."""
+
+    workspace = view.workspace
+    return WorkspaceResponse(
+        id=workspace.id,
+        title=workspace.title,
+        type=workspace.type,
+        novel_id=workspace.novel_id,
+        language=workspace.language,
+        source_type=view.source_type,
+        source_available=view.source_available,
+        chapter_count=view.novel.chapter_count if view.novel else 0,
+        novel=to_novel_response(view.novel) if view.novel else None,
+        created_at=workspace.created_at,
+        updated_at=workspace.updated_at,
+        etag=workspace.etag,
+    )
+
+
+def to_workspace_detail_response(view: WorkspaceView) -> WorkspaceDetailResponse:
+    """Convert an enriched workspace to its detail response."""
+
+    return WorkspaceDetailResponse(
+        **to_workspace_response(view).model_dump(),
+        chapters=[to_novel_chapter_summary(chapter) for chapter in view.chapters],
     )
 
 

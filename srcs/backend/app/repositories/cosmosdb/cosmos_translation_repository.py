@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -86,6 +87,20 @@ class CosmosTranslationRepository:
             items=[self._deserialize(item) for item in page],
             continuation_token=cast(str | None, page_iterator.continuation_token),
         )
+
+    def list_by_novel(self, novel_id: str) -> Sequence[Translation]:
+        items = self._container.query_items(
+            query=(
+                "SELECT * FROM c WHERE c.novelId = @novel_id "
+                "AND c.status != @deleted_status ORDER BY c.updatedAt DESC"
+            ),
+            parameters=[
+                {"name": "@novel_id", "value": novel_id},
+                {"name": "@deleted_status", "value": TranslationStatus.DELETED.value},
+            ],
+            enable_cross_partition_query=True,
+        )
+        return [self._deserialize(item) for item in items]
 
     def update(self, translation: Translation, etag: str | None) -> Translation:
         if self.get_by_id(translation.id) is None:

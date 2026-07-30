@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from copy import deepcopy
 from datetime import UTC, datetime
 from typing import Protocol
@@ -25,6 +26,8 @@ class TranslationRepository(Protocol):
     def get_by_id(self, id: str) -> Translation | None: ...
 
     def list(self, limit: int, continuation_token: str | None) -> TranslationPage: ...
+
+    def list_by_novel(self, novel_id: str) -> Sequence[Translation]: ...
 
     def update(self, translation: Translation, etag: str | None) -> Translation: ...
 
@@ -118,6 +121,16 @@ class InMemoryTranslationRepository:
         next_offset = offset + len(page)
         next_token = str(next_offset) if next_offset < len(translations) else None
         return TranslationPage(items=page, continuation_token=next_token)
+
+    def list_by_novel(self, novel_id: str) -> Sequence[Translation]:
+        translations = [
+            deepcopy(translation)
+            for translation in self._translations.values()
+            if translation.status != TranslationStatus.DELETED
+            and translation.novel_id == novel_id
+        ]
+        translations.sort(key=lambda item: (item.updated_at, item.id), reverse=True)
+        return translations
 
     def update(self, translation: Translation, etag: str | None) -> Translation:
         current = self._translations.get(translation.id)

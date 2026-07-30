@@ -16,6 +16,7 @@ from app.repositories.translation_result_repository import (
     InMemoryTranslationResultRepository,
 )
 from app.repositories.user_repository import InMemoryUserRepository
+from app.repositories.workspace_repository import InMemoryWorkspaceRepository
 
 TEST_ADMIN_EMAIL = "admin@example.com"
 TEST_ADMIN_PASSWORD = "s3cret-pass"
@@ -216,6 +217,13 @@ def translation_result_repository() -> InMemoryTranslationResultRepository:
 
 
 @pytest.fixture
+def workspace_repository() -> InMemoryWorkspaceRepository:
+    """Shared in-memory workspace repository for a test app instance."""
+
+    return InMemoryWorkspaceRepository()
+
+
+@pytest.fixture
 def novel_chapter_repository() -> InMemoryNovelChapterRepository:
     """Shared in-memory novel chapters for a test app instance."""
 
@@ -277,6 +285,7 @@ def client(
     novel_repository: InMemoryNovelRepository,
     translation_repository: InMemoryTranslationRepository,
     translation_result_repository: InMemoryTranslationResultRepository,
+    workspace_repository: InMemoryWorkspaceRepository,
     novel_chapter_repository: InMemoryNovelChapterRepository,
     scraping_repository: InMemoryScrapingRepository,
     scraping_result_repository: InMemoryScrapingResultRepository,
@@ -308,6 +317,11 @@ def client(
         lambda config: translation_result_repository,
     )
     monkeypatch.setattr(
+        "app.repositories.cosmosdb.cosmos_workspace_repository."
+        "build_cosmos_workspace_repository",
+        lambda config: workspace_repository,
+    )
+    monkeypatch.setattr(
         "app.repositories.cosmosdb.cosmos_novel_chapter_repository."
         "build_cosmos_novel_chapter_repository",
         lambda config: novel_chapter_repository,
@@ -334,6 +348,7 @@ def client(
     service_provider.repository_novel = novel_repository
     service_provider.repository_translation = translation_repository
     service_provider.repository_translation_result = translation_result_repository
+    service_provider.repository_workspace = workspace_repository
     service_provider.repository_novel_chapter = novel_chapter_repository
     service_provider.repository_scraping = scraping_repository
     service_provider.repository_scraping_result = scraping_result_repository
@@ -349,6 +364,7 @@ def client(
     main_module.repository_novel = novel_repository
     main_module.repository_translation = translation_repository
     main_module.repository_translation_result = translation_result_repository
+    main_module.repository_workspace = workspace_repository
     main_module.repository_scraping = scraping_repository
     main_module.repository_scraping_result = scraping_result_repository
     main_module.provider_cache = cache_provider

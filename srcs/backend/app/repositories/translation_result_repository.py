@@ -17,6 +17,8 @@ class TranslationResultRepository(Protocol):
 
     def get(self, translation_id: str, task_id: str) -> TranslationResult | None: ...
 
+    def list_by_translation(self, translation_id: str) -> list[TranslationResult]: ...
+
     def upsert(self, result: TranslationResult) -> TranslationResult: ...
 
     def delete_by_translation(self, translation_id: str) -> None: ...
@@ -37,6 +39,14 @@ class InMemoryTranslationResultRepository:
         with self._lock:
             result = self._results.get((translation_id, task_id))
             return deepcopy(result) if result is not None else None
+
+    def list_by_translation(self, translation_id: str) -> list[TranslationResult]:
+        with self._lock:
+            return [
+                deepcopy(result)
+                for (result_translation_id, _), result in self._results.items()
+                if result_translation_id == translation_id
+            ]
 
     def upsert(self, result: TranslationResult) -> TranslationResult:
         if result.id != result.task_id:

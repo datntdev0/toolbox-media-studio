@@ -320,7 +320,10 @@ def test_translation_validation_missing_novel_and_legacy_routes(client: TestClie
     )
     assert invalid_token.status_code == 422
     assert client.get("/api/translations?continuationToken=-1", headers=headers).status_code == 422
-    assert client.get("/api/workspaces", headers=headers).status_code == 404
+    assert client.get("/api/workspaces", headers=headers).json() == {
+        "items": [],
+        "continuationToken": None,
+    }
     legacy_body = client.post(
         "/api/translations",
         headers=headers,
@@ -334,7 +337,7 @@ def test_translation_validation_missing_novel_and_legacy_routes(client: TestClie
     assert legacy_body.status_code == 422
 
     openapi = client.get("/openapi.json").json()
-    assert all("Workspace" not in schema for schema in openapi["components"]["schemas"])
+    assert "WorkspaceResponse" in openapi["components"]["schemas"]
 
 
 def test_translation_configuration_rejects_blank_values(client: TestClient) -> None:

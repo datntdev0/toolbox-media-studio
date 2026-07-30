@@ -36,6 +36,16 @@ class CosmosTranslationResultRepository:
             return None
         return self._deserialize(item)
 
+    def list_by_translation(self, translation_id: str) -> list[TranslationResult]:
+        items = self._container.query_items(
+            query="SELECT * FROM c WHERE c.translationId = @translation_id",
+            parameters=[
+                {"name": "@translation_id", "value": translation_id},
+            ],
+            partition_key=translation_id,
+        )
+        return [self._deserialize(item) for item in items]
+
     def upsert(self, result: TranslationResult) -> TranslationResult:
         if result.id != result.task_id:
             raise ValueError("TranslationResult id must equal taskId")

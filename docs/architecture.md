@@ -152,6 +152,7 @@ binaries go to Blob with a pointer (2 MB item limit; RU cost scales with item si
 | `novels` | `/userId` | library entry, connector ref, status, counts | "my library" (single-partition) |
 | `chapters` | `/novelId` | metadata + Blob pointers (`rawBlobPath`, `translations{lang→ptr}`) | "all chapters of a novel" |
 | `translations` | `/id` | translation project + AI configuration referencing a novel | translation lookup and list |
+| `domain.workspaces` | `/id` | media workspace referencing a novel and selected language | workspace lookup and list |
 | `jobs` | `/createdBy` | header + active idempotency key + rollup `{total, completed, failed}` | user-scoped jobs and active dedupe |
 | `tasks` | `/jobId` | per-chapter / per-scene unit; status, attempts, output ptr | "all tasks of a job" (fan-out) |
 | `aimodels` | `/userId` | provider/model config; credential = Key Vault ref, never inline | AI Models page list |

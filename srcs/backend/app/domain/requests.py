@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, 
 from app.domain.novels import Novel, NovelStatus
 from app.domain.translations import Translation, TranslationConfiguration, TranslationStatus
 from app.domain.users import User, UserRole, UserStatus
+from app.domain.workspaces import Workspace, WorkspaceType
 
 NonBlankStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
@@ -158,6 +159,25 @@ class TranslationPreviewResponse(BaseModel):
     content: list[NonBlankStr]
 
 
+class WorkspaceCreateRequest(BaseModel):
+    """Payload for creating a media workspace."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    title: NonBlankStr
+    type: WorkspaceType
+    novel_id: NonBlankStr = Field(alias="novelId")
+    language: NonBlankStr
+
+
+class WorkspaceUpdateRequest(BaseModel):
+    """Title-only workspace replacement payload."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: NonBlankStr
+
+
 def to_user_entity(body: UserCreateRequest) -> User:
     """Convert a UserCreateRequest to a User entity."""
 
@@ -231,4 +251,24 @@ def to_translation_configuration(
         provider_id=body.provider_id.strip(),
         model_id=body.model_id.strip(),
         global_prompt=body.global_prompt.strip(),
+    )
+
+
+def to_workspace_entity(
+    body: WorkspaceCreateRequest,
+    created_by: str,
+) -> Workspace:
+    """Convert a WorkspaceCreateRequest to a Workspace entity."""
+
+    now = datetime.now(UTC)
+    return Workspace(
+        id=str(uuid4()),
+        title=body.title.strip(),
+        type=body.type,
+        novel_id=body.novel_id.strip(),
+        language=body.language.strip(),
+        created_by=created_by,
+        created_at=now,
+        updated_by=created_by,
+        updated_at=now,
     )

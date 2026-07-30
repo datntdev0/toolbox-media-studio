@@ -723,17 +723,70 @@ export class NovelsClient {
     }
 
     /**
-     * Get Novel Chapter Route
+     * List Novel Languages Route
      * @return Successful Response
      */
-    get_novel_chapter(id: string, chapterId: string): Promise<NovelChapterContentResponse> {
-        let url_ = this.baseUrl + "/api/novels/{id}/chapters/{chapterId}";
+    list_novel_languages(id: string): Promise<NovelLanguageListResponse> {
+        let url_ = this.baseUrl + "/api/novels/{id}/languages";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processList_novel_languages(_response);
+        });
+    }
+
+    protected processList_novel_languages(response: Response): Promise<NovelLanguageListResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = NovelLanguageListResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<NovelLanguageListResponse>(null as any);
+    }
+
+    /**
+     * Get Novel Chapter Route
+     * @param language (optional) 
+     * @return Successful Response
+     */
+    get_novel_chapter(id: string, chapterId: string, language: Language | undefined): Promise<NovelChapterContentResponse> {
+        let url_ = this.baseUrl + "/api/novels/{id}/chapters/{chapterId}?";
         if (id === undefined || id === null)
             throw new globalThis.Error("The parameter 'id' must be defined.");
         url_ = url_.replace("{id}", encodeURIComponent("" + id));
         if (chapterId === undefined || chapterId === null)
             throw new globalThis.Error("The parameter 'chapterId' must be defined.");
         url_ = url_.replace("{chapterId}", encodeURIComponent("" + chapterId));
+        if (language === null)
+            throw new globalThis.Error("The parameter 'language' cannot be null.");
+        else if (language !== undefined)
+            url_ += "language=" + encodeURIComponent("" + language) + "&";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -1447,6 +1500,270 @@ export class TranslationsClient {
     }
 }
 
+export class WorkspacesClient {
+    private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
+    private baseUrl: string;
+    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
+
+    constructor(baseUrl?: string, http?: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> }) {
+        this.http = http ? http : window as any;
+        this.baseUrl = baseUrl ?? "";
+    }
+
+    /**
+     * Create Workspace Route
+     * @return Successful Response
+     */
+    create_workspace(body: WorkspaceCreateRequest): Promise<WorkspaceResponse> {
+        let url_ = this.baseUrl + "/api/workspaces";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(body);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processCreate_workspace(_response);
+        });
+    }
+
+    protected processCreate_workspace(response: Response): Promise<WorkspaceResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 201) {
+            return response.text().then((_responseText) => {
+            let result201: any = null;
+            let resultData201 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result201 = WorkspaceResponse.fromJS(resultData201);
+            return result201;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<WorkspaceResponse>(null as any);
+    }
+
+    /**
+     * List Workspaces Route
+     * @param type (optional) 
+     * @param limit (optional) 
+     * @param continuationToken (optional) 
+     * @return Successful Response
+     */
+    list_workspaces(type: Type | undefined, limit: number | undefined, continuationToken: Anonymous3 | undefined): Promise<WorkspaceListResponse> {
+        let url_ = this.baseUrl + "/api/workspaces?";
+        if (type === null)
+            throw new globalThis.Error("The parameter 'type' cannot be null.");
+        else if (type !== undefined)
+            url_ += "type=" + encodeURIComponent("" + type) + "&";
+        if (limit === null)
+            throw new globalThis.Error("The parameter 'limit' cannot be null.");
+        else if (limit !== undefined)
+            url_ += "limit=" + encodeURIComponent("" + limit) + "&";
+        if (continuationToken === null)
+            throw new globalThis.Error("The parameter 'continuationToken' cannot be null.");
+        else if (continuationToken !== undefined)
+            url_ += "continuationToken=" + encodeURIComponent("" + continuationToken) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processList_workspaces(_response);
+        });
+    }
+
+    protected processList_workspaces(response: Response): Promise<WorkspaceListResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = WorkspaceListResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<WorkspaceListResponse>(null as any);
+    }
+
+    /**
+     * Get Workspace Route
+     * @return Successful Response
+     */
+    get_workspace(id: string): Promise<WorkspaceDetailResponse> {
+        let url_ = this.baseUrl + "/api/workspaces/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGet_workspace(_response);
+        });
+    }
+
+    protected processGet_workspace(response: Response): Promise<WorkspaceDetailResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = WorkspaceDetailResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<WorkspaceDetailResponse>(null as any);
+    }
+
+    /**
+     * Update Workspace Route
+     * @return Successful Response
+     */
+    update_workspace(id: string, body: WorkspaceUpdateRequest): Promise<WorkspaceResponse> {
+        let url_ = this.baseUrl + "/api/workspaces/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(body);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processUpdate_workspace(_response);
+        });
+    }
+
+    protected processUpdate_workspace(response: Response): Promise<WorkspaceResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = WorkspaceResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<WorkspaceResponse>(null as any);
+    }
+
+    /**
+     * Delete Workspace Route
+     * @return Successful Response
+     */
+    delete_workspace(id: string): Promise<void> {
+        let url_ = this.baseUrl + "/api/workspaces/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "DELETE",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processDelete_workspace(_response);
+        });
+    }
+
+    protected processDelete_workspace(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 204) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+}
+
 export class ScrapingsClient {
     private http: { fetch(url: RequestInfo, init?: RequestInit): Promise<Response> };
     private baseUrl: string;
@@ -1571,7 +1888,7 @@ export class ScrapingsClient {
      * @param search (optional) 
      * @return Successful Response
      */
-    list_scrapings(limit: number | undefined, continuationToken: Anonymous3 | undefined, search: Search | undefined): Promise<ScrapingListResponse> {
+    list_scrapings(limit: number | undefined, continuationToken: Anonymous4 | undefined, search: Search | undefined): Promise<ScrapingListResponse> {
         let url_ = this.baseUrl + "/api/scrapings?";
         if (limit === null)
             throw new globalThis.Error("The parameter 'limit' cannot be null.");
@@ -2685,7 +3002,7 @@ export class NovelCreateRequest implements INovelCreateRequest {
     title!: string;
     description?: Description2;
     coverImageUrl?: CoverImageUrl2;
-    language?: Language;
+    language?: Language2;
     author?: Author2;
     tags?: Tags;
     notes?: Notes;
@@ -2746,7 +3063,7 @@ export interface INovelCreateRequest {
     title: string;
     description?: Description2;
     coverImageUrl?: CoverImageUrl2;
-    language?: Language;
+    language?: Language2;
     author?: Author2;
     tags?: Tags;
     notes?: Notes;
@@ -2760,7 +3077,7 @@ export class NovelDetailResponse implements INovelDetailResponse {
     title!: string;
     description?: Description3;
     coverImageUrl?: CoverImageUrl3;
-    language?: Language2;
+    language?: Language3;
     author?: Author3;
     tags!: string[];
     notes?: Notes2;
@@ -2865,7 +3182,7 @@ export interface INovelDetailResponse {
     title: string;
     description?: Description3;
     coverImageUrl?: CoverImageUrl3;
-    language?: Language2;
+    language?: Language3;
     author?: Author3;
     tags: string[];
     notes?: Notes2;
@@ -2876,6 +3193,121 @@ export interface INovelDetailResponse {
     updatedAt: Date;
     etag?: Etag3;
     chapters?: NovelChapterSummaryResponse[];
+
+    [key: string]: any;
+}
+
+/** All unique languages currently available for a novel. */
+export class NovelLanguageListResponse implements INovelLanguageListResponse {
+    items!: NovelLanguageResponse[];
+
+    [key: string]: any;
+
+    constructor(data?: INovelLanguageListResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+        if (!data) {
+            this.items = [];
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            if (Array.isArray(_data["items"])) {
+                this.items = [] as any;
+                for (let item of _data["items"])
+                    this.items!.push(NovelLanguageResponse.fromJS(item));
+            }
+        }
+    }
+
+    static fromJS(data: any): NovelLanguageListResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new NovelLanguageListResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        if (Array.isArray(this.items)) {
+            data["items"] = [];
+            for (let item of this.items)
+                data["items"].push(item ? item.toJSON() : undefined as any);
+        }
+        return data;
+    }
+}
+
+/** All unique languages currently available for a novel. */
+export interface INovelLanguageListResponse {
+    items: NovelLanguageResponse[];
+
+    [key: string]: any;
+}
+
+/** One original or translated language available for a novel. */
+export class NovelLanguageResponse implements INovelLanguageResponse {
+    code!: string;
+    sourceType!: WorkspaceSourceType;
+
+    [key: string]: any;
+
+    constructor(data?: INovelLanguageResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.code = _data["code"];
+            this.sourceType = _data["sourceType"];
+        }
+    }
+
+    static fromJS(data: any): NovelLanguageResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new NovelLanguageResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["code"] = this.code;
+        data["sourceType"] = this.sourceType;
+        return data;
+    }
+}
+
+/** One original or translated language available for a novel. */
+export interface INovelLanguageResponse {
+    code: string;
+    sourceType: WorkspaceSourceType;
 
     [key: string]: any;
 }
@@ -2951,7 +3383,7 @@ export class NovelResponse implements INovelResponse {
     title!: string;
     description?: Description4;
     coverImageUrl?: CoverImageUrl4;
-    language?: Language3;
+    language?: Language4;
     author?: Author4;
     tags!: string[];
     notes?: Notes3;
@@ -3045,7 +3477,7 @@ export interface INovelResponse {
     title: string;
     description?: Description4;
     coverImageUrl?: CoverImageUrl4;
-    language?: Language3;
+    language?: Language4;
     author?: Author4;
     tags: string[];
     notes?: Notes3;
@@ -3192,7 +3624,7 @@ export class NovelUpdateRequest implements INovelUpdateRequest {
     title?: Title;
     description?: Description5;
     coverImageUrl?: CoverImageUrl5;
-    language?: Language4;
+    language?: Language5;
     author?: Author5;
     tags?: Tags2;
     notes?: Notes4;
@@ -3259,7 +3691,7 @@ export interface INovelUpdateRequest {
     title?: Title;
     description?: Description5;
     coverImageUrl?: CoverImageUrl5;
-    language?: Language4;
+    language?: Language5;
     author?: Author5;
     tags?: Tags2;
     notes?: Notes4;
@@ -5570,6 +6002,370 @@ export interface IValidationError {
     [key: string]: any;
 }
 
+/** Payload for creating a media workspace. */
+export class WorkspaceCreateRequest implements IWorkspaceCreateRequest {
+    title!: string;
+    type!: WorkspaceType;
+    novelId!: string;
+    language!: string;
+
+    constructor(data?: IWorkspaceCreateRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.title = _data["title"];
+            this.type = _data["type"];
+            this.novelId = _data["novelId"];
+            this.language = _data["language"];
+        }
+    }
+
+    static fromJS(data: any): WorkspaceCreateRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new WorkspaceCreateRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["title"] = this.title;
+        data["type"] = this.type;
+        data["novelId"] = this.novelId;
+        data["language"] = this.language;
+        return data;
+    }
+}
+
+/** Payload for creating a media workspace. */
+export interface IWorkspaceCreateRequest {
+    title: string;
+    type: WorkspaceType;
+    novelId: string;
+    language: string;
+}
+
+/** Workspace payload including language-aware chapters. */
+export class WorkspaceDetailResponse implements IWorkspaceDetailResponse {
+    id!: string;
+    title!: string;
+    type!: WorkspaceType;
+    novelId!: string;
+    language!: string;
+    sourceType!: WorkspaceSourceType;
+    sourceAvailable!: boolean;
+    chapterCount!: number;
+    novel?: Novel3;
+    createdAt!: Date;
+    updatedAt!: Date;
+    etag?: Etag11;
+    chapters?: NovelChapterSummaryResponse[];
+
+    [key: string]: any;
+
+    constructor(data?: IWorkspaceDetailResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.id = _data["id"];
+            this.title = _data["title"];
+            this.type = _data["type"];
+            this.novelId = _data["novelId"];
+            this.language = _data["language"];
+            this.sourceType = _data["sourceType"];
+            this.sourceAvailable = _data["sourceAvailable"];
+            this.chapterCount = _data["chapterCount"];
+            this.novel = _data["novel"];
+            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
+            this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
+            this.etag = _data["etag"];
+            if (Array.isArray(_data["chapters"])) {
+                this.chapters = [] as any;
+                for (let item of _data["chapters"])
+                    this.chapters!.push(NovelChapterSummaryResponse.fromJS(item));
+            }
+        }
+    }
+
+    static fromJS(data: any): WorkspaceDetailResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new WorkspaceDetailResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["id"] = this.id;
+        data["title"] = this.title;
+        data["type"] = this.type;
+        data["novelId"] = this.novelId;
+        data["language"] = this.language;
+        data["sourceType"] = this.sourceType;
+        data["sourceAvailable"] = this.sourceAvailable;
+        data["chapterCount"] = this.chapterCount;
+        data["novel"] = this.novel;
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
+        data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
+        data["etag"] = this.etag;
+        if (Array.isArray(this.chapters)) {
+            data["chapters"] = [];
+            for (let item of this.chapters)
+                data["chapters"].push(item ? item.toJSON() : undefined as any);
+        }
+        return data;
+    }
+}
+
+/** Workspace payload including language-aware chapters. */
+export interface IWorkspaceDetailResponse {
+    id: string;
+    title: string;
+    type: WorkspaceType;
+    novelId: string;
+    language: string;
+    sourceType: WorkspaceSourceType;
+    sourceAvailable: boolean;
+    chapterCount: number;
+    novel?: Novel3;
+    createdAt: Date;
+    updatedAt: Date;
+    etag?: Etag11;
+    chapters?: NovelChapterSummaryResponse[];
+
+    [key: string]: any;
+}
+
+/** Paged workspace list. */
+export class WorkspaceListResponse implements IWorkspaceListResponse {
+    items!: WorkspaceResponse[];
+    continuationToken?: ContinuationToken5;
+
+    [key: string]: any;
+
+    constructor(data?: IWorkspaceListResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+        if (!data) {
+            this.items = [];
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            if (Array.isArray(_data["items"])) {
+                this.items = [] as any;
+                for (let item of _data["items"])
+                    this.items!.push(WorkspaceResponse.fromJS(item));
+            }
+            this.continuationToken = _data["continuationToken"];
+        }
+    }
+
+    static fromJS(data: any): WorkspaceListResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new WorkspaceListResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        if (Array.isArray(this.items)) {
+            data["items"] = [];
+            for (let item of this.items)
+                data["items"].push(item ? item.toJSON() : undefined as any);
+        }
+        data["continuationToken"] = this.continuationToken;
+        return data;
+    }
+}
+
+/** Paged workspace list. */
+export interface IWorkspaceListResponse {
+    items: WorkspaceResponse[];
+    continuationToken?: ContinuationToken5;
+
+    [key: string]: any;
+}
+
+/** Workspace payload enriched with live novel metadata. */
+export class WorkspaceResponse implements IWorkspaceResponse {
+    id!: string;
+    title!: string;
+    type!: WorkspaceType;
+    novelId!: string;
+    language!: string;
+    sourceType!: WorkspaceSourceType;
+    sourceAvailable!: boolean;
+    chapterCount!: number;
+    novel?: Novel4;
+    createdAt!: Date;
+    updatedAt!: Date;
+    etag?: Etag12;
+
+    [key: string]: any;
+
+    constructor(data?: IWorkspaceResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.id = _data["id"];
+            this.title = _data["title"];
+            this.type = _data["type"];
+            this.novelId = _data["novelId"];
+            this.language = _data["language"];
+            this.sourceType = _data["sourceType"];
+            this.sourceAvailable = _data["sourceAvailable"];
+            this.chapterCount = _data["chapterCount"];
+            this.novel = _data["novel"];
+            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
+            this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
+            this.etag = _data["etag"];
+        }
+    }
+
+    static fromJS(data: any): WorkspaceResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new WorkspaceResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["id"] = this.id;
+        data["title"] = this.title;
+        data["type"] = this.type;
+        data["novelId"] = this.novelId;
+        data["language"] = this.language;
+        data["sourceType"] = this.sourceType;
+        data["sourceAvailable"] = this.sourceAvailable;
+        data["chapterCount"] = this.chapterCount;
+        data["novel"] = this.novel;
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
+        data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
+        data["etag"] = this.etag;
+        return data;
+    }
+}
+
+/** Workspace payload enriched with live novel metadata. */
+export interface IWorkspaceResponse {
+    id: string;
+    title: string;
+    type: WorkspaceType;
+    novelId: string;
+    language: string;
+    sourceType: WorkspaceSourceType;
+    sourceAvailable: boolean;
+    chapterCount: number;
+    novel?: Novel4;
+    createdAt: Date;
+    updatedAt: Date;
+    etag?: Etag12;
+
+    [key: string]: any;
+}
+
+/** Kinds of novel content selected by a workspace. */
+export enum WorkspaceSourceType {
+    Original = "original",
+    Translation = "translation",
+}
+
+/** Supported media workspace types. */
+export enum WorkspaceType {
+    Audio = "audio",
+}
+
+/** Title-only workspace replacement payload. */
+export class WorkspaceUpdateRequest implements IWorkspaceUpdateRequest {
+    title!: string;
+
+    constructor(data?: IWorkspaceUpdateRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.title = _data["title"];
+        }
+    }
+
+    static fromJS(data: any): WorkspaceUpdateRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new WorkspaceUpdateRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["title"] = this.title;
+        return data;
+    }
+}
+
+/** Title-only workspace replacement payload. */
+export interface IWorkspaceUpdateRequest {
+    title: string;
+}
+
 export class Continuationtoken implements IContinuationtoken {
 
     [key: string]: any;
@@ -5658,6 +6454,50 @@ export interface IAnonymous {
     [key: string]: any;
 }
 
+export class Language implements ILanguage {
+
+    [key: string]: any;
+
+    constructor(data?: ILanguage) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Language {
+        data = typeof data === 'object' ? data : {};
+        let result = new Language();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ILanguage {
+
+    [key: string]: any;
+}
+
 export class Anonymous2 implements IAnonymous2 {
 
     [key: string]: any;
@@ -5702,6 +6542,50 @@ export interface IAnonymous2 {
     [key: string]: any;
 }
 
+export class Type implements IType {
+
+    [key: string]: any;
+
+    constructor(data?: IType) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Type {
+        data = typeof data === 'object' ? data : {};
+        let result = new Type();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IType {
+
+    [key: string]: any;
+}
+
 export class Anonymous3 implements IAnonymous3 {
 
     [key: string]: any;
@@ -5742,6 +6626,50 @@ export class Anonymous3 implements IAnonymous3 {
 }
 
 export interface IAnonymous3 {
+
+    [key: string]: any;
+}
+
+export class Anonymous4 implements IAnonymous4 {
+
+    [key: string]: any;
+
+    constructor(data?: IAnonymous4) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Anonymous4 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Anonymous4();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IAnonymous4 {
 
     [key: string]: any;
 }
@@ -6318,11 +7246,11 @@ export interface ICoverImageUrl2 {
     [key: string]: any;
 }
 
-export class Language implements ILanguage {
+export class Language2 implements ILanguage2 {
 
     [key: string]: any;
 
-    constructor(data?: ILanguage) {
+    constructor(data?: ILanguage2) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -6340,9 +7268,9 @@ export class Language implements ILanguage {
         }
     }
 
-    static fromJS(data: any): Language {
+    static fromJS(data: any): Language2 {
         data = typeof data === 'object' ? data : {};
-        let result = new Language();
+        let result = new Language2();
         result.init(data);
         return result;
     }
@@ -6357,7 +7285,7 @@ export class Language implements ILanguage {
     }
 }
 
-export interface ILanguage {
+export interface ILanguage2 {
 
     [key: string]: any;
 }
@@ -6582,11 +7510,11 @@ export interface ICoverImageUrl3 {
     [key: string]: any;
 }
 
-export class Language2 implements ILanguage2 {
+export class Language3 implements ILanguage3 {
 
     [key: string]: any;
 
-    constructor(data?: ILanguage2) {
+    constructor(data?: ILanguage3) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -6604,9 +7532,9 @@ export class Language2 implements ILanguage2 {
         }
     }
 
-    static fromJS(data: any): Language2 {
+    static fromJS(data: any): Language3 {
         data = typeof data === 'object' ? data : {};
-        let result = new Language2();
+        let result = new Language3();
         result.init(data);
         return result;
     }
@@ -6621,7 +7549,7 @@ export class Language2 implements ILanguage2 {
     }
 }
 
-export interface ILanguage2 {
+export interface ILanguage3 {
 
     [key: string]: any;
 }
@@ -6934,11 +7862,11 @@ export interface ICoverImageUrl4 {
     [key: string]: any;
 }
 
-export class Language3 implements ILanguage3 {
+export class Language4 implements ILanguage4 {
 
     [key: string]: any;
 
-    constructor(data?: ILanguage3) {
+    constructor(data?: ILanguage4) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -6956,9 +7884,9 @@ export class Language3 implements ILanguage3 {
         }
     }
 
-    static fromJS(data: any): Language3 {
+    static fromJS(data: any): Language4 {
         data = typeof data === 'object' ? data : {};
-        let result = new Language3();
+        let result = new Language4();
         result.init(data);
         return result;
     }
@@ -6973,7 +7901,7 @@ export class Language3 implements ILanguage3 {
     }
 }
 
-export interface ILanguage3 {
+export interface ILanguage4 {
 
     [key: string]: any;
 }
@@ -7286,11 +8214,11 @@ export interface ICoverImageUrl5 {
     [key: string]: any;
 }
 
-export class Language4 implements ILanguage4 {
+export class Language5 implements ILanguage5 {
 
     [key: string]: any;
 
-    constructor(data?: ILanguage4) {
+    constructor(data?: ILanguage5) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -7308,9 +8236,9 @@ export class Language4 implements ILanguage4 {
         }
     }
 
-    static fromJS(data: any): Language4 {
+    static fromJS(data: any): Language5 {
         data = typeof data === 'object' ? data : {};
-        let result = new Language4();
+        let result = new Language5();
         result.init(data);
         return result;
     }
@@ -7325,7 +8253,7 @@ export class Language4 implements ILanguage4 {
     }
 }
 
-export interface ILanguage4 {
+export interface ILanguage5 {
 
     [key: string]: any;
 }
@@ -9306,6 +10234,226 @@ export class Loc implements ILoc {
 }
 
 export interface ILoc {
+
+    [key: string]: any;
+}
+
+export class Novel3 implements INovel3 {
+
+    [key: string]: any;
+
+    constructor(data?: INovel3) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Novel3 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Novel3();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface INovel3 {
+
+    [key: string]: any;
+}
+
+export class Etag11 implements IEtag11 {
+
+    [key: string]: any;
+
+    constructor(data?: IEtag11) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Etag11 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Etag11();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IEtag11 {
+
+    [key: string]: any;
+}
+
+export class ContinuationToken5 implements IContinuationToken5 {
+
+    [key: string]: any;
+
+    constructor(data?: IContinuationToken5) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): ContinuationToken5 {
+        data = typeof data === 'object' ? data : {};
+        let result = new ContinuationToken5();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IContinuationToken5 {
+
+    [key: string]: any;
+}
+
+export class Novel4 implements INovel4 {
+
+    [key: string]: any;
+
+    constructor(data?: INovel4) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Novel4 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Novel4();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface INovel4 {
+
+    [key: string]: any;
+}
+
+export class Etag12 implements IEtag12 {
+
+    [key: string]: any;
+
+    constructor(data?: IEtag12) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Etag12 {
+        data = typeof data === 'object' ? data : {};
+        let result = new Etag12();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IEtag12 {
 
     [key: string]: any;
 }
