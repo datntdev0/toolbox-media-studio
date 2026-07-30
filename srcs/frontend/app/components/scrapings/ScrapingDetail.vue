@@ -407,6 +407,10 @@ async function loadResult(taskId: string) {
 function resultFor(taskId: string) {
   return resultCache.value[cacheKey(taskId)]
 }
+
+function resultCharacterCount(taskId: string) {
+  return formatCharacterCount(resultFor(taskId)?.content || [])
+}
 </script>
 
 <template>
@@ -855,6 +859,9 @@ function resultFor(taskId: string) {
                         v-else-if="resultFor(item.task.id)"
                         class="mx-auto max-w-3xl space-y-3 py-1 text-sm/6 text-toned"
                       >
+                        <p class="text-right text-xs tabular-nums text-muted">
+                          {{ resultCharacterCount(item.task.id) }} characters
+                        </p>
                         <p
                           v-for="(paragraph, index) in resultFor(item.task.id)?.content || []"
                           :key="index"

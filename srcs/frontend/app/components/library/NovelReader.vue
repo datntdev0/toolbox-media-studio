@@ -30,6 +30,9 @@ const dirty = computed(() => editing.value && draft.value !== (content.value?.co
 const paragraphs = computed(() =>
   (content.value?.content || '').split(/\n\s*\n/g).map(item => item.trim()).filter(Boolean)
 )
+const characterCount = computed(() =>
+  formatCharacterCount(editing.value ? draft.value : content.value?.content || '')
+)
 
 watch(() => props.chapter?.id, () => {
   editing.value = false
@@ -197,6 +200,9 @@ defineExpose({ confirmDiscard, refresh: load })
             :rows="24"
             class="w-full flex-1 font-mono text-sm/7"
           />
+          <p class="text-right text-xs tabular-nums text-muted">
+            {{ characterCount }} characters
+          </p>
           <div class="sticky bottom-0 flex justify-end gap-2 border-t border-default bg-default py-3">
             <UButton
               label="Cancel"
@@ -244,6 +250,9 @@ defineExpose({ confirmDiscard, refresh: load })
           <h1 class="text-2xl font-semibold text-highlighted sm:text-3xl">
             {{ chapter.title }}
           </h1>
+          <p class="mt-2 text-xs tabular-nums text-muted">
+            {{ characterCount }} characters
+          </p>
         </header>
         <div class="space-y-5 text-base/8 text-toned sm:text-lg/9">
           <p v-for="(paragraph, index) in paragraphs" :key="index">

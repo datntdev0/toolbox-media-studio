@@ -12,13 +12,17 @@ const props = defineProps<{
 const configuration = defineModel<TranslationConfigurationInput>('configuration', {
   required: true
 })
-const previewValid = defineModel<boolean>('previewValid', { default: true })
+const previewValid = ref(false)
 const toast = useToast()
 const { previewTranslation } = useApiClient()
 const previewLoading = ref(false)
 const previewError = ref<string | null>(null)
 const previewTitle = ref('')
 const previewParagraphs = ref<string[]>([])
+const originalCharacterCount = computed(() =>
+  formatCharacterCount(previewChapter.value?.originalParagraphs || [])
+)
+const previewCharacterCount = computed(() => formatCharacterCount(previewParagraphs.value))
 
 const providerId = computed({
   get: () => configuration.value.providerId,
@@ -212,7 +216,7 @@ async function generatePreview() {
       <template #body>
         <section class="min-h-0">
           <h5 class="mb-2 text-muted font-medium">
-            Original content
+            Original content · {{ originalCharacterCount }} characters
           </h5>
           <article
             :lang="workspace.sourceLanguage.code"
@@ -233,7 +237,7 @@ async function generatePreview() {
           <div v-if="previewValid && !previewError">
             <h5 class="mb-2 flex items-center gap-2 text-muted font-medium">
               <UIcon name="lucide:circle-check" class="size-4 text-success" />
-              {{ previewTitle || `Preview generated from Chapter ${previewChapter?.number}` }}
+              {{ previewTitle || `Preview generated from Chapter ${previewChapter?.number}` }} · {{ previewCharacterCount }} characters
             </h5>
             <article
               :lang="workspace.targetLanguage.code"

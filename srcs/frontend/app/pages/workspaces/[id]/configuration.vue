@@ -16,7 +16,6 @@ definePageMeta({
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
-const previewValid = ref(false)
 const saving = ref(false)
 const loading = ref(true)
 const loadError = ref<unknown>()
@@ -108,7 +107,7 @@ async function backToWorkspace() {
 }
 
 async function save() {
-  if (!previewValid.value || !workspace.value) return
+  if (!workspace.value) return
   saving.value = true
   try {
     const updated = await useTranslationWorkspaceApi().update(workspace.value.id, {
@@ -157,7 +156,7 @@ async function save() {
           <UButton
             label="Save configuration"
             icon="lucide:save"
-            :disabled="!previewValid || !workspace"
+            :disabled="!workspace"
             :loading="saving"
             @click="save"
           />
@@ -171,7 +170,6 @@ async function save() {
       <WorkspacesConfigurationPreview
         v-else-if="workspace"
         v-model:configuration="configuration"
-        v-model:preview-valid="previewValid"
         :workspace="workspace"
         :preview-chapter-id="previewChapterId"
       />

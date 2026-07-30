@@ -50,6 +50,10 @@ const canEdit = computed(() =>
   && props.chapter.status !== 'translating'
   && props.chapter.originalParagraphs.length > 0
 )
+const originalCharacterCount = computed(() => formatCharacterCount(props.chapter.originalParagraphs))
+const translationCharacterCount = computed(() =>
+  formatCharacterCount(editing.value ? draft.value : localTranslation.value)
+)
 
 watch(() => props.chapter.id, () => {
   editing.value = false
@@ -148,7 +152,7 @@ defineExpose({ confirmDiscard, focusChapters })
               />
             </div>
             <p class="mt-0.5 truncate text-xs text-muted">
-              Chapter {{ chapter.number }} · {{ chapter.title }}
+              Chapter {{ chapter.number }} · {{ chapter.title }} · {{ originalCharacterCount }} characters
             </p>
           </div>
           <div class="flex gap-1">
@@ -258,7 +262,7 @@ defineExpose({ confirmDiscard, focusChapters })
               />
             </div>
             <p class="mt-0.5 truncate text-xs text-muted">
-              Chapter {{ chapter.number }} · {{ chapter.title }}
+              Chapter {{ chapter.number }} · {{ chapter.title }} · {{ translationCharacterCount }} characters
             </p>
           </div>
           <UButton
@@ -291,6 +295,9 @@ defineExpose({ confirmDiscard, focusChapters })
               class="w-full flex-1 font-mono text-sm/7"
               :placeholder="`Enter the ${workspace.targetLanguage.label} translation…`"
             />
+            <p class="text-right text-xs tabular-nums text-muted">
+              {{ translationCharacterCount }} characters
+            </p>
             <div class="sticky bottom-0 mt-4 flex justify-end gap-2 border-t border-default bg-default/95 py-3 backdrop-blur">
               <UButton
                 label="Cancel"
