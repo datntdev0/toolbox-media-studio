@@ -53,7 +53,7 @@ async function submit() {
       description: `“${workspace.name}” is ready for setup.`,
       color: 'success'
     })
-    await router.push(`/workspaces/${workspace.id}`)
+    await router.push(`/translations/${workspace.id}`)
   } catch (error) {
     toast.add({
       title: 'Unable to create workspace',

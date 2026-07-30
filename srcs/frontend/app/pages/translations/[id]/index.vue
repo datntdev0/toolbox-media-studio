@@ -235,7 +235,7 @@ async function navigateChapter(offset: number) {
 
 async function openConfiguration() {
   await router.push({
-    path: `/workspaces/${workspaceId.value}/configuration`,
+    path: `/translations/${workspaceId.value}/configuration`,
     query: route.query
   })
 }
@@ -383,9 +383,9 @@ onBeforeUnmount(() => {
       </template>
       <template #right>
         <UButton
-          label="Workspaces"
+          label="Translations"
           icon="lucide:arrow-left"
-          to="/workspaces/translations"
+          to="/translations"
           color="neutral"
           variant="ghost"
           size="sm"
@@ -407,9 +407,9 @@ onBeforeUnmount(() => {
       title="Unable to load workspace"
       description="The workspace could not be found or the service is unavailable."
       :actions="[{
-        label: 'Back to Workspaces',
+        label: 'Back to Translations',
         icon: 'lucide:arrow-left',
-        to: '/workspaces/translations'
+        to: '/translations'
       }]"
     />
 
@@ -511,7 +511,7 @@ onBeforeUnmount(() => {
       </template>
 
       <template #right>
-        <WorkspacesRunToolbar
+        <TranslationsRunToolbar
           v-model:range-start="rangeStart"
           v-model:range-end="rangeEnd"
           v-model:refetch="refetch"
@@ -528,7 +528,7 @@ onBeforeUnmount(() => {
       </template>
     </UDashboardToolbar>
 
-    <WorkspacesComparisonReader
+    <TranslationsComparisonReader
       v-if="workspace && selectedChapter"
       ref="comparisonRef"
       :workspace="workspace"
@@ -547,7 +547,7 @@ onBeforeUnmount(() => {
     />
   </UDashboardPanel>
 
-  <WorkspacesChapterSlideover
+  <TranslationsChapterSlideover
     v-if="workspace"
     v-model:open="chaptersOpen"
     :workspace="workspace"

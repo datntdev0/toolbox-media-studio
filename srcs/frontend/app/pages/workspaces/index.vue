@@ -1,3 +1,3 @@
 <script setup lang="ts">
-await navigateTo('/workspaces/translations', { redirectCode: 302 })
+await navigateTo('/workspaces/audios', { redirectCode: 302 })
 </script>

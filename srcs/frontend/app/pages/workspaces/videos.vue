@@ -4,7 +4,6 @@ import type { NavigationMenuItem } from '@nuxt/ui'
 definePageMeta({ title: 'Video workspaces', middleware: ['auth'] })
 
 const links = [
-  { label: 'Translations', icon: 'lucide:languages', to: '/workspaces/translations' },
   { label: 'Audios', icon: 'lucide:audio-lines', to: '/workspaces/audios' },
   { label: 'Videos', icon: 'lucide:clapperboard', to: '/workspaces/videos' }
 ] satisfies NavigationMenuItem[]

@@ -102,7 +102,7 @@ useHead(() => ({
 
 async function backToWorkspace() {
   await router.push({
-    path: `/workspaces/${workspaceId.value}`,
+    path: `/translations/${workspaceId.value}`,
     query: route.query
   })
 }
@@ -168,7 +168,7 @@ async function save() {
     <template #body>
       <USkeleton v-if="loading" class="h-96 rounded-xl" />
 
-      <WorkspacesConfigurationPreview
+      <TranslationsConfigurationPreview
         v-else-if="workspace"
         v-model:configuration="configuration"
         :workspace="workspace"

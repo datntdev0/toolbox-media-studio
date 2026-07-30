@@ -19,7 +19,15 @@ const links = [
     {
       label: 'Workspaces',
       icon: 'lucide:gallery-horizontal-end',
-      to: '/workspaces/translations',
+      to: '/workspaces',
+      onSelect: () => {
+        open.value = false
+      }
+    },
+    {
+      label: 'Translations',
+      icon: 'lucide:languages',
+      to: '/translations',
       onSelect: () => {
         open.value = false
       }

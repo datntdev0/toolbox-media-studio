@@ -45,7 +45,7 @@ const configuredModel = computed(() => props.workspace.configuration
 
     <template #title>
       <NuxtLink
-        :to="`/workspaces/${workspace.id}`"
+        :to="`/translations/${workspace.id}`"
         class="after:absolute after:inset-0 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
       >
         {{ workspace.name }}

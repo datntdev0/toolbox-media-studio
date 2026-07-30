@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { NavigationMenuItem } from '@nuxt/ui'
 import type { NovelResponse } from '~~/shared/api-services/srv-core.client'
 import type {
   TranslationApiRecord,
@@ -8,11 +7,11 @@ import type {
 import { normalizeTranslationWorkspace } from '~/composables/useTranslationWorkspaceApi'
 
 definePageMeta({
-  title: 'Workspaces',
+  title: 'Translations',
   middleware: ['auth']
 })
 
-useHead({ title: 'Workspaces' })
+useHead({ title: 'Translations' })
 
 const search = ref('')
 const createOpen = ref(false)
@@ -31,20 +30,6 @@ const editOpen = computed({
     if (!value) editingWorkspace.value = null
   }
 })
-
-const links = [{
-  label: 'Translations',
-  icon: 'lucide:languages',
-  to: '/workspaces/translations'
-}, {
-  label: 'Audios',
-  icon: 'lucide:audio-lines',
-  to: '/workspaces/audios'
-}, {
-  label: 'Videos',
-  icon: 'lucide:clapperboard',
-  to: '/workspaces/videos'
-}] satisfies NavigationMenuItem[]
 
 const filteredWorkspaces = computed(() => {
   const query = search.value.trim().toLowerCase()
@@ -124,9 +109,9 @@ async function deleteWorkspace(workspace: TranslationWorkspace) {
 </script>
 
 <template>
-  <UDashboardPanel id="workspaces">
+  <UDashboardPanel id="translations">
     <template #header>
-      <UDashboardNavbar title="Workspaces">
+      <UDashboardNavbar title="Translations">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -138,10 +123,6 @@ async function deleteWorkspace(workspace: TranslationWorkspace) {
           />
         </template>
       </UDashboardNavbar>
-
-      <UDashboardToolbar>
-        <UNavigationMenu :items="links" highlight class="-mx-1 flex-1" />
-      </UDashboardToolbar>
     </template>
 
     <template #body>
@@ -187,7 +168,7 @@ async function deleteWorkspace(workspace: TranslationWorkspace) {
           v-else-if="filteredWorkspaces.length"
           class="grid-cols-1 gap-4 sm:grid-cols-1 lg:grid-cols-1 xl:grid-cols-2"
         >
-          <WorkspacesWorkspaceCard
+          <TranslationsListItemCard
             v-for="workspace in filteredWorkspaces"
             :key="workspace.id"
             :workspace="workspace"
@@ -223,13 +204,13 @@ async function deleteWorkspace(workspace: TranslationWorkspace) {
     </template>
   </UDashboardPanel>
 
-  <WorkspacesCreateProjectModal
+  <TranslationsCreateModal
     v-model:open="createOpen"
     :novels="novels"
     @created="upsertWorkspace"
   />
 
-  <WorkspacesEditProjectModal
+  <TranslationsUpdateModal
     v-if="editingWorkspace"
     v-model:open="editOpen"
     :workspace="editingWorkspace"
