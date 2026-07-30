@@ -248,12 +248,12 @@ async function refreshWorkspace() {
   }
 }
 
-async function saveTranslationContent(content: string) {
+async function saveTranslationContent(content: string, title: string) {
   if (!workspace.value || !selectedChapter.value) {
     throw new Error('Translation chapter is unavailable')
   }
   const chapterId = selectedChapter.value.id
-  const result = await translationApi.updateResult(workspaceId.value, chapterId, content)
+  const result = await translationApi.updateResult(workspaceId.value, chapterId, content, title)
   const chapter = workspace.value.chapters.find(item => item.id === chapterId)
   if (chapter) {
     chapter.translatedParagraphs = result.content

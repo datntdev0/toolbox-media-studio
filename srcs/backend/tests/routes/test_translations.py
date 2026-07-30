@@ -478,10 +478,14 @@ def test_translation_result_can_be_manually_added_and_edited(
     created = client.put(
         f"/api/translations/{translation['id']}/result/chapter-1",
         headers=headers,
-        json={"content": "First translated paragraph\n\nSecond translated paragraph"},
+        json={
+            "title": "Translated chapter one",
+            "content": "First translated paragraph\n\nSecond translated paragraph",
+        },
     )
 
     assert created.status_code == 200
+    assert created.json()["title"] == "Translated chapter one"
     assert created.json()["content"] == [
         "First translated paragraph",
         "Second translated paragraph",
@@ -497,9 +501,10 @@ def test_translation_result_can_be_manually_added_and_edited(
     edited = client.put(
         f"/api/translations/{translation['id']}/result/chapter-1",
         headers=headers,
-        json={"content": "Replacement translation"},
+        json={"title": "Updated translated title", "content": "Replacement translation"},
     )
     assert edited.status_code == 200
+    assert edited.json()["title"] == "Updated translated title"
     assert edited.json()["content"] == ["Replacement translation"]
 
     fetched = client.get(
@@ -507,6 +512,7 @@ def test_translation_result_can_be_manually_added_and_edited(
         headers=headers,
     )
     assert fetched.status_code == 200
+    assert fetched.json()["title"] == "Updated translated title"
     assert fetched.json()["content"] == ["Replacement translation"]
 
 

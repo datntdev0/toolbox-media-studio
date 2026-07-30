@@ -180,11 +180,11 @@ export function useTranslationWorkspaceApi() {
         content: (response.content || []).map(String)
       } satisfies TranslationResult
     },
-    async updateResult(id: string, taskId: string, content: string) {
+    async updateResult(id: string, taskId: string, content: string, title: string) {
       const response = await translations.update_translation_result(
         id,
         taskId,
-        new TranslationResultUpdateRequest({ content })
+        new TranslationResultUpdateRequest({ content, title })
       )
       return {
         title: response.title,

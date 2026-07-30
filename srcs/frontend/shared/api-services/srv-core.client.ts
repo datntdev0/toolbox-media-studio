@@ -5258,6 +5258,7 @@ export interface ITranslationResultResponse {
 /** Manual translated content supplied for one chapter task. */
 export class TranslationResultUpdateRequest implements ITranslationResultUpdateRequest {
     content!: string;
+    title?: string;
 
     constructor(data?: ITranslationResultUpdateRequest) {
         if (data) {
@@ -5266,11 +5267,15 @@ export class TranslationResultUpdateRequest implements ITranslationResultUpdateR
                     (this as any)[property] = (data as any)[property];
             }
         }
+        if (!data) {
+            this.title = "";
+        }
     }
 
     init(_data?: any) {
         if (_data) {
             this.content = _data["content"];
+            this.title = _data["title"] !== undefined ? _data["title"] : "";
         }
     }
 
@@ -5284,6 +5289,7 @@ export class TranslationResultUpdateRequest implements ITranslationResultUpdateR
     toJSON(data?: any) {
         data = typeof data === 'object' ? data : {};
         data["content"] = this.content;
+        data["title"] = this.title;
         return data;
     }
 }
@@ -5291,6 +5297,7 @@ export class TranslationResultUpdateRequest implements ITranslationResultUpdateR
 /** Manual translated content supplied for one chapter task. */
 export interface ITranslationResultUpdateRequest {
     content: string;
+    title?: string;
 }
 
 /** One-based manifest range accepted by translation start. */

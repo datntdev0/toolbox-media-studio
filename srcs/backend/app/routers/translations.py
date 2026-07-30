@@ -416,7 +416,11 @@ def update_translation_result_route(
                 id=task.id,
                 translation_id=translation.id,
                 task_id=task.id,
-                title=existing.title if existing is not None else task.title,
+                title=(
+                    body.title.strip()
+                    if body.title.strip()
+                    else existing.title if existing is not None else task.title
+                ),
                 chapter_number=(
                     existing.chapter_number if existing is not None else task.chapter_number
                 ),

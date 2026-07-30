@@ -43,6 +43,7 @@ class TranslationResultUpdateRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     content: str
+    title: str = ""
 
 
 def to_translation_result_response(

@@ -12,7 +12,7 @@ const props = defineProps<{
   translationAvailable: boolean
   translationLoading: boolean
   translationLoadError: boolean
-  saveTranslation: (content: string) => Promise<TranslationResult>
+  saveTranslation: (content: string, title: string) => Promise<TranslationResult>
   originalLoading: boolean
   originalLoadError: boolean
   canPrevious: boolean
@@ -30,6 +30,7 @@ const viewMode = ref<'original' | 'translation'>('original')
 const editing = ref(false)
 const saving = ref(false)
 const draft = ref('')
+const titleDraft = ref('')
 const localTranslation = ref<string[]>([])
 const chaptersButtonRef = ref<{ $el?: HTMLElement } | null>(null)
 
@@ -39,7 +40,10 @@ const tabItems = [
 ]
 
 const dirty = computed(() =>
-  editing.value && draft.value !== localTranslation.value.join('\n\n')
+  editing.value && (
+    draft.value !== localTranslation.value.join('\n\n')
+    || titleDraft.value !== translatedChapterTitle.value
+  )
 )
 const chapterStatus = computed(() =>
   chapterStatusMeta[props.chapter.status]
@@ -59,6 +63,7 @@ watch(() => props.chapter.id, () => {
   saving.value = false
   localTranslation.value = [...props.chapter.translatedParagraphs]
   draft.value = localTranslation.value.join('\n\n')
+  titleDraft.value = translatedChapterTitle.value
   viewMode.value = 'original'
 }, { immediate: true })
 
@@ -66,10 +71,12 @@ watch(() => props.chapter.translatedParagraphs, (paragraphs) => {
   if (editing.value) return
   localTranslation.value = [...paragraphs]
   draft.value = localTranslation.value.join('\n\n')
+  titleDraft.value = translatedChapterTitle.value
 })
 
 function startEdit() {
   draft.value = localTranslation.value.join('\n\n')
+  titleDraft.value = translatedChapterTitle.value
   editing.value = true
   viewMode.value = 'translation'
 }
@@ -85,6 +92,7 @@ async function cancelEdit() {
     if (!discard) return
   }
   draft.value = localTranslation.value.join('\n\n')
+  titleDraft.value = translatedChapterTitle.value
   editing.value = false
 }
 
@@ -102,9 +110,10 @@ async function saveEdit() {
   if (saving.value) return
   saving.value = true
   try {
-    const result = await props.saveTranslation(draft.value)
+    const result = await props.saveTranslation(draft.value, titleDraft.value)
     localTranslation.value = result.content
     draft.value = localTranslation.value.join('\n\n')
+    titleDraft.value = result.title
     editing.value = false
     toast.add({
       title: 'Translation saved',
@@ -277,7 +286,7 @@ defineExpose({ confirmDiscard, focusChapters })
           </div>
           <UButton
             v-if="!editing"
-            :label="localTranslation.length ? 'Edit translation' : 'Add translation'"
+            :label="localTranslation.length ? 'Edit' : 'Create'"
             icon="lucide:pencil"
             color="neutral"
             variant="soft"
@@ -285,46 +294,43 @@ defineExpose({ confirmDiscard, focusChapters })
             :disabled="!canEdit"
             @click="startEdit"
           />
+          <UButton
+            v-if="editing"
+            label="Cancel"
+            color="neutral"
+            variant="subtle"
+            @click="cancelEdit"
+          />
+          <UButton
+            v-if="editing"
+            label="Save"
+            icon="lucide:save"
+            :loading="saving"
+            :disabled="saving"
+            @click="saveEdit"
+          />
         </header>
 
-        <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
-          <div v-if="editing" class="flex min-h-96 flex-1 flex-col p-4 sm:p-6">
-            <UAlert
-              class="mb-4"
-              color="neutral"
-              variant="subtle"
-              icon="lucide:pencil-line"
-              title="Editing translated copy"
-              description="Save to store this chapter's translated content."
-            />
-            <UTextarea
-              v-model="draft"
-              aria-label="Translated chapter content"
-              :rows="22"
-              autoresize
-              class="w-full flex-1 font-mono text-sm/7"
-              :placeholder="`Enter the ${workspace.targetLanguage.label} translation…`"
-            />
-            <p class="text-right text-xs tabular-nums text-muted">
-              {{ translationCharacterCount }} characters
-            </p>
-            <div class="sticky bottom-0 mt-4 flex justify-end gap-2 border-t border-default bg-default/95 py-3 backdrop-blur">
-              <UButton
-                label="Cancel"
-                color="neutral"
-                variant="subtle"
-                @click="cancelEdit"
-              />
-              <UButton
-                label="Save translation"
-                icon="lucide:save"
-                :loading="saving"
-                :disabled="saving"
-                @click="saveEdit"
-              />
-            </div>
-          </div>
+        <div v-if="editing" class="min-h-96 flex flex-col p-4 sm:p-6">
+          <UInput
+            v-model="titleDraft"
+            aria-label="Translated chapter title"
+            placeholder="Translated chapter title"
+            class="mb-4 w-full text-lg font-semibold"
+          />
+          <UTextarea
+            v-model="draft"
+            autoresize
+            aria-label="Translated chapter content"
+            class="flex-col flex-1 overflow-y-auto font-mono text-sm/7"
+            :placeholder="`Enter the ${workspace.targetLanguage.label} translation…`"
+          />
+          <p class="mt-1 text-right text-xs tabular-nums text-muted">
+            {{ translationCharacterCount }} characters
+          </p>
+        </div>
 
+        <div v-else class="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div
             v-if="translationLoading && !localTranslation.length"
             class="mx-auto w-full max-w-3xl space-y-4 p-8 sm:p-12"
