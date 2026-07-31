@@ -337,7 +337,7 @@ async function onNovelUpdated() {
     @bind="bindScraping"
   />
 
-  <LibraryEditNovelModal
+  <LibraryUpdateNovelModal
     v-if="editingNovel"
     v-model:open="editOpen"
     :novel="editingNovel"

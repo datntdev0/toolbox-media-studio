@@ -95,7 +95,16 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         <div class="flex items-start gap-4">
           <div class="w-48 shrink-0">
             <UFormField label="Cover image" name="coverImage">
-              <UFileUpload v-model="coverImage" variant="area" accept="image/jpeg,image/png" label="Choose cover image" description="JPEG or PNG, max 1 MB" :file-image="true" :preview="true" class="w-48 aspect-[2/3]" />
+              <UFileUpload
+                v-model="coverImage"
+                variant="area"
+                accept="image/jpeg,image/png"
+                label="Choose cover image"
+                description="JPEG or PNG, max 1 MB"
+                :file-image="true"
+                :preview="true"
+                class="w-48 aspect-[2/3]"
+              />
             </UFormField>
           </div>
           <div class="min-w-0 flex-1 space-y-4">

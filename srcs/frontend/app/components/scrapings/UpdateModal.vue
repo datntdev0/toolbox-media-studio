@@ -52,9 +52,15 @@ async function loadDetail() {
   }
 }
 
-watch(open, value => { if (value) void loadDetail() })
-watch(() => props.scrapingId, () => { if (open.value) void loadDetail() })
-watch(coverImage, file => { if (file) clearCoverImage.value = false })
+watch(open, (value) => {
+  if (value) void loadDetail()
+})
+watch(() => props.scrapingId, () => {
+  if (open.value) void loadDetail()
+})
+watch(coverImage, (file) => {
+  if (file) clearCoverImage.value = false
+})
 function populateMetadata(metadata: CrawlerMetadataResponse) {
   state.title = metadata.title
   state.author = metadata.author ? String(metadata.author) : ''
@@ -109,31 +115,82 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 </script>
 
 <template>
-  <UModal v-model:open="open" title="Edit scraping" description="Update the scraped novel metadata." :ui="{ content: 'sm:max-w-3xl' }" :dismissible="!submitting">
+  <UModal
+    v-model:open="open"
+    title="Edit scraping"
+    description="Update the scraped novel metadata."
+    :ui="{ content: 'sm:max-w-3xl' }"
+    :dismissible="!submitting"
+  >
     <template #body>
-      <div v-if="loading" class="space-y-4"><USkeleton class="h-24 w-full" /><USkeleton class="h-48 w-full" /></div>
-      <UForm v-else :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
+      <div v-if="loading" class="space-y-4">
+        <USkeleton class="h-24 w-full" /><USkeleton class="h-48 w-full" />
+      </div>
+      <UForm
+        v-else
+        :schema="schema"
+        :state="state"
+        class="space-y-4"
+        @submit="onSubmit"
+      >
         <div class="flex items-start gap-4">
           <div class="w-48 shrink-0">
             <UFormField label="Cover image" name="coverImage">
-              <UFileUpload v-model="coverImage" variant="area" accept="image/jpeg,image/png" label="Choose cover image" description="JPEG or PNG, max 1 MB" :file-image="true" :preview="true" class="w-48 aspect-[2/3]" />
+              <UFileUpload
+                v-model="coverImage"
+                variant="area"
+                accept="image/jpeg,image/png"
+                label="Choose cover image"
+                description="JPEG or PNG, max 1 MB"
+                :file-image="true"
+                :preview="true"
+                class="w-48 aspect-[2/3]"
+              />
               <UCheckbox v-if="detail?.metadata.coverImageUrl" v-model="clearCoverImage" label="Remove current cover" />
             </UFormField>
           </div>
           <div class="min-w-0 flex-1 space-y-4">
-            <UFormField label="Title" name="title" required><UInput v-model="state.title" class="w-full" autofocus /></UFormField>
+            <UFormField label="Title" name="title" required>
+              <UInput v-model="state.title" class="w-full" autofocus />
+            </UFormField>
             <div class="grid gap-4 sm:grid-cols-2">
-              <UFormField label="Author" name="author"><UInput v-model="state.author" class="w-full" /></UFormField>
-              <UFormField label="Category" name="category"><UInput v-model="state.category" class="w-full" /></UFormField>
+              <UFormField label="Author" name="author">
+                <UInput v-model="state.author" class="w-full" />
+              </UFormField>
+              <UFormField label="Category" name="category">
+                <UInput v-model="state.category" class="w-full" />
+              </UFormField>
             </div>
-            <UFormField label="Updated date" name="updatedDate"><UInput v-model="state.updatedDate" class="w-full" /></UFormField>
-            <UFormField label="Protagonists" name="protagonists" hint="Comma-separated"><UInput v-model="state.protagonists" class="w-full" /></UFormField>
+            <UFormField label="Updated date" name="updatedDate">
+              <UInput v-model="state.updatedDate" class="w-full" />
+            </UFormField>
+            <UFormField label="Protagonists" name="protagonists" hint="Comma-separated">
+              <UInput v-model="state.protagonists" class="w-full" />
+            </UFormField>
           </div>
         </div>
-        <UFormField label="Description" name="description"><UTextarea v-model="state.description" class="w-full" :rows="5" /></UFormField>
+        <UFormField label="Description" name="description">
+          <UTextarea v-model="state.description" class="w-full" :rows="5" />
+        </UFormField>
         <div class="flex justify-between gap-2">
-          <UButton label="Refetch" icon="lucide:refresh-cw" color="neutral" variant="soft" :loading="refetching" :disabled="submitting" @click="refetchMetadata" />
-          <div class="flex gap-2"><UButton label="Cancel" color="neutral" variant="subtle" :disabled="submitting" @click="open = false" /><UButton label="Save changes" type="submit" :loading="submitting" /></div>
+          <UButton
+            label="Refetch"
+            icon="lucide:refresh-cw"
+            color="neutral"
+            variant="soft"
+            :loading="refetching"
+            :disabled="submitting"
+            @click="refetchMetadata"
+          />
+          <div class="flex gap-2">
+            <UButton
+              label="Cancel"
+              color="neutral"
+              variant="subtle"
+              :disabled="submitting"
+              @click="open = false"
+            /><UButton label="Save changes" type="submit" :loading="submitting" />
+          </div>
         </div>
       </UForm>
     </template>

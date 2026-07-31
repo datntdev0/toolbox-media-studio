@@ -198,7 +198,7 @@ function onUpdated(updated: AudioWorkspace) {
     </USlideover>
   </ClientOnly>
 
-  <WorkspacesEditAudioProjectModal
+  <WorkspacesUpdateAudioProjectModal
     v-if="workspace"
     v-model:open="editOpen"
     :workspace="workspace"

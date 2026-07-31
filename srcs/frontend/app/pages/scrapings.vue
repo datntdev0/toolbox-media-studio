@@ -263,7 +263,7 @@ async function onScrapingEdited(detail: ScrapingDetailResponse) {
 </script>
 
 <template>
-  <ScrapingsScrapingList
+  <ScrapingsListLayout
     ref="listRef"
     :scrapings="scrapings"
     :selected-id="selectedId"
@@ -281,7 +281,7 @@ async function onScrapingEdited(detail: ScrapingDetailResponse) {
     @load-more="loadScrapings({ more: true })"
   />
 
-  <ScrapingsScrapingDetail
+  <ScrapingsDetailLayout
     v-if="selectedId && !isMobile"
     ref="detailRef"
     :scraping-id="selectedId"
@@ -311,7 +311,7 @@ async function onScrapingEdited(detail: ScrapingDetailResponse) {
       :ui="{ content: 'w-full max-w-3xl' }"
     >
       <template #content>
-        <ScrapingsScrapingDetail
+        <ScrapingsDetailLayout
           v-if="selectedId"
           ref="detailRef"
           :scraping-id="selectedId"
@@ -324,12 +324,12 @@ async function onScrapingEdited(detail: ScrapingDetailResponse) {
     </USlideover>
   </ClientOnly>
 
-  <ScrapingsCreateScrapingModal
+  <ScrapingsCreateModal
     v-model:open="createScrapingOpen"
     @created="onCreated"
   />
 
-  <ScrapingsEditScrapingModal
+  <ScrapingsUpdateModal
     v-model:open="editScrapingOpen"
     :scraping-id="editingScrapingId"
     @updated="onScrapingEdited"

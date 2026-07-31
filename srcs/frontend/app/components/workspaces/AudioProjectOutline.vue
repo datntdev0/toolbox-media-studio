@@ -24,8 +24,8 @@ const filteredChapters = computed(() => {
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
-    <div class="space-y-5 p-4 sm:p-5">
+  <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4 sm:p-5">
       <section aria-labelledby="audio-project-heading">
         <div class="mb-3 flex items-center justify-between gap-2">
           <h2 id="audio-project-heading" class="font-semibold text-highlighted">
@@ -84,7 +84,7 @@ const filteredChapters = computed(() => {
           />
         </div>
         <div class="flex gap-4">
-          <div class="flex h-32 w-22 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10">
+          <div class="flex w-18 h-full shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10">
             <img
               v-if="workspace.novel.coverImageUrl && !failedCover"
               :src="workspace.novel.coverImageUrl"
@@ -98,7 +98,17 @@ const filteredChapters = computed(() => {
             <h1 class="text-lg font-semibold text-highlighted">
               {{ workspace.novel.title }}
             </h1>
-            <dl class="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+            <div v-if="workspace.novel.tags.length" class="flex flex-wrap gap-1.5">
+              <UBadge
+                v-for="tag in workspace.novel.tags"
+                :key="tag"
+                :label="tag"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+              />
+            </div>
+            <dl class="flex flex-row flex-wrap justify-between gap-x-3 gap-y-2 text-sm">
               <div>
                 <dt class="text-xs text-muted">
                   Author
@@ -134,21 +144,8 @@ const filteredChapters = computed(() => {
                 </dd>
               </div>
             </dl>
-            <div v-if="workspace.novel.tags.length" class="flex flex-wrap gap-1.5">
-              <UBadge
-                v-for="tag in workspace.novel.tags"
-                :key="tag"
-                :label="tag"
-                color="neutral"
-                variant="subtle"
-                size="sm"
-              />
-            </div>
           </div>
         </div>
-        <p class="mt-3 line-clamp-4 text-sm/6 text-muted">
-          {{ workspace.novel.description || 'No description available.' }}
-        </p>
       </section>
 
       <UAlert
@@ -162,7 +159,7 @@ const filteredChapters = computed(() => {
 
       <USeparator />
 
-      <section aria-labelledby="audio-chapters-heading">
+      <section aria-labelledby="audio-chapters-heading" class="flex min-h-0 flex-1 flex-col">
         <div class="mb-3 flex items-end justify-between gap-2">
           <div>
             <h2 id="audio-chapters-heading" class="font-semibold text-highlighted">
@@ -181,7 +178,11 @@ const filteredChapters = computed(() => {
           />
         </div>
 
-        <div v-if="filteredChapters.length" class="overflow-hidden rounded-lg border border-default">
+        <div
+          v-if="filteredChapters.length"
+          aria-label="chapter-list"
+          class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-default"
+        >
           <button
             v-for="chapter in filteredChapters"
             :key="chapter.id"

@@ -293,7 +293,7 @@ async function deleteNovel(novel: NovelResponse) {
           </p>
         </div>
 
-        <LibraryEditNovelModal
+        <LibraryUpdateNovelModal
           v-if="editingNovel"
           v-model:open="isEditModalOpen"
           :novel="editingNovel"

@@ -40,35 +40,40 @@ function readValue(value: unknown, fallback = '') {
   const record = value as Record<string, unknown>
   return String(record.name ?? record.value ?? record.text ?? fallback)
 }
-
-function formatDate(value?: string | null) {
-  if (!value) return 'Not yet'
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }).format(new Date(value))
-}
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
-    <div class="space-y-5 p-4 sm:p-5">
+  <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4 sm:p-5">
       <section aria-labelledby="novel-info-heading">
         <div class="mb-3 flex items-center justify-between">
           <h2 id="novel-info-heading" class="font-semibold text-highlighted">
             Novel information
           </h2>
-          <UButton
-            label="Edit"
-            icon="lucide:pencil"
-            size="sm"
-            color="neutral"
-            variant="ghost"
-            @click="emit('edit')"
-          />
+          <div class="flex gap-2">
+            <UButton
+              label="Edit"
+              icon="lucide:pencil"
+              size="sm"
+              color="neutral"
+              variant="ghost"
+              @click="emit('edit')"
+            />
+            <UButton
+              v-if="novel.binding"
+              label="Sync"
+              icon="lucide:refresh-cw"
+              size="sm"
+              color="neutral"
+              variant="soft"
+              :loading="syncing"
+              :disabled="sourceLoading || sourceUnavailable"
+              @click="emit('sync')"
+            />
+          </div>
         </div>
         <div class="flex gap-4">
-          <div class="flex h-32 w-22 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10">
+          <div class="flex w-18 h-full shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10">
             <img
               v-if="readValue(novel.coverImageUrl) && !failedCover"
               :src="readValue(novel.coverImageUrl)"
@@ -82,7 +87,17 @@ function formatDate(value?: string | null) {
             <h1 class="text-lg font-semibold text-highlighted">
               {{ novel.title }}
             </h1>
-            <dl class="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+            <div v-if="novel.tags?.length" class="flex flex-wrap gap-1.5">
+              <UBadge
+                v-for="tag in novel.tags"
+                :key="tag"
+                :label="tag"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+              />
+            </div>
+            <dl class="flex flex-row flex-wrap justify-between gap-x-3 gap-y-2 text-sm">
               <div>
                 <dt class="text-xs text-muted">
                   Author
@@ -116,16 +131,6 @@ function formatDate(value?: string | null) {
                 </dd>
               </div>
             </dl>
-            <div v-if="novel.tags?.length" class="flex flex-wrap gap-1.5">
-              <UBadge
-                v-for="tag in novel.tags"
-                :key="tag"
-                :label="tag"
-                color="neutral"
-                variant="subtle"
-                size="sm"
-              />
-            </div>
           </div>
         </div>
         <p class="mt-3 line-clamp-4 text-sm/6 text-muted">
@@ -133,10 +138,17 @@ function formatDate(value?: string | null) {
         </p>
       </section>
 
-      <USeparator />
-
       <section aria-labelledby="binding-heading">
-        <div class="mb-3 flex items-center justify-between gap-2">
+        <div class="mb-3 flex items-center gap-2">
+          <UButton
+            v-if="novel.binding"
+            :to="`/scrapings?id=${encodeURIComponent(novel.binding.scrapingId)}`"
+            icon="lucide:external-link"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            aria-label="Open bound scraping"
+          />
           <div>
             <h2 id="binding-heading" class="font-semibold text-highlighted">
               Scraping source
@@ -145,20 +157,9 @@ function formatDate(value?: string | null) {
               Binding is permanent for this novel.
             </p>
           </div>
-          <UButton
-            v-if="novel.binding"
-            label="Sync"
-            icon="lucide:refresh-cw"
-            size="sm"
-            color="neutral"
-            variant="soft"
-            :loading="syncing"
-            :disabled="sourceLoading || sourceUnavailable"
-            @click="emit('sync')"
-          />
         </div>
 
-        <div v-if="novel.binding" class="rounded-lg border border-default bg-elevated/30 p-3">
+        <div v-if="novel.binding" class="flex flex-row gap-4 rounded-lg border border-default bg-elevated/30 p-3">
           <div class="flex items-center gap-3">
             <div class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary/10">
               <img
@@ -199,16 +200,8 @@ function formatDate(value?: string | null) {
               variant="subtle"
               size="sm"
             />
-            <UButton
-              :to="`/scrapings?id=${encodeURIComponent(novel.binding.scrapingId)}`"
-              icon="lucide:external-link"
-              color="neutral"
-              variant="ghost"
-              size="sm"
-              aria-label="Open bound scraping"
-            />
           </div>
-          <div v-if="scraping" class="mt-3 space-y-1.5">
+          <div v-if="scraping" class="flex-1 mt-3 space-y-1.5">
             <div class="flex items-center justify-between gap-2 text-xs text-muted">
               <span>Downloaded chapters</span>
               <span>{{ scraping.progress.completed }} / {{ scraping.progress.total }}</span>
@@ -219,24 +212,6 @@ function formatDate(value?: string | null) {
               size="xs"
             />
           </div>
-          <dl class="mt-3 grid grid-cols-2 gap-3 border-t border-default pt-3 text-xs">
-            <div>
-              <dt class="text-muted">
-                Source updated
-              </dt>
-              <dd class="mt-0.5 text-toned">
-                {{ formatDate(scraping?.updatedAt) }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-muted">
-                Last synced
-              </dt>
-              <dd class="mt-0.5 text-toned">
-                {{ formatDate(novel.binding.lastSyncedAt) }}
-              </dd>
-            </div>
-          </dl>
         </div>
 
         <UEmpty
@@ -252,7 +227,7 @@ function formatDate(value?: string | null) {
 
       <USeparator />
 
-      <section aria-labelledby="chapter-list-heading">
+      <section aria-labelledby="chapter-list-heading" class="flex min-h-0 flex-1 flex-col">
         <div class="mb-3 flex items-end justify-between gap-2">
           <div>
             <h2 id="chapter-list-heading" class="font-semibold text-highlighted">
@@ -271,7 +246,11 @@ function formatDate(value?: string | null) {
           />
         </div>
 
-        <div v-if="filteredChapters.length" class="overflow-hidden rounded-lg border border-default">
+        <div
+          v-if="filteredChapters.length"
+          aria-label="chapter-list"
+          class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-default"
+        >
           <button
             v-for="chapter in filteredChapters"
             :key="chapter.id"

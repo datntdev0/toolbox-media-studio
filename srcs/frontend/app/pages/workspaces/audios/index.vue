@@ -193,7 +193,7 @@ async function deleteWorkspace(workspace: AudioWorkspace) {
     @created="upsertWorkspace"
   />
 
-  <WorkspacesEditAudioProjectModal
+  <WorkspacesUpdateAudioProjectModal
     v-if="editingWorkspace"
     v-model:open="editOpen"
     :workspace="editingWorkspace"
