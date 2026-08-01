@@ -93,17 +93,6 @@ class ScrapingHandler(MessageHandler):
             return
         task = _require_task(claimed, task.id)
         self._publish_update(claimed, task_id=task.id)
-        self._logger.info(
-            "Processing Scraping task: %s",
-            {
-                "messageId": message.id,
-                "scrapingId": claimed.id,
-                "taskId": task.id,
-                "createdBy": claimed.created_by,
-                "attempt": task.attempts,
-                "refetch": event.refetch,
-            },
-        )
 
         existing = self._results.get(claimed.id, task.id)
         try:

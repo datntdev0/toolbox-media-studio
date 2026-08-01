@@ -1,0 +1,128 @@
+name: datntdev_media_studio_full
+
+# Define shared network
+networks:
+  toolbox-network:
+    driver: bridge
+
+services:
+  cosmosdb:
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-latest
+    container_name: toolbox-cosmosdb
+    # Advertise the Compose DNS name to SDK clients running in other containers.
+    command: ["--protocol", "http", "--gateway-endpoint", "cosmosdb:8081"]
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "1234:1234"
+    volumes:
+      - cosmosdb-data:/data
+    networks:
+      - toolbox-network
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: toolbox-azurite
+    command:
+      - azurite
+      - --silent
+      - --blobHost
+      - 0.0.0.0
+      - --queueHost
+      - 0.0.0.0
+      - --tableHost
+      - 0.0.0.0
+      - --location
+      - /data
+      - --debug
+      - /data/azurite.log
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+    volumes:
+      - azurite-data:/data
+    networks:
+      - toolbox-network
+    restart: unless-stopped
+
+  flaresolverr:
+    image: flaresolverr/flaresolverr
+    container_name: toolbox-flaresolverr
+    environment:
+      LOG_LEVEL: info
+      TZ: Asia/Ho_Chi_Minh
+      PORT: "8191"
+    ports:
+      - "8191:8191"
+    networks:
+      - toolbox-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ../srcs/backend
+      dockerfile: Dockerfile
+    container_name: toolbox-backend
+    ports:
+      - "8000:8000"
+    networks:
+      - toolbox-network
+    depends_on:
+      cosmosdb:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+      flaresolverr:
+        condition: service_started
+    env_file:
+      - ../srcs/backend/.env
+    environment:
+      # Override connection strings to use Docker network container names
+      FAST_AZ_CONNECTION_STRING_COSMOSDB: "AccountEndpoint=http://cosmosdb:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
+      FAST_AZ_CONNECTION_STRING_STORAGE_BLOB: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+      FAST_AZ_CONNECTION_STRING_STORAGE_QUEUE: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;QueueEndpoint=http://azurite:10001/devstoreaccount1;"
+      FAST_FLARESOLVERR_BASE_URL: "http://flaresolverr:8191/v1"
+    volumes:
+      - ./backend-logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ../srcs/frontend
+      dockerfile: Dockerfile
+    container_name: toolbox-frontend
+    ports:
+      - "3000:3000"
+    networks:
+      - toolbox-network
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      # Browser-accessible API URL (from host machine)
+      NUXT_PUBLIC_SERV_URL: "http://localhost:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  cosmosdb-data:
+  azurite-data:

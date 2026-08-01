@@ -1,0 +1,96 @@
+# Portainer stack for Docker Standalone.
+#
+# Required Portainer stack environment variables:
+#   PUBLIC_BACKEND_URL       Example: https://api.media.example.com
+#   PUBLIC_FRONTEND_URL      Example: https://media.example.com
+#   JWT_SIGNING_KEY          A long random secret
+#   DEFAULT_ADMIN_EMAIL      Initial administrator email
+#   DEFAULT_ADMIN_PASSWORD   Initial administrator password
+#   AZURE_COSMOS_CONNECTION_STRING
+#   AZURE_STORAGE_BLOB_CONNECTION_STRING
+#   AZURE_STORAGE_QUEUE_CONNECTION_STRING
+#
+# Optional Portainer stack environment variables:
+#   IMAGE_TAG                Defaults to 21f7635
+#   FRONTEND_PORT            Defaults to 3000
+#   BACKEND_PORT             Defaults to 8000
+#
+# If the GHCR packages are private, add ghcr.io as a Portainer registry first.
+
+services:
+  flaresolverr:
+    image: flaresolverr/flaresolverr
+    container_name: toolbox-flaresolverr
+    environment:
+      LOG_LEVEL: info
+      TZ: Asia/Ho_Chi_Minh
+      PORT: "8191"
+    expose:
+      - "8191"
+    networks:
+      - toolbox-network
+    restart: unless-stopped
+
+  backend:
+    image: ghcr.io/datntdev0/toolbox-media-studio-backend:${IMAGE_TAG:-21f7635}
+    pull_policy: always
+    container_name: toolbox-backend
+    ports:
+      - "${BACKEND_PORT:-8080}:8000"
+    networks:
+      - toolbox-network
+    depends_on:
+      flaresolverr:
+        condition: service_started
+    environment:
+      FAST_ENVIRONMENT: production
+      FAST_SECURITY_JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?JWT_SIGNING_KEY is required}
+      FAST_SECURITY_DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:?DEFAULT_ADMIN_EMAIL is required}
+      FAST_SECURITY_DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:?DEFAULT_ADMIN_PASSWORD is required}
+      FAST_SECURITY_CORS_ALLOWED_ORIGIN: ${PUBLIC_FRONTEND_URL:?PUBLIC_FRONTEND_URL is required}
+      FAST_AZ_CONNECTION_STRING_COSMOSDB: ${AZURE_COSMOS_CONNECTION_STRING:?AZURE_COSMOS_CONNECTION_STRING is required}
+      FAST_AZ_CONNECTION_STRING_STORAGE_BLOB: ${AZURE_STORAGE_BLOB_CONNECTION_STRING:?AZURE_STORAGE_BLOB_CONNECTION_STRING is required}
+      FAST_AZ_CONNECTION_STRING_STORAGE_QUEUE: ${AZURE_STORAGE_QUEUE_CONNECTION_STRING:?AZURE_STORAGE_QUEUE_CONNECTION_STRING is required}
+      FAST_AZ_COSMOSDB_DATABASE_NAME: ${AZURE_COSMOS_DATABASE_NAME:-datntdev.mediastudio}
+      FAST_FLARESOLVERR_BASE_URL: http://flaresolverr:8191/v1
+      FAST_AZURE_AI_FOUNDRY_ENDPOINT: ${AZURE_AI_FOUNDRY_ENDPOINT:-}
+      FAST_AZURE_AI_FOUNDRY_API_KEY: ${AZURE_AI_FOUNDRY_API_KEY:-}
+      FAST_AZURE_SPEECH_ENDPOINT: ${AZURE_SPEECH_ENDPOINT:-}
+      FAST_AZURE_SPEECH_API_KEY: ${AZURE_SPEECH_API_KEY:-}
+    volumes:
+      - backend-logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    image: ghcr.io/datntdev0/toolbox-media-studio-frontend:${IMAGE_TAG:-21f7635}
+    pull_policy: always
+    container_name: toolbox-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    networks:
+      - toolbox-network
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      NUXT_PUBLIC_SERV_URL: ${PUBLIC_BACKEND_URL:?PUBLIC_BACKEND_URL is required}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+
+networks:
+  toolbox-network:
+    driver: bridge
+
+volumes:
+  backend-logs:

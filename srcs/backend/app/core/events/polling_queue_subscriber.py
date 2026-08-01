@@ -41,11 +41,6 @@ class PollingQueueSubscriber:
         self._queue_client.ensure_exists()
         for i in range(self._workers):
             self._add_worker(i)
-        self._logger.info(
-            "Starting queue listener for '%s' with %d workers",
-            self._name,
-            self._workers,
-        )
         self._scheduler.start()
 
     def stop(self) -> None:
@@ -63,6 +58,11 @@ class PollingQueueSubscriber:
         )
 
     def _peak_message_loop(self, index: int) -> None:
+        self._logger.info(
+            "Starting queue listener for '%s' with %d workers",
+            self._name,
+            self._workers,
+        )
         while True:
             time.sleep(LISTENER_SEEK_INTERVAL_SECONDS)
             if self._stop_event.is_set():

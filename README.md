@@ -133,10 +133,33 @@ git clone https://github.com/yourusername/toolbox-media-studio.git
 cd toolbox-media-studio
 ```
 
-### 2. Start Local Infrastructure
+### 2. Choose Your Development Setup
 
-Start the Azure CosmosDB Emulator, Azurite (Blob/Queue emulator), and FlareSolverr for local
-crawler metadata fetches:
+#### Option A: Full Docker Stack (Recommended for Quick Start)
+
+Run the entire application stack in Docker containers:
+
+```bash
+# Configure backend environment variables
+cp srcs/backend/.env.example srcs/backend/.env
+# Edit srcs/backend/.env with required values
+
+# Start all services (infrastructure + backend + frontend)
+docker compose -f deploy/dockercompose.local.full.yml up -d
+```
+
+Access the application:
+- **Frontend:** `http://localhost:3000`
+- **Backend API:** `http://localhost:8000`
+- **API Docs:** `http://localhost:8000/docs`
+
+See [deploy/README.md](deploy/README.md) for detailed Docker deployment guide.
+
+#### Option B: Local Development (Infrastructure in Docker)
+
+For faster iteration during development, run infrastructure in Docker and backend/frontend locally:
+
+**Start Local Infrastructure:**
 
 ```bash
 docker compose -f deploy/dockercompose.local.infra.yml -p datntdev_media_studio_infra up -d
@@ -148,7 +171,7 @@ This starts:
 - Azurite (Queue) at `http://localhost:10001`
 - FlareSolverr at `http://localhost:8191`
 
-### 3. Setup Backend (FastAPI)
+### 3. Setup Backend (FastAPI) - Local Development
 
 ```bash
 scripts/backend.setup.sh
@@ -162,7 +185,7 @@ root `.venv`, installs the FastAPI package with dev dependencies, and creates `s
 `srcs/backend/.env.example` when missing. `backend.start.sh` activates the virtual environment and
 starts Uvicorn from `srcs/backend`. You can still run the commands manually if you prefer.
 
-### 4. Setup Frontend (Nuxt)
+### 4. Setup Frontend (Nuxt) - Local Development
 
 In a new terminal:
 
@@ -183,6 +206,8 @@ pnpm dev
 ```
 
 The web app will be available at `http://localhost:3000`.
+
+> **Note:** Steps 3 and 4 are only needed for Option B (local development). Skip these if you're using Option A (full Docker stack).
 
 ### 5. Running Tests
 

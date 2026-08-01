@@ -42,8 +42,7 @@ class AzureStorageQueueClient(PollingQueueClient):
             pass
 
     def pop(self) -> QueueMessage | None:
-        messages = list(self._queue_client.receive_messages(messages_per_page=1,visibility_timeout=1))
-        message = messages[0] if messages else None
+        message = self._queue_client.receive_message(visibility_timeout=1,timeout=10)
         if message is None:
             return None
 

@@ -1,3 +1,8 @@
+# Define shared network for all services
+networks:
+  toolbox-network:
+    driver: bridge
+
 services:
   cosmosdb:
     image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-latest
@@ -11,6 +16,14 @@ services:
       - "1234:1234"
     volumes:
       - cosmosdb-data:/data
+    networks:
+      - toolbox-network
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
     restart: unless-stopped
 
   azurite:
@@ -35,6 +48,8 @@ services:
       - "10002:10002"
     volumes:
       - azurite-data:/data
+    networks:
+      - toolbox-network
     restart: unless-stopped
 
   flaresolverr:
@@ -46,6 +61,8 @@ services:
       PORT: "8191"
     ports:
       - "8191:8191"
+    networks:
+      - toolbox-network
     restart: unless-stopped
 
 volumes:
