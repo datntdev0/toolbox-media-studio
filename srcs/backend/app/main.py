@@ -13,6 +13,7 @@ from app.core.injection import (
     provider_public_blob,
     queue_listener_scraping,
     queue_listener_translation,
+    queue_listener_workspace,
     queue_subscriber_sample,
     realtime_hub,
     repository_novel,
@@ -22,6 +23,7 @@ from app.core.injection import (
     repository_translation_result,
     repository_user,
     repository_workspace,
+    repository_workspace_result,
 )
 from app.routers import auth, health, novels, realtime, scrapings, translations, users, workspaces
 
@@ -40,6 +42,7 @@ async def lifespan(app: FastAPI):
     app.state.repository_translation = repository_translation
     app.state.repository_translation_result = repository_translation_result
     app.state.repository_workspace = repository_workspace
+    app.state.repository_workspace_result = repository_workspace_result
     app.state.repository_scraping = repository_scraping
     app.state.repository_scraping_result = repository_scraping_result
     app.state.provider_cache = provider_cache  # Backward-compatible cache provider state name
@@ -48,6 +51,7 @@ async def lifespan(app: FastAPI):
     app.state.queue_subscriber_sample = queue_subscriber_sample
     app.state.queue_listener_scraping = queue_listener_scraping
     app.state.queue_listener_translation = queue_listener_translation
+    app.state.queue_listener_workspace = queue_listener_workspace
     app.state.realtime_hub = realtime_hub
 
     from app.core.security.authentication import seed_admin_user
@@ -56,6 +60,7 @@ async def lifespan(app: FastAPI):
     queue_subscriber_sample.start()
     queue_listener_scraping.start()
     queue_listener_translation.start()
+    queue_listener_workspace.start()
 
     try:
         yield
@@ -72,6 +77,10 @@ async def lifespan(app: FastAPI):
             queue_listener_translation.stop()
         except Exception:
             logger.exception("Translation queue listener failed to stop")
+        try:
+            queue_listener_workspace.stop()
+        except Exception:
+            logger.exception("Workspace task queue listener failed to stop")
         await realtime_hub.close_all()
 
 app = FastAPI(lifespan=lifespan)

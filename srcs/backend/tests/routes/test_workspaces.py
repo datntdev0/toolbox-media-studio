@@ -13,7 +13,7 @@ from app.repositories.translation_repository import InMemoryTranslationRepositor
 from app.repositories.translation_result_repository import (
     InMemoryTranslationResultRepository,
 )
-from tests.conftest import TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD
+from tests.conftest import TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD, FakeQueuePublisher
 
 
 def test_workspace_crud_and_language_aware_chapter_reads(
@@ -253,6 +253,82 @@ def test_translated_chapter_returns_not_found_when_result_is_missing(
         headers=headers,
     )
     assert response.status_code == 404
+
+
+def test_workspace_start_and_stop_queue_available_chapters(
+    client: TestClient,
+    novel_chapter_repository: InMemoryNovelChapterRepository,
+    queue_publisher: FakeQueuePublisher,
+) -> None:
+    headers = _headers(_login(client))
+    novel = client.post(
+        "/api/novels",
+        headers=headers,
+        json={"title": "Audio task source", "language": "en"},
+    ).json()
+    novel_chapter_repository.save(_chapter(novel["id"], "chapter-1", 0))
+    novel_chapter_repository.save(_chapter(novel["id"], "chapter-2", 1))
+    workspace = client.post(
+        "/api/workspaces",
+        headers=headers,
+        json={
+            "title": "Queued audio",
+            "type": "audio",
+            "novelId": novel["id"],
+            "language": "en",
+        },
+    ).json()
+
+    started = client.patch(
+        f"/api/workspaces/{workspace['id']}/start",
+        headers=headers,
+        json={
+            "provider": "Built-in Microsoft Foundry",
+            "voice": "vi-VN-HoaiMyNeural",
+            "chapterIndexFrom": 1,
+            "chapterIndexTo": 2,
+            "refetch": True,
+        },
+    )
+    assert started.status_code == 202
+    detail = started.json()
+    assert detail["progress"]["queued"] == 2
+    assert [task["status"] for task in detail["tasks"]] == ["queued", "queued"]
+    assert all(task["provider"] == "Built-in Microsoft Foundry" for task in detail["tasks"])
+    assert [name for name, _ in queue_publisher.messages] == [
+        "workspaces-tasks",
+        "workspaces-tasks",
+    ]
+    assert queue_publisher.messages[0][1] == {
+        "schemaVersion": 1,
+        "type": "workspace.task.requested",
+        "workspaceId": workspace["id"],
+        "createdBy": queue_publisher.messages[0][1]["createdBy"],
+        "taskId": "chapter-1",
+        "provider": "Built-in Microsoft Foundry",
+        "voice": "vi-VN-HoaiMyNeural",
+        "refetch": True,
+        "enqueuedAt": queue_publisher.messages[0][1]["enqueuedAt"],
+    }
+
+    stopped = client.patch(
+        f"/api/workspaces/{workspace['id']}/stop",
+        headers=headers,
+    )
+    assert stopped.status_code == 200
+    assert stopped.json()["progress"]["queued"] == 0
+    assert stopped.json()["progress"]["created"] == 2
+
+    assert client.patch(
+        f"/api/workspaces/{workspace['id']}/start",
+        headers=headers,
+        json={
+            "provider": "foundry",
+            "voice": "voice",
+            "chapterIndexFrom": 2,
+            "chapterIndexTo": 1,
+        },
+    ).status_code == 422
 
 
 def _chapter(novel_id: str, chapter_id: str, index: int) -> NovelChapter:

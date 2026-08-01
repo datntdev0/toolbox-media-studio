@@ -16,7 +16,10 @@ from app.domain.translations import (
 )
 from app.domain.users import User, UserRole, UserStatus
 from app.domain.workspaces import (
+    WorkspaceProgress,
     WorkspaceSourceType,
+    WorkspaceTask,
+    WorkspaceTaskStatus,
     WorkspaceType,
     WorkspaceView,
 )
@@ -265,6 +268,40 @@ class WorkspaceDetailResponse(WorkspaceResponse):
     """Workspace payload including language-aware chapters."""
 
     chapters: list[NovelChapterSummaryResponse] = Field(default_factory=list)
+    progress: "WorkspaceProgressResponse"
+    tasks: list["WorkspaceTaskResponse"] = Field(default_factory=list)
+
+
+class WorkspaceProgressResponse(BaseModel):
+    """Workspace task rollup counters."""
+
+    total: int
+    created: int
+    queued: int
+    running: int
+    completed: int
+    failed: int
+
+
+class WorkspaceTaskResponse(BaseModel):
+    """One persisted workspace chapter task."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    title: str
+    chapter_number: int | None = Field(default=None, alias="chapterNumber")
+    manifest_index: int = Field(alias="manifestIndex")
+    status: WorkspaceTaskStatus
+    attempts: int
+    last_error: str | None = Field(default=None, alias="lastError")
+    result_available: bool = Field(alias="resultAvailable")
+    completed_at: datetime | None = Field(default=None, alias="completedAt")
+    source_chapter_updated_at: datetime = Field(alias="sourceChapterUpdatedAt")
+    source_updated: bool = Field(alias="sourceUpdated")
+    source_removed: bool = Field(alias="sourceRemoved")
+    provider: str | None = None
+    voice: str | None = None
 
 
 class WorkspaceListResponse(BaseModel):
@@ -475,9 +512,44 @@ def to_workspace_detail_response(view: WorkspaceView) -> WorkspaceDetailResponse
     return WorkspaceDetailResponse(
         **to_workspace_response(view).model_dump(),
         chapters=[to_novel_chapter_summary(chapter) for chapter in view.chapters],
+        progress=_to_workspace_progress_response(view.workspace.progress),
+        tasks=[_to_workspace_task_response(task) for task in view.workspace.tasks],
+    )
+
+
+def _to_workspace_progress_response(
+    progress: WorkspaceProgress,
+) -> WorkspaceProgressResponse:
+    return WorkspaceProgressResponse(
+        total=progress.total,
+        created=progress.created,
+        queued=progress.queued,
+        running=progress.running,
+        completed=progress.completed,
+        failed=progress.failed,
+    )
+
+
+def _to_workspace_task_response(task: WorkspaceTask) -> WorkspaceTaskResponse:
+    return WorkspaceTaskResponse(
+        id=task.id,
+        title=task.title,
+        chapter_number=task.chapter_number,
+        manifest_index=task.manifest_index,
+        status=task.status,
+        attempts=task.attempts,
+        last_error=task.last_error,
+        result_available=task.result_available,
+        completed_at=task.completed_at,
+        source_chapter_updated_at=task.source_chapter_updated_at,
+        source_updated=task.source_updated,
+        source_removed=task.source_removed,
+        provider=task.provider,
+        voice=task.voice,
     )
 
 
 # NovelResponse intentionally appears before the binding contract so existing
 # response definitions stay grouped; resolve that forward reference explicitly.
 NovelResponse.model_rebuild()
+WorkspaceDetailResponse.model_rebuild()

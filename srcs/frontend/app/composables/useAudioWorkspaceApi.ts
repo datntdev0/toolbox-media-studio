@@ -3,10 +3,13 @@ import type {
   AudioLanguageOption,
   AudioWorkspace,
   AudioWorkspaceChapter,
-  AudioWorkspaceNovel
+  AudioWorkspaceNovel,
+  AudioWorkspaceTask,
+  AudioWorkspaceTaskStatus
 } from '~/types/audio-workspace'
 import {
   WorkspaceCreateRequest,
+  WorkspaceStartRequest,
   WorkspaceType,
   WorkspaceUpdateRequest
 } from '~~/shared/api-services/srv-core.client'
@@ -51,6 +54,35 @@ function normalizeChapter(value: unknown): AudioWorkspaceChapter {
   }
 }
 
+const taskStatuses = new Set<AudioWorkspaceTaskStatus>([
+  'created',
+  'queued',
+  'running',
+  'completed',
+  'failed'
+])
+
+function normalizeTask(value: unknown): AudioWorkspaceTask {
+  const task = asRecord(value)
+  const status = String(task.status || 'created') as AudioWorkspaceTaskStatus
+  return {
+    id: String(task.id || ''),
+    title: String(task.title || 'Untitled chapter'),
+    chapterNumber: task.chapterNumber == null ? null : Number(task.chapterNumber),
+    manifestIndex: Number(task.manifestIndex || 0),
+    status: taskStatuses.has(status) ? status : 'created',
+    attempts: Number(task.attempts || 0),
+    lastError: task.lastError ? String(task.lastError) : null,
+    resultAvailable: Boolean(task.resultAvailable),
+    completedAt: task.completedAt ? asDateString(task.completedAt) : null,
+    sourceChapterUpdatedAt: asDateString(task.sourceChapterUpdatedAt),
+    sourceUpdated: Boolean(task.sourceUpdated),
+    sourceRemoved: Boolean(task.sourceRemoved),
+    provider: task.provider ? String(task.provider) : null,
+    voice: task.voice ? String(task.voice) : null
+  }
+}
+
 export function normalizeAudioWorkspace(value: unknown): AudioWorkspace {
   const record = asRecord(value)
   return {
@@ -66,6 +98,15 @@ export function normalizeAudioWorkspace(value: unknown): AudioWorkspace {
     chapters: Array.isArray(record.chapters)
       ? record.chapters.map(normalizeChapter)
       : [],
+    tasks: Array.isArray(record.tasks) ? record.tasks.map(normalizeTask) : [],
+    progress: {
+      total: Number(asRecord(record.progress).total || 0),
+      created: Number(asRecord(record.progress).created || 0),
+      queued: Number(asRecord(record.progress).queued || 0),
+      running: Number(asRecord(record.progress).running || 0),
+      completed: Number(asRecord(record.progress).completed || 0),
+      failed: Number(asRecord(record.progress).failed || 0)
+    },
     createdAt: asDateString(record.createdAt),
     updatedAt: asDateString(record.updatedAt)
   }
@@ -108,6 +149,26 @@ export function useAudioWorkspaceApi() {
     async delete(id: string) {
       const { workspaces } = useApiClient()
       await workspaces.delete_workspace(id)
+    },
+    async start(id: string, body: {
+      provider: string
+      voice: string
+      chapterIndexFrom: number
+      chapterIndexTo: number
+      refetch: boolean
+      force: boolean
+    }) {
+      const { workspaces } = useApiClient()
+      const response = await workspaces.start_workspace(
+        id,
+        new WorkspaceStartRequest(body)
+      )
+      return normalizeAudioWorkspace(response.toJSON())
+    },
+    async stop(id: string) {
+      const { workspaces } = useApiClient()
+      const response = await workspaces.stop_workspace(id)
+      return normalizeAudioWorkspace(response.toJSON())
     },
     async listLanguages(novelId: string) {
       const { novels } = useApiClient()

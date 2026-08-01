@@ -1762,6 +1762,106 @@ export class WorkspacesClient {
         }
         return Promise.resolve<void>(null as any);
     }
+
+    /**
+     * Start Workspace Route
+     * @return Successful Response
+     */
+    start_workspace(id: string, body: WorkspaceStartRequest): Promise<WorkspaceDetailResponse> {
+        let url_ = this.baseUrl + "/api/workspaces/{id}/start";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(body);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processStart_workspace(_response);
+        });
+    }
+
+    protected processStart_workspace(response: Response): Promise<WorkspaceDetailResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 202) {
+            return response.text().then((_responseText) => {
+            let result202: any = null;
+            let resultData202 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result202 = WorkspaceDetailResponse.fromJS(resultData202);
+            return result202;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<WorkspaceDetailResponse>(null as any);
+    }
+
+    /**
+     * Stop Workspace Route
+     * @return Successful Response
+     */
+    stop_workspace(id: string): Promise<WorkspaceDetailResponse> {
+        let url_ = this.baseUrl + "/api/workspaces/{id}/stop";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "PATCH",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processStop_workspace(_response);
+        });
+    }
+
+    protected processStop_workspace(response: Response): Promise<WorkspaceDetailResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = WorkspaceDetailResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<WorkspaceDetailResponse>(null as any);
+    }
 }
 
 export class ScrapingsClient {
@@ -6074,6 +6174,8 @@ export class WorkspaceDetailResponse implements IWorkspaceDetailResponse {
     updatedAt!: Date;
     etag?: Etag11;
     chapters?: NovelChapterSummaryResponse[];
+    progress!: WorkspaceProgressResponse;
+    tasks?: WorkspaceTaskResponse[];
 
     [key: string]: any;
 
@@ -6083,6 +6185,9 @@ export class WorkspaceDetailResponse implements IWorkspaceDetailResponse {
                 if (data.hasOwnProperty(property))
                     (this as any)[property] = (data as any)[property];
             }
+        }
+        if (!data) {
+            this.progress = new WorkspaceProgressResponse();
         }
     }
 
@@ -6108,6 +6213,12 @@ export class WorkspaceDetailResponse implements IWorkspaceDetailResponse {
                 this.chapters = [] as any;
                 for (let item of _data["chapters"])
                     this.chapters!.push(NovelChapterSummaryResponse.fromJS(item));
+            }
+            this.progress = _data["progress"] ? WorkspaceProgressResponse.fromJS(_data["progress"]) : new WorkspaceProgressResponse();
+            if (Array.isArray(_data["tasks"])) {
+                this.tasks = [] as any;
+                for (let item of _data["tasks"])
+                    this.tasks!.push(WorkspaceTaskResponse.fromJS(item));
             }
         }
     }
@@ -6142,6 +6253,12 @@ export class WorkspaceDetailResponse implements IWorkspaceDetailResponse {
             for (let item of this.chapters)
                 data["chapters"].push(item ? item.toJSON() : undefined as any);
         }
+        data["progress"] = this.progress ? this.progress.toJSON() : undefined as any;
+        if (Array.isArray(this.tasks)) {
+            data["tasks"] = [];
+            for (let item of this.tasks)
+                data["tasks"].push(item ? item.toJSON() : undefined as any);
+        }
         return data;
     }
 }
@@ -6161,6 +6278,8 @@ export interface IWorkspaceDetailResponse {
     updatedAt: Date;
     etag?: Etag11;
     chapters?: NovelChapterSummaryResponse[];
+    progress: WorkspaceProgressResponse;
+    tasks?: WorkspaceTaskResponse[];
 
     [key: string]: any;
 }
@@ -6226,6 +6345,76 @@ export class WorkspaceListResponse implements IWorkspaceListResponse {
 export interface IWorkspaceListResponse {
     items: WorkspaceResponse[];
     continuationToken?: ContinuationToken5;
+
+    [key: string]: any;
+}
+
+/** Workspace task rollup counters. */
+export class WorkspaceProgressResponse implements IWorkspaceProgressResponse {
+    total!: number;
+    created!: number;
+    queued!: number;
+    running!: number;
+    completed!: number;
+    failed!: number;
+
+    [key: string]: any;
+
+    constructor(data?: IWorkspaceProgressResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.total = _data["total"];
+            this.created = _data["created"];
+            this.queued = _data["queued"];
+            this.running = _data["running"];
+            this.completed = _data["completed"];
+            this.failed = _data["failed"];
+        }
+    }
+
+    static fromJS(data: any): WorkspaceProgressResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new WorkspaceProgressResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["total"] = this.total;
+        data["created"] = this.created;
+        data["queued"] = this.queued;
+        data["running"] = this.running;
+        data["completed"] = this.completed;
+        data["failed"] = this.failed;
+        return data;
+    }
+}
+
+/** Workspace task rollup counters. */
+export interface IWorkspaceProgressResponse {
+    total: number;
+    created: number;
+    queued: number;
+    running: number;
+    completed: number;
+    failed: number;
 
     [key: string]: any;
 }
@@ -6328,6 +6517,179 @@ export interface IWorkspaceResponse {
 export enum WorkspaceSourceType {
     Original = "original",
     Translation = "translation",
+}
+
+/** Audio task configuration and inclusive one-based chapter range. */
+export class WorkspaceStartRequest implements IWorkspaceStartRequest {
+    provider!: string;
+    voice!: string;
+    chapterIndexFrom!: number;
+    chapterIndexTo!: number;
+    refetch?: boolean;
+    force?: boolean;
+
+    constructor(data?: IWorkspaceStartRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+        if (!data) {
+            this.refetch = false;
+            this.force = false;
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.provider = _data["provider"];
+            this.voice = _data["voice"];
+            this.chapterIndexFrom = _data["chapterIndexFrom"];
+            this.chapterIndexTo = _data["chapterIndexTo"];
+            this.refetch = _data["refetch"] !== undefined ? _data["refetch"] : false;
+            this.force = _data["force"] !== undefined ? _data["force"] : false;
+        }
+    }
+
+    static fromJS(data: any): WorkspaceStartRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new WorkspaceStartRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["provider"] = this.provider;
+        data["voice"] = this.voice;
+        data["chapterIndexFrom"] = this.chapterIndexFrom;
+        data["chapterIndexTo"] = this.chapterIndexTo;
+        data["refetch"] = this.refetch;
+        data["force"] = this.force;
+        return data;
+    }
+}
+
+/** Audio task configuration and inclusive one-based chapter range. */
+export interface IWorkspaceStartRequest {
+    provider: string;
+    voice: string;
+    chapterIndexFrom: number;
+    chapterIndexTo: number;
+    refetch?: boolean;
+    force?: boolean;
+}
+
+/** One persisted workspace chapter task. */
+export class WorkspaceTaskResponse implements IWorkspaceTaskResponse {
+    id!: string;
+    title!: string;
+    chapterNumber?: ChapterNumber8;
+    manifestIndex!: number;
+    status!: WorkspaceTaskStatus;
+    attempts!: number;
+    lastError?: LastError3;
+    resultAvailable!: boolean;
+    completedAt?: CompletedAt3;
+    sourceChapterUpdatedAt!: Date;
+    sourceUpdated!: boolean;
+    sourceRemoved!: boolean;
+    provider?: Provider;
+    voice?: Voice;
+
+    [key: string]: any;
+
+    constructor(data?: IWorkspaceTaskResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.id = _data["id"];
+            this.title = _data["title"];
+            this.chapterNumber = _data["chapterNumber"];
+            this.manifestIndex = _data["manifestIndex"];
+            this.status = _data["status"];
+            this.attempts = _data["attempts"];
+            this.lastError = _data["lastError"];
+            this.resultAvailable = _data["resultAvailable"];
+            this.completedAt = _data["completedAt"];
+            this.sourceChapterUpdatedAt = _data["sourceChapterUpdatedAt"] ? new Date(_data["sourceChapterUpdatedAt"].toString()) : undefined as any;
+            this.sourceUpdated = _data["sourceUpdated"];
+            this.sourceRemoved = _data["sourceRemoved"];
+            this.provider = _data["provider"];
+            this.voice = _data["voice"];
+        }
+    }
+
+    static fromJS(data: any): WorkspaceTaskResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new WorkspaceTaskResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["id"] = this.id;
+        data["title"] = this.title;
+        data["chapterNumber"] = this.chapterNumber;
+        data["manifestIndex"] = this.manifestIndex;
+        data["status"] = this.status;
+        data["attempts"] = this.attempts;
+        data["lastError"] = this.lastError;
+        data["resultAvailable"] = this.resultAvailable;
+        data["completedAt"] = this.completedAt;
+        data["sourceChapterUpdatedAt"] = this.sourceChapterUpdatedAt ? this.sourceChapterUpdatedAt.toISOString() : undefined as any;
+        data["sourceUpdated"] = this.sourceUpdated;
+        data["sourceRemoved"] = this.sourceRemoved;
+        data["provider"] = this.provider;
+        data["voice"] = this.voice;
+        return data;
+    }
+}
+
+/** One persisted workspace chapter task. */
+export interface IWorkspaceTaskResponse {
+    id: string;
+    title: string;
+    chapterNumber?: ChapterNumber8;
+    manifestIndex: number;
+    status: WorkspaceTaskStatus;
+    attempts: number;
+    lastError?: LastError3;
+    resultAvailable: boolean;
+    completedAt?: CompletedAt3;
+    sourceChapterUpdatedAt: Date;
+    sourceUpdated: boolean;
+    sourceRemoved: boolean;
+    provider?: Provider;
+    voice?: Voice;
+
+    [key: string]: any;
+}
+
+/** Lifecycle states for one audio chapter task. */
+export enum WorkspaceTaskStatus {
+    Created = "created",
+    Queued = "queued",
+    Running = "running",
+    Completed = "completed",
+    Failed = "failed",
 }
 
 /** Supported media workspace types. */
@@ -10461,6 +10823,226 @@ export class Etag12 implements IEtag12 {
 }
 
 export interface IEtag12 {
+
+    [key: string]: any;
+}
+
+export class ChapterNumber8 implements IChapterNumber8 {
+
+    [key: string]: any;
+
+    constructor(data?: IChapterNumber8) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): ChapterNumber8 {
+        data = typeof data === 'object' ? data : {};
+        let result = new ChapterNumber8();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IChapterNumber8 {
+
+    [key: string]: any;
+}
+
+export class LastError3 implements ILastError3 {
+
+    [key: string]: any;
+
+    constructor(data?: ILastError3) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): LastError3 {
+        data = typeof data === 'object' ? data : {};
+        let result = new LastError3();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ILastError3 {
+
+    [key: string]: any;
+}
+
+export class CompletedAt3 implements ICompletedAt3 {
+
+    [key: string]: any;
+
+    constructor(data?: ICompletedAt3) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): CompletedAt3 {
+        data = typeof data === 'object' ? data : {};
+        let result = new CompletedAt3();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface ICompletedAt3 {
+
+    [key: string]: any;
+}
+
+export class Provider implements IProvider {
+
+    [key: string]: any;
+
+    constructor(data?: IProvider) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Provider {
+        data = typeof data === 'object' ? data : {};
+        let result = new Provider();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IProvider {
+
+    [key: string]: any;
+}
+
+export class Voice implements IVoice {
+
+    [key: string]: any;
+
+    constructor(data?: IVoice) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+        }
+    }
+
+    static fromJS(data: any): Voice {
+        data = typeof data === 'object' ? data : {};
+        let result = new Voice();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        return data;
+    }
+}
+
+export interface IVoice {
 
     [key: string]: any;
 }

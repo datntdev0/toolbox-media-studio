@@ -17,6 +17,9 @@ from app.repositories.translation_result_repository import (
 )
 from app.repositories.user_repository import InMemoryUserRepository
 from app.repositories.workspace_repository import InMemoryWorkspaceRepository
+from app.repositories.workspace_result_repository import (
+    InMemoryWorkspaceResultRepository,
+)
 
 TEST_ADMIN_EMAIL = "admin@example.com"
 TEST_ADMIN_PASSWORD = "s3cret-pass"
@@ -224,6 +227,13 @@ def workspace_repository() -> InMemoryWorkspaceRepository:
 
 
 @pytest.fixture
+def workspace_result_repository() -> InMemoryWorkspaceResultRepository:
+    """Shared in-memory audio workspace task results."""
+
+    return InMemoryWorkspaceResultRepository()
+
+
+@pytest.fixture
 def novel_chapter_repository() -> InMemoryNovelChapterRepository:
     """Shared in-memory novel chapters for a test app instance."""
 
@@ -286,6 +296,7 @@ def client(
     translation_repository: InMemoryTranslationRepository,
     translation_result_repository: InMemoryTranslationResultRepository,
     workspace_repository: InMemoryWorkspaceRepository,
+    workspace_result_repository: InMemoryWorkspaceResultRepository,
     novel_chapter_repository: InMemoryNovelChapterRepository,
     scraping_repository: InMemoryScrapingRepository,
     scraping_result_repository: InMemoryScrapingResultRepository,
@@ -322,6 +333,11 @@ def client(
         lambda config: workspace_repository,
     )
     monkeypatch.setattr(
+        "app.repositories.cosmosdb.cosmos_workspace_result_repository."
+        "build_cosmos_workspace_result_repository",
+        lambda config: workspace_result_repository,
+    )
+    monkeypatch.setattr(
         "app.repositories.cosmosdb.cosmos_novel_chapter_repository."
         "build_cosmos_novel_chapter_repository",
         lambda config: novel_chapter_repository,
@@ -349,6 +365,7 @@ def client(
     service_provider.repository_translation = translation_repository
     service_provider.repository_translation_result = translation_result_repository
     service_provider.repository_workspace = workspace_repository
+    service_provider.repository_workspace_result = workspace_result_repository
     service_provider.repository_novel_chapter = novel_chapter_repository
     service_provider.repository_scraping = scraping_repository
     service_provider.repository_scraping_result = scraping_result_repository
@@ -359,12 +376,14 @@ def client(
     service_provider.queue_subscriber_sample = FakeQueueListener()
     service_provider.queue_listener_scraping = FakeQueueListener()
     service_provider.queue_listener_translation = FakeQueueListener()
+    service_provider.queue_listener_workspace = FakeQueueListener()
 
     main_module.repository_user = user_repository
     main_module.repository_novel = novel_repository
     main_module.repository_translation = translation_repository
     main_module.repository_translation_result = translation_result_repository
     main_module.repository_workspace = workspace_repository
+    main_module.repository_workspace_result = workspace_result_repository
     main_module.repository_scraping = scraping_repository
     main_module.repository_scraping_result = scraping_result_repository
     main_module.provider_cache = cache_provider
@@ -374,6 +393,7 @@ def client(
     main_module.queue_subscriber_sample = FakeQueueListener()
     main_module.queue_listener_scraping = FakeQueueListener()
     main_module.queue_listener_translation = FakeQueueListener()
+    main_module.queue_listener_workspace = FakeQueueListener()
 
     monkeypatch.setattr(health_router, "_check_cosmos", lambda logger, settings: True)
     monkeypatch.setattr(health_router, "_check_blob_storage", lambda logger, settings: True)

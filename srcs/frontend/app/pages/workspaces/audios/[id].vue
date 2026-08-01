@@ -6,12 +6,23 @@ definePageMeta({ title: 'Audio workspace', middleware: ['auth'] })
 
 const route = useRoute()
 const router = useRouter()
+const toast = useToast()
+const audioApi = useAudioWorkspaceApi()
 const breakpoints = useBreakpoints(breakpointsTailwind)
 const isMobile = breakpoints.smaller('lg')
 const workspace = ref<AudioWorkspace | null>(null)
 const loading = ref(true)
 const error = ref(false)
 const editOpen = ref(false)
+const starting = ref(false)
+const stopping = ref(false)
+const provider = ref('Built-in Microsoft Foundry')
+const voice = ref('vi-VN-HoaiMyNeural')
+const chapterIndexFrom = ref(1)
+const chapterIndexTo = ref(1)
+const refetch = ref(false)
+const force = ref(false)
+let realtimeRefreshTimer: ReturnType<typeof setTimeout> | undefined
 const workspaceId = computed(() => String(route.params.id || ''))
 const selectedId = computed(() => {
   const value = route.query.chapter
@@ -48,13 +59,35 @@ async function loadWorkspace() {
   loading.value = true
   error.value = false
   try {
-    workspace.value = await useAudioWorkspaceApi().get(workspaceId.value)
+    applyWorkspace(await audioApi.get(workspaceId.value))
     if (!isMobile.value || selectedId.value) await selectDefaultChapter()
   } catch {
     workspace.value = null
     error.value = true
   } finally {
     loading.value = false
+  }
+}
+
+function applyWorkspace(nextWorkspace: AudioWorkspace) {
+  workspace.value = nextWorkspace
+  const available = nextWorkspace.chapters.filter(
+    chapter => chapter.contentAvailable && !chapter.sourceRemoved
+  )
+  const indexes = new Set(available.map(chapter => chapter.manifestIndex + 1))
+  if (!indexes.has(chapterIndexFrom.value)) {
+    chapterIndexFrom.value = (available[0]?.manifestIndex ?? 0) + 1
+  }
+  if (!indexes.has(chapterIndexTo.value)) {
+    chapterIndexTo.value = (available.at(-1)?.manifestIndex ?? 0) + 1
+  }
+}
+
+async function refreshWorkspace() {
+  try {
+    applyWorkspace(await audioApi.get(workspaceId.value))
+  } catch {
+    // Preserve the current reader while a background refresh races another update.
   }
 }
 
@@ -91,6 +124,80 @@ function onUpdated(updated: AudioWorkspace) {
     updatedAt: updated.updatedAt
   }
 }
+
+async function startWorkspace() {
+  if (!workspace.value || starting.value) return
+  if (chapterIndexFrom.value > chapterIndexTo.value) return
+  starting.value = true
+  try {
+    applyWorkspace(await audioApi.start(workspaceId.value, {
+      provider: provider.value,
+      voice: voice.value,
+      chapterIndexFrom: chapterIndexFrom.value,
+      chapterIndexTo: chapterIndexTo.value,
+      refetch: refetch.value,
+      force: force.value
+    }))
+    toast.add({
+      title: 'Audio tasks queued',
+      description: `Chapters ${chapterIndexFrom.value}–${chapterIndexTo.value} were submitted to the audio queue.`,
+      color: 'success',
+      icon: 'lucide:play'
+    })
+  } catch {
+    await refreshWorkspace()
+    toast.add({
+      title: 'Unable to publish audio tasks',
+      description: 'Queued state was preserved. Enable Force to retry tasks already queued.',
+      color: 'error',
+      icon: 'lucide:circle-alert'
+    })
+  } finally {
+    starting.value = false
+  }
+}
+
+async function stopWorkspace() {
+  if (stopping.value) return
+  stopping.value = true
+  try {
+    applyWorkspace(await audioApi.stop(workspaceId.value))
+    toast.add({
+      title: 'Queued audio tasks stopped',
+      description: 'Queued chapters were reset. A chapter already running will finish normally.',
+      color: 'success',
+      icon: 'lucide:square'
+    })
+  } catch {
+    await refreshWorkspace()
+    toast.add({
+      title: 'Unable to stop queued audio tasks',
+      description: 'The workspace changed while the stop request was applied.',
+      color: 'error',
+      icon: 'lucide:circle-alert'
+    })
+  } finally {
+    stopping.value = false
+  }
+}
+
+type WorkspaceUpdatedPayload = {
+  workspaceId: string
+  taskId?: string
+}
+
+useRealtime().onMessage<WorkspaceUpdatedPayload>('workspace.updated', ({ payload }) => {
+  if (payload.workspaceId !== workspaceId.value) return
+  if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer)
+  realtimeRefreshTimer = setTimeout(() => {
+    realtimeRefreshTimer = undefined
+    void refreshWorkspace()
+  }, 200)
+})
+
+onBeforeUnmount(() => {
+  if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer)
+})
 </script>
 
 <template>
@@ -156,13 +263,23 @@ function onUpdated(updated: AudioWorkspace) {
 
   <WorkspacesAudioChapterReader
     v-if="workspace && !isMobile"
+    v-model:provider="provider"
+    v-model:voice="voice"
+    v-model:chapter-index-from="chapterIndexFrom"
+    v-model:chapter-index-to="chapterIndexTo"
+    v-model:refetch="refetch"
+    v-model:force="force"
     :workspace="workspace"
     :chapter="selectedChapter"
     :position="selectedIndex + 1"
     :total="workspace.chapters.length"
     :can-previous="selectedIndex > 0"
     :can-next="selectedIndex >= 0 && selectedIndex < workspace.chapters.length - 1"
+    :starting="starting"
+    :stopping="stopping"
     @navigate="navigateChapter"
+    @start="startWorkspace"
+    @stop="stopWorkspace"
   />
 
   <div v-else-if="!isMobile" class="hidden flex-1 items-center justify-center p-8 lg:flex">
@@ -184,6 +301,12 @@ function onUpdated(updated: AudioWorkspace) {
       <template #content>
         <WorkspacesAudioChapterReader
           v-if="workspace && selectedChapter"
+          v-model:provider="provider"
+          v-model:voice="voice"
+          v-model:chapter-index-from="chapterIndexFrom"
+          v-model:chapter-index-to="chapterIndexTo"
+          v-model:refetch="refetch"
+          v-model:force="force"
           mobile
           :workspace="workspace"
           :chapter="selectedChapter"
@@ -191,8 +314,12 @@ function onUpdated(updated: AudioWorkspace) {
           :total="workspace.chapters.length"
           :can-previous="selectedIndex > 0"
           :can-next="selectedIndex < workspace.chapters.length - 1"
+          :starting="starting"
+          :stopping="stopping"
           @close="replaceChapter()"
           @navigate="navigateChapter"
+          @start="startWorkspace"
+          @stop="stopWorkspace"
         />
       </template>
     </USlideover>

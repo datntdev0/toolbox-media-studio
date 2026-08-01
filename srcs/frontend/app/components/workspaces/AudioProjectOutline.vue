@@ -64,6 +64,35 @@ const filteredChapters = computed(() => {
               variant="subtle"
             />
           </div>
+          <div class="space-y-1.5 pt-2">
+            <div class="flex justify-between gap-3 text-xs text-muted">
+              <span>Audio progress</span>
+              <span class="tabular-nums">
+                {{ workspace.progress.completed }} / {{ workspace.progress.total }} chapters
+              </span>
+            </div>
+            <UProgress
+              :model-value="workspace.progress.completed"
+              :max="Math.max(workspace.progress.total, 1)"
+              size="xs"
+            />
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+              <span class="inline-flex items-center gap-1.5">
+                <UIcon name="lucide:clock-3" class="size-3.5" />
+                <span class="tabular-nums">{{ workspace.progress.queued }}</span>
+                queued
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <UIcon
+                  name="lucide:loader-circle"
+                  class="size-3.5"
+                  :class="workspace.progress.running ? 'animate-spin' : undefined"
+                />
+                <span class="tabular-nums">{{ workspace.progress.running }}</span>
+                running
+              </span>
+            </div>
+          </div>
         </div>
       </section>
 

@@ -178,6 +178,27 @@ class WorkspaceUpdateRequest(BaseModel):
     title: NonBlankStr
 
 
+class WorkspaceStartRequest(BaseModel):
+    """Audio task configuration and inclusive one-based chapter range."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    provider: NonBlankStr
+    voice: NonBlankStr
+    chapter_index_from: int = Field(ge=1, alias="chapterIndexFrom")
+    chapter_index_to: int = Field(ge=1, alias="chapterIndexTo")
+    refetch: bool = False
+    force: bool = False
+
+    @model_validator(mode="after")
+    def validate_chapter_range(self) -> "WorkspaceStartRequest":
+        if self.chapter_index_from > self.chapter_index_to:
+            raise ValueError(
+                "chapterIndexFrom must be less than or equal to chapterIndexTo"
+            )
+        return self
+
+
 def to_user_entity(body: UserCreateRequest) -> User:
     """Convert a UserCreateRequest to a User entity."""
 

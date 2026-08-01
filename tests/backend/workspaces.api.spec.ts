@@ -62,6 +62,45 @@ test.describe('/api/workspaces CRUD', () => {
     expect(((await updatedResponse.json()) as { title: string }).title)
       .toBe('Updated English audio');
 
+    const invalidStartResponse = await request.patch(
+      `/api/workspaces/${workspace.id}/start`,
+      {
+        headers,
+        data: {
+          provider: 'Built-in Microsoft Foundry',
+          voice: 'vi-VN-HoaiMyNeural',
+          chapterIndexFrom: 2,
+          chapterIndexTo: 1,
+        },
+      },
+    );
+    expect(invalidStartResponse.status()).toBe(422);
+
+    const emptyStartResponse = await request.patch(
+      `/api/workspaces/${workspace.id}/start`,
+      {
+        headers,
+        data: {
+          provider: 'Built-in Microsoft Foundry',
+          voice: 'vi-VN-HoaiMyNeural',
+          chapterIndexFrom: 1,
+          chapterIndexTo: 1,
+          refetch: false,
+          force: false,
+        },
+      },
+    );
+    expect(emptyStartResponse.status()).toBe(422);
+
+    const stoppedResponse = await request.patch(
+      `/api/workspaces/${workspace.id}/stop`,
+      { headers },
+    );
+    expect(stoppedResponse.status()).toBe(200);
+    expect(
+      ((await stoppedResponse.json()) as { progress: { queued: number } }).progress.queued,
+    ).toBe(0);
+
     expect(
       (await request.delete(`/api/workspaces/${workspace.id}`, { headers })).status(),
     ).toBe(204);

@@ -13,14 +13,27 @@ const props = defineProps<{
   canPrevious: boolean
   canNext: boolean
   mobile?: boolean
+  starting?: boolean
+  stopping?: boolean
 }>()
 const emit = defineEmits<{
   close: []
   navigate: [offset: number]
+  start: []
+  stop: []
 }>()
+const provider = defineModel<string>('provider', { required: true })
+const voice = defineModel<string>('voice', { required: true })
+const chapterIndexFrom = defineModel<number>('chapterIndexFrom', { required: true })
+const chapterIndexTo = defineModel<number>('chapterIndexTo', { required: true })
+const refetch = defineModel<boolean>('refetch', { default: false })
+const force = defineModel<boolean>('force', { default: false })
 const content = ref<AudioChapterContent | null>(null)
 const loading = ref(false)
 const error = ref(false)
+const activeSegmentIndex = ref<number | null>(null)
+const playbackState = ref<'idle' | 'playing' | 'paused'>('idle')
+const playbackTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const characterCount = computed(() =>
   formatCharacterCount(content.value?.content || [])
 )
@@ -32,6 +45,7 @@ watch(
 )
 
 async function load() {
+  resetPlayback()
   content.value = null
   error.value = false
   if (!props.chapter?.contentAvailable) return
@@ -48,11 +62,70 @@ async function load() {
     loading.value = false
   }
 }
+
+function clearPlaybackTimer() {
+  if (playbackTimer.value) {
+    clearTimeout(playbackTimer.value)
+    playbackTimer.value = null
+  }
+}
+
+function resetPlayback() {
+  clearPlaybackTimer()
+  activeSegmentIndex.value = null
+  playbackState.value = 'idle'
+}
+
+function schedulePlayback() {
+  clearPlaybackTimer()
+  playbackTimer.value = setTimeout(() => {
+    playbackTimer.value = null
+    if (playbackState.value !== 'playing' || activeSegmentIndex.value === null) return
+
+    activeSegmentIndex.value = null
+    playbackState.value = 'idle'
+  }, 5000)
+}
+
+function playSegment(index: number) {
+  if (!content.value?.content[index]) return
+
+  clearPlaybackTimer()
+  activeSegmentIndex.value = index
+  playbackState.value = 'playing'
+  schedulePlayback()
+}
+
+function toggleSegmentPlayback(index: number) {
+  if (activeSegmentIndex.value === index && playbackState.value === 'playing') {
+    pausePlayback()
+    return
+  }
+
+  playSegment(index)
+}
+
+function pausePlayback() {
+  if (playbackState.value !== 'playing') return
+  clearPlaybackTimer()
+  playbackState.value = 'paused'
+}
+
+onBeforeUnmount(resetPlayback)
 </script>
 
 <template>
   <UDashboardPanel id="audio-chapter-reader">
-    <UDashboardNavbar :title="content?.title || chapter?.title || 'Chapter content'" :toggle="false">
+    <UDashboardNavbar
+      :title="content?.title || chapter?.title || 'Chapter content'"
+      :toggle="false"
+      :ui="{
+        root: 'h-auto min-w-0 flex-wrap items-start gap-y-2 py-2',
+        left: 'max-w-[calc(100%-7rem)]',
+        center: 'order-3 flex min-w-0 basis-full',
+        right: 'ml-auto'
+      }"
+    >
       <template v-if="mobile" #leading>
         <UButton
           icon="lucide:x"
@@ -84,6 +157,22 @@ async function load() {
         />
       </template>
     </UDashboardNavbar>
+
+    <UDashboardToolbar class="py-4">
+      <WorkspacesAudioRunToolbar
+        v-model:provider="provider"
+        v-model:voice="voice"
+        v-model:chapter-index-from="chapterIndexFrom"
+        v-model:chapter-index-to="chapterIndexTo"
+        v-model:refetch="refetch"
+        v-model:force="force"
+        :workspace="workspace"
+        :starting="starting"
+        :stopping="stopping"
+        @start="emit('start')"
+        @stop="emit('stop')"
+      />
+    </UDashboardToolbar>
 
     <div class="min-h-0 flex-1 overflow-y-auto">
       <div v-if="loading" class="mx-auto max-w-4xl space-y-4 p-6 sm:p-10" aria-label="Loading chapter">
@@ -129,44 +218,38 @@ async function load() {
           <section
             v-for="(line, index) in content.content"
             :key="index"
-            class="group rounded-lg border border-default bg-default p-4 sm:flex sm:items-start sm:gap-4"
+            class="group rounded-lg border p-4 transition-all duration-300 sm:flex sm:items-start sm:gap-4"
+            :class="activeSegmentIndex === index
+              ? 'border-primary/70 bg-primary/5 shadow-sm ring-1 ring-primary/30'
+              : 'border-default bg-default'"
             :aria-labelledby="`audio-line-${index}`"
+            :aria-current="activeSegmentIndex === index ? 'step' : undefined"
           >
             <div class="min-w-0 flex-1">
-              <p class="mb-2 text-xs font-medium tabular-nums text-muted">
-                Segment {{ index + 1 }}
+              <p class="mb-2 flex items-center gap-2 text-xs font-medium tabular-nums text-muted">
+                <span>Segment {{ index + 1 }}</span>
+                <span v-if="activeSegmentIndex === index" class="inline-flex items-center gap-0.5 text-primary" aria-label="Playing">
+                  <span class="h-3 w-0.5 animate-pulse rounded-full bg-current" />
+                  <span class="h-2 w-0.5 animate-pulse rounded-full bg-current [animation-delay:120ms]" />
+                  <span class="h-4 w-0.5 animate-pulse rounded-full bg-current [animation-delay:240ms]" />
+                </span>
               </p>
               <p :id="`audio-line-${index}`" class="whitespace-pre-wrap text-base/8 text-toned sm:text-lg/9">
                 {{ line }}
               </p>
             </div>
             <div class="mt-3 flex shrink-0 gap-2 sm:mt-0">
-              <UTooltip text="TTS generation is not available in this release">
-                <span>
-                  <UButton
-                    label="TTS"
-                    icon="lucide:waves"
-                    color="neutral"
-                    variant="soft"
-                    size="sm"
-                    disabled
-                    :aria-label="`Generate speech for segment ${index + 1}`"
-                  />
-                </span>
-              </UTooltip>
-              <UTooltip text="No generated audio is available">
-                <span>
-                  <UButton
-                    icon="lucide:play"
-                    color="neutral"
-                    variant="ghost"
-                    size="sm"
-                    square
-                    disabled
-                    :aria-label="`Play segment ${index + 1}`"
-                  />
-                </span>
-              </UTooltip>
+              <UButton
+                :icon="activeSegmentIndex === index && playbackState === 'playing' ? 'lucide:pause' : 'lucide:play'"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                square
+                :aria-label="activeSegmentIndex === index && playbackState === 'playing'
+                  ? `Playing segment ${index + 1}`
+                  : `Play segment ${index + 1}`"
+                @click="toggleSegmentPlayback(index)"
+              />
             </div>
           </section>
         </div>
