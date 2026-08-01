@@ -220,6 +220,15 @@ export function useAudioWorkspaceApi() {
       const { workspaces } = useApiClient()
       const response = await workspaces.get_workspace_task_result(id, taskId)
       return normalizeTaskResult(response.toJSON())
+    },
+    async exportTask(id: string, taskId: string) {
+      const { workspaces } = useApiClient()
+      const response = await workspaces.export_workspace_task_audio(id, taskId)
+      const result = response.toJSON() as Record<string, unknown>
+      return {
+        exportUrl: String(result.exportUrl || ''),
+        createdAt: String(result.createdAt || new Date().toISOString())
+      }
     }
   }
 }

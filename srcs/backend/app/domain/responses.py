@@ -337,6 +337,15 @@ class WorkspaceTaskResultResponse(BaseModel):
     updated_at: datetime = Field(alias="updatedAt")
 
 
+class WorkspaceTaskExportResponse(BaseModel):
+    """Concatenated audio export URL for a completed workspace task."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    export_url: str = Field(alias="exportUrl")
+    created_at: datetime = Field(alias="createdAt")
+
+
 def to_user_response(current_user: User) -> UserResponse:
     """Convert a User domain model to a UserResponse model."""
 

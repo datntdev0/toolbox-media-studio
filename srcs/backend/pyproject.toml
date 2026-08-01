@@ -23,6 +23,7 @@ dependencies = [
     "httpx>=0.27",
     "openai>=1.40",
     "beautifulsoup4>=4.12",
+    "ffmpeg-python>=0.2",
 ]
 
 [project.optional-dependencies]

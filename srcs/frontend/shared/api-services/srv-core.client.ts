@@ -1815,6 +1815,57 @@ export class WorkspacesClient {
     }
 
     /**
+     * Export Workspace Task Audio Route
+     * @return Successful Response
+     */
+    export_workspace_task_audio(id: string, taskId: string): Promise<WorkspaceTaskExportResponse> {
+        let url_ = this.baseUrl + "/api/workspaces/{id}/tasks/{taskId}/export";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (taskId === undefined || taskId === null)
+            throw new globalThis.Error("The parameter 'taskId' must be defined.");
+        url_ = url_.replace("{taskId}", encodeURIComponent("" + taskId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processExport_workspace_task_audio(_response);
+        });
+    }
+
+    protected processExport_workspace_task_audio(response: Response): Promise<WorkspaceTaskExportResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = WorkspaceTaskExportResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<WorkspaceTaskExportResponse>(null as any);
+    }
+
+    /**
      * Start Workspace Route
      * @return Successful Response
      */
@@ -6630,6 +6681,60 @@ export interface IWorkspaceStartRequest {
     chapterIndexTo: number;
     refetch?: boolean;
     force?: boolean;
+}
+
+/** Concatenated audio export URL for a completed workspace task. */
+export class WorkspaceTaskExportResponse implements IWorkspaceTaskExportResponse {
+    exportUrl!: string;
+    createdAt!: Date;
+
+    [key: string]: any;
+
+    constructor(data?: IWorkspaceTaskExportResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.exportUrl = _data["exportUrl"];
+            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
+        }
+    }
+
+    static fromJS(data: any): WorkspaceTaskExportResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new WorkspaceTaskExportResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["exportUrl"] = this.exportUrl;
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
+        return data;
+    }
+}
+
+/** Concatenated audio export URL for a completed workspace task. */
+export interface IWorkspaceTaskExportResponse {
+    exportUrl: string;
+    createdAt: Date;
+
+    [key: string]: any;
 }
 
 /** One persisted workspace chapter task. */

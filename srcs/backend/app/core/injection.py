@@ -13,6 +13,7 @@ from app.events.sample_handler import SampleQueueListener
 from app.events.scraping_handler import ScrapingQueueListener
 from app.events.translation_handler import TranslationQueueListener
 from app.events.workspace_handler import WorkspaceTaskQueueListener
+from app.providers.audio_export_provider import AudioExportProvider, build_audio_export_provider
 from app.providers.blob_storage_provider import PublicBlobProvider, build_public_blob_provider
 from app.providers.cache_provider import CacheProvider, build_cosmos_cache_provider
 from app.providers.proxy_service_provider import ProxyProvider, build_proxy_provider
@@ -80,6 +81,7 @@ provider_public_blob = build_public_blob_provider(config)
 provider_cache = build_cosmos_cache_provider(config)
 provider_translation_service_factory = build_translation_service_provider_factory(config)
 provider_speech_service = build_speech_service_provider(config)
+provider_audio_export = build_audio_export_provider()
 realtime_hub = RealtimeHub()
 
 # Queue publishers and subscribers can be registered
@@ -218,5 +220,6 @@ ProviderTranslationServiceFactoryDep = Annotated[
     Depends(lambda: provider_translation_service_factory),
 ]
 ProviderPublicBlobDep = Annotated[PublicBlobProvider, Depends(lambda: provider_public_blob)]
+ProviderAudioExportDep = Annotated[AudioExportProvider, Depends(lambda: provider_audio_export)]
 PollingQueuePublisherDep = Annotated[PollingQueuePublisher, Depends(lambda: queue_publisher)]
 RealtimeHubDep = Annotated[RealtimeHub, Depends(lambda: realtime_hub)]

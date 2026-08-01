@@ -68,6 +68,27 @@ class PublicBlobProvider:
         except Exception as exc:
             raise BlobStorageError("Sentence audio could not be uploaded") from exc
 
+    def upload_task_export(
+        self,
+        workspace_id: str,
+        task_id: str,
+        content: bytes,
+    ) -> str:
+        """Upload a concatenated task audio export and return its public URL."""
+
+        blob_name = f"workspaces/{workspace_id}/{task_id}/export.wav"
+        try:
+            container = self._service.get_container_client(self._container_name)
+            blob = container.get_blob_client(blob_name)
+            blob.upload_blob(
+                content,
+                overwrite=True,
+                content_settings=ContentSettings(content_type="audio/wav"),
+            )
+            return blob.url
+        except Exception as exc:
+            raise BlobStorageError("Task export audio could not be uploaded") from exc
+
 
 def build_public_blob_provider(config: Any) -> PublicBlobProvider:
     return PublicBlobProvider(config)

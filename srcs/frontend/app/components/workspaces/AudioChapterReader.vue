@@ -34,9 +34,11 @@ const loading = ref(false)
 const error = ref(false)
 const taskResult = ref<AudioWorkspaceTaskResult | null>(null)
 const resultError = ref(false)
+const exporting = ref(false)
 const activeSentenceIndex = ref<number | null>(null)
 const playbackState = ref<'idle' | 'playing' | 'paused'>('idle')
 const sequentialPlayMode = ref(false)
+const toast = useToast()
 let activeAudio: HTMLAudioElement | null = null
 let contentRequestId = 0
 let resultRequestId = 0
@@ -236,6 +238,41 @@ function stopAllSentences() {
   resetPlayback()
 }
 
+async function exportAudio() {
+  if (!narrationReady.value || !props.chapter || exporting.value) return
+  exporting.value = true
+  try {
+    const result = await useAudioWorkspaceApi().exportTask(
+      props.workspace.id,
+      props.chapter.id
+    )
+    if (result.exportUrl) {
+      const link = document.createElement('a')
+      link.href = result.exportUrl
+      link.download = `${props.workspace.title}-${props.chapter.title}.wav`
+      link.style.display = 'none'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      toast.add({
+        title: 'Export started',
+        description: 'Your audio file download should begin shortly.',
+        color: 'success',
+        icon: 'lucide:download'
+      })
+    }
+  } catch (cause) {
+    toast.add({
+      title: 'Export failed',
+      description: cause instanceof Error ? cause.message : 'Unable to export audio. Please try again.',
+      color: 'error',
+      icon: 'lucide:circle-alert'
+    })
+  } finally {
+    exporting.value = false
+  }
+}
+
 onBeforeUnmount(resetPlayback)
 </script>
 
@@ -279,6 +316,15 @@ onBeforeUnmount(resetPlayback)
           variant="ghost"
           aria-label="Stop sequential playback"
           @click="stopAllSentences"
+        />
+        <UButton
+          icon="lucide:download"
+          color="neutral"
+          variant="ghost"
+          aria-label="Export audio"
+          :disabled="!narrationReady"
+          :loading="exporting"
+          @click="exportAudio"
         />
         <UButton
           icon="lucide:chevron-left"
