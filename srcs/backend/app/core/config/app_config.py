@@ -35,6 +35,13 @@ class AiFoundrySettings:
     endpoint: str
     api_key: str
 
+
+@dataclass
+class AzureSpeechSettings:
+    endpoint: str
+    api_key: str
+    timeout_seconds: int
+
 CACHE_TTL_DEFAULT = 3600
 CACHE_TTL_CRAWLER = 3600 * 24 * 30
 
@@ -86,4 +93,9 @@ class AppConfig:
         self.ai_foundry: AiFoundrySettings = AiFoundrySettings(
             endpoint=os.environ.get("FAST_AZURE_AI_FOUNDRY_ENDPOINT", ""),
             api_key=os.environ.get("FAST_AZURE_AI_FOUNDRY_API_KEY", ""),
+        )
+        self.azure_speech: AzureSpeechSettings = AzureSpeechSettings(
+            endpoint=os.environ.get("FAST_AZURE_SPEECH_ENDPOINT", ""),
+            api_key=os.environ.get("FAST_AZURE_SPEECH_API_KEY", ""),
+            timeout_seconds=int(os.environ.get("FAST_AZURE_SPEECH_TIMEOUT_SECONDS", "60")),
         )

@@ -1764,6 +1764,57 @@ export class WorkspacesClient {
     }
 
     /**
+     * Get Workspace Task Result Route
+     * @return Successful Response
+     */
+    get_workspace_task_result(id: string, taskId: string): Promise<WorkspaceTaskResultResponse> {
+        let url_ = this.baseUrl + "/api/workspaces/{id}/tasks/{taskId}/result";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (taskId === undefined || taskId === null)
+            throw new globalThis.Error("The parameter 'taskId' must be defined.");
+        url_ = url_.replace("{taskId}", encodeURIComponent("" + taskId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGet_workspace_task_result(_response);
+        });
+    }
+
+    protected processGet_workspace_task_result(response: Response): Promise<WorkspaceTaskResultResponse> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = WorkspaceTaskResultResponse.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status === 422) {
+            return response.text().then((_responseText) => {
+            let result422: any = null;
+            let resultData422 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result422 = HTTPValidationError.fromJS(resultData422);
+            return throwException("Validation Error", status, _responseText, _headers, result422);
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<WorkspaceTaskResultResponse>(null as any);
+    }
+
+    /**
      * Start Workspace Route
      * @return Successful Response
      */
@@ -6679,6 +6730,145 @@ export interface IWorkspaceTaskResponse {
     sourceRemoved: boolean;
     provider?: Provider;
     voice?: Voice;
+
+    [key: string]: any;
+}
+
+/** Completed audio output for one workspace chapter task. */
+export class WorkspaceTaskResultResponse implements IWorkspaceTaskResultResponse {
+    taskId!: string;
+    workspaceId!: string;
+    provider!: string;
+    voice!: string;
+    sentences!: WorkspaceTaskResultSentenceResponse[];
+    createdAt!: Date;
+    updatedAt!: Date;
+
+    [key: string]: any;
+
+    constructor(data?: IWorkspaceTaskResultResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+        if (!data) {
+            this.sentences = [];
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.taskId = _data["taskId"];
+            this.workspaceId = _data["workspaceId"];
+            this.provider = _data["provider"];
+            this.voice = _data["voice"];
+            if (Array.isArray(_data["sentences"])) {
+                this.sentences = [] as any;
+                for (let item of _data["sentences"])
+                    this.sentences!.push(WorkspaceTaskResultSentenceResponse.fromJS(item));
+            }
+            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
+            this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
+        }
+    }
+
+    static fromJS(data: any): WorkspaceTaskResultResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new WorkspaceTaskResultResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["taskId"] = this.taskId;
+        data["workspaceId"] = this.workspaceId;
+        data["provider"] = this.provider;
+        data["voice"] = this.voice;
+        if (Array.isArray(this.sentences)) {
+            data["sentences"] = [];
+            for (let item of this.sentences)
+                data["sentences"].push(item ? item.toJSON() : undefined as any);
+        }
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
+        data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
+        return data;
+    }
+}
+
+/** Completed audio output for one workspace chapter task. */
+export interface IWorkspaceTaskResultResponse {
+    taskId: string;
+    workspaceId: string;
+    provider: string;
+    voice: string;
+    sentences: WorkspaceTaskResultSentenceResponse[];
+    createdAt: Date;
+    updatedAt: Date;
+
+    [key: string]: any;
+}
+
+/** One sentence audio file in a completed workspace task result. */
+export class WorkspaceTaskResultSentenceResponse implements IWorkspaceTaskResultSentenceResponse {
+    index!: number;
+    audioUrl!: string;
+
+    [key: string]: any;
+
+    constructor(data?: IWorkspaceTaskResultSentenceResponse) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            for (var property in _data) {
+                if (_data.hasOwnProperty(property))
+                    this[property] = _data[property];
+            }
+            this.index = _data["index"];
+            this.audioUrl = _data["audioUrl"];
+        }
+    }
+
+    static fromJS(data: any): WorkspaceTaskResultSentenceResponse {
+        data = typeof data === 'object' ? data : {};
+        let result = new WorkspaceTaskResultSentenceResponse();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        for (var property in this) {
+            if (this.hasOwnProperty(property))
+                data[property] = this[property];
+        }
+        data["index"] = this.index;
+        data["audioUrl"] = this.audioUrl;
+        return data;
+    }
+}
+
+/** One sentence audio file in a completed workspace task result. */
+export interface IWorkspaceTaskResultSentenceResponse {
+    index: number;
+    audioUrl: string;
 
     [key: string]: any;
 }

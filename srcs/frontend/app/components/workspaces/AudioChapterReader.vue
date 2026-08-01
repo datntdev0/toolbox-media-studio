@@ -2,7 +2,8 @@
 import type {
   AudioChapterContent,
   AudioWorkspace,
-  AudioWorkspaceChapter
+  AudioWorkspaceChapter,
+  AudioWorkspaceTaskResult
 } from '~/types/audio-workspace'
 
 const props = defineProps<{
@@ -31,84 +32,208 @@ const force = defineModel<boolean>('force', { default: false })
 const content = ref<AudioChapterContent | null>(null)
 const loading = ref(false)
 const error = ref(false)
-const activeSegmentIndex = ref<number | null>(null)
+const taskResult = ref<AudioWorkspaceTaskResult | null>(null)
+const resultError = ref(false)
+const activeSentenceIndex = ref<number | null>(null)
 const playbackState = ref<'idle' | 'playing' | 'paused'>('idle')
-const playbackTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const sequentialPlayMode = ref(false)
+let activeAudio: HTMLAudioElement | null = null
+let contentRequestId = 0
+let resultRequestId = 0
+const selectedTask = computed(() =>
+  props.workspace.tasks.find(task => task.id === props.chapter?.id) || null
+)
 const characterCount = computed(() =>
   formatCharacterCount(content.value?.content || [])
+)
+const audioUrls = computed(() => {
+  const sentenceCount = content.value?.content.length || 0
+  const result = taskResult.value
+  const task = selectedTask.value
+  if (
+    !result
+    || !task
+    || task.status !== 'completed'
+    || !task.resultAvailable
+    || task.sourceUpdated
+    || result.workspaceId !== props.workspace.id
+    || result.taskId !== task.id
+    || result.sentences.length !== sentenceCount
+  ) return []
+
+  const urls = Array<string>(sentenceCount)
+  for (const sentence of result.sentences) {
+    if (
+      !Number.isInteger(sentence.index)
+      || sentence.index < 0
+      || sentence.index >= sentenceCount
+      || !sentence.audioUrl
+      || urls[sentence.index]
+    ) return []
+    urls[sentence.index] = sentence.audioUrl
+  }
+  return urls.every(Boolean) ? urls : []
+})
+const narrationReady = computed(() =>
+  Boolean(content.value?.content.length) && audioUrls.value.length === content.value?.content.length
 )
 
 watch(
   () => [props.chapter?.id, props.workspace.language],
-  () => void load(),
+  () => void loadContent(),
   { immediate: true }
 )
 
-async function load() {
+watch(
+  () => [
+    props.chapter?.id,
+    props.workspace.language,
+    selectedTask.value?.resultAvailable,
+    selectedTask.value?.sourceUpdated,
+    selectedTask.value?.completedAt
+  ],
+  () => void loadTaskResult(),
+  { immediate: true }
+)
+
+async function loadContent() {
+  const requestId = ++contentRequestId
   resetPlayback()
   content.value = null
   error.value = false
-  if (!props.chapter?.contentAvailable) return
+  loading.value = false
+  const chapter = props.chapter
+  if (!chapter?.contentAvailable) return
   loading.value = true
   try {
-    content.value = await useAudioWorkspaceApi().getChapter(
+    const nextContent = await useAudioWorkspaceApi().getChapter(
       props.workspace.novelId,
-      props.chapter.id,
+      chapter.id,
       props.workspace.language
     )
+    if (requestId === contentRequestId) content.value = nextContent
   } catch {
-    error.value = true
+    if (requestId === contentRequestId) error.value = true
   } finally {
-    loading.value = false
+    if (requestId === contentRequestId) loading.value = false
   }
 }
 
-function clearPlaybackTimer() {
-  if (playbackTimer.value) {
-    clearTimeout(playbackTimer.value)
-    playbackTimer.value = null
+async function loadTaskResult() {
+  const requestId = ++resultRequestId
+  resetPlayback()
+  taskResult.value = null
+  resultError.value = false
+  const task = selectedTask.value
+  if (!task?.resultAvailable || task.sourceUpdated || !props.chapter) return
+
+  try {
+    const result = await useAudioWorkspaceApi().getTaskResult(
+      props.workspace.id,
+      task.id
+    )
+    if (requestId === resultRequestId) taskResult.value = result
+  } catch {
+    if (requestId === resultRequestId) resultError.value = true
   }
+}
+
+function disposeAudio() {
+  if (!activeAudio) return
+  activeAudio.onended = null
+  activeAudio.onerror = null
+  activeAudio.pause()
+  activeAudio.removeAttribute('src')
+  activeAudio.load()
+  activeAudio = null
 }
 
 function resetPlayback() {
-  clearPlaybackTimer()
-  activeSegmentIndex.value = null
+  disposeAudio()
+  activeSentenceIndex.value = null
   playbackState.value = 'idle'
+  sequentialPlayMode.value = false
 }
 
-function schedulePlayback() {
-  clearPlaybackTimer()
-  playbackTimer.value = setTimeout(() => {
-    playbackTimer.value = null
-    if (playbackState.value !== 'playing' || activeSegmentIndex.value === null) return
-
-    activeSegmentIndex.value = null
-    playbackState.value = 'idle'
-  }, 5000)
+function handlePlaybackError(audio: HTMLAudioElement) {
+  if (activeAudio !== audio) return
+  resetPlayback()
+  resultError.value = true
 }
 
-function playSegment(index: number) {
-  if (!content.value?.content[index]) return
+async function playSegment(index: number) {
+  const url = audioUrls.value[index]
+  if (!url) return
 
-  clearPlaybackTimer()
-  activeSegmentIndex.value = index
+  if (activeSentenceIndex.value === index && activeAudio) {
+    const audio = activeAudio
+    try {
+      await audio.play()
+      if (activeAudio === audio) playbackState.value = 'playing'
+    } catch {
+      handlePlaybackError(audio)
+    }
+    return
+  }
+
+  disposeAudio()
+  const audio = new Audio(url)
+  activeAudio = audio
+  activeSentenceIndex.value = index
   playbackState.value = 'playing'
-  schedulePlayback()
+  resultError.value = false
+  audio.onended = () => {
+    if (activeAudio !== audio) return
+    const nextIndex = index + 1
+    if (sequentialPlayMode.value && audioUrls.value[nextIndex]) {
+      void playSegment(nextIndex)
+      return
+    }
+    resetPlayback()
+  }
+  audio.onerror = () => handlePlaybackError(audio)
+
+  try {
+    await audio.play()
+  } catch {
+    handlePlaybackError(audio)
+  }
 }
 
-function toggleSegmentPlayback(index: number) {
-  if (activeSegmentIndex.value === index && playbackState.value === 'playing') {
+function toggleSentencePlayback(index: number) {
+  if (!audioUrls.value[index]) return
+  if (activeSentenceIndex.value === index && playbackState.value === 'playing') {
+    sequentialPlayMode.value = false
     pausePlayback()
     return
   }
 
-  playSegment(index)
+  sequentialPlayMode.value = false
+  void playSegment(index)
 }
 
 function pausePlayback() {
-  if (playbackState.value !== 'playing') return
-  clearPlaybackTimer()
+  if (playbackState.value !== 'playing' || !activeAudio) return
+  activeAudio.pause()
   playbackState.value = 'paused'
+}
+
+function playAllSentences() {
+  if (!narrationReady.value) return
+  if (playbackState.value === 'playing' && sequentialPlayMode.value) {
+    pausePlayback()
+    return
+  }
+  if (playbackState.value === 'paused' && sequentialPlayMode.value) {
+    void playSegment(activeSentenceIndex.value ?? 0)
+    return
+  }
+  sequentialPlayMode.value = true
+  void playSegment(0)
+}
+
+function stopAllSentences() {
+  resetPlayback()
 }
 
 onBeforeUnmount(resetPlayback)
@@ -139,6 +264,22 @@ onBeforeUnmount(resetPlayback)
         <span v-if="chapter" class="hidden text-xs text-muted sm:inline">
           {{ position }} / {{ total }}
         </span>
+        <UButton
+          :icon="sequentialPlayMode && playbackState === 'playing' ? 'lucide:pause' : 'lucide:play'"
+          :color="sequentialPlayMode ? 'primary' : 'neutral'"
+          variant="ghost"
+          :aria-label="sequentialPlayMode && playbackState === 'playing' ? 'Pause all sentences' : 'Play all sentences'"
+          :disabled="!narrationReady"
+          @click="playAllSentences"
+        />
+        <UButton
+          v-if="sequentialPlayMode"
+          icon="lucide:stop-circle"
+          color="neutral"
+          variant="ghost"
+          aria-label="Stop sequential playback"
+          @click="stopAllSentences"
+        />
         <UButton
           icon="lucide:chevron-left"
           color="neutral"
@@ -188,7 +329,7 @@ onBeforeUnmount(resetPlayback)
           icon="lucide:circle-alert"
           title="Unable to load chapter"
           description="The selected language content could not be opened."
-          :actions="[{ label: 'Retry', color: 'error', variant: 'soft', onClick: load }]"
+          :actions="[{ label: 'Retry', color: 'error', variant: 'soft', onClick: loadContent }]"
         />
       </div>
 
@@ -210,25 +351,39 @@ onBeforeUnmount(resetPlayback)
             {{ content.title }}
           </h1>
           <p class="mt-2 text-xs tabular-nums text-muted">
-            {{ content.content.length }} segments · {{ characterCount }} characters
+            {{ content.content.length }} sentences · {{ characterCount }} characters
           </p>
         </header>
+
+        <UAlert
+          v-if="resultError"
+          class="mb-6"
+          color="warning"
+          variant="subtle"
+          icon="lucide:audio-lines"
+          title="Narration unavailable"
+          description="The chapter text is still available, but its audio could not be loaded or played."
+        />
 
         <div v-if="content.content.length" class="space-y-3">
           <section
             v-for="(line, index) in content.content"
             :key="index"
             class="group rounded-lg border p-4 transition-all duration-300 sm:flex sm:items-start sm:gap-4"
-            :class="activeSegmentIndex === index
+            :class="activeSentenceIndex === index
               ? 'border-primary/70 bg-primary/5 shadow-sm ring-1 ring-primary/30'
               : 'border-default bg-default'"
             :aria-labelledby="`audio-line-${index}`"
-            :aria-current="activeSegmentIndex === index ? 'step' : undefined"
+            :aria-current="activeSentenceIndex === index ? 'step' : undefined"
           >
             <div class="min-w-0 flex-1">
               <p class="mb-2 flex items-center gap-2 text-xs font-medium tabular-nums text-muted">
-                <span>Segment {{ index + 1 }}</span>
-                <span v-if="activeSegmentIndex === index" class="inline-flex items-center gap-0.5 text-primary" aria-label="Playing">
+                <span>Sentence {{ index + 1 }}</span>
+                <span
+                  v-if="activeSentenceIndex === index && playbackState === 'playing'"
+                  class="inline-flex items-center gap-0.5 text-primary"
+                  aria-label="Playing"
+                >
                   <span class="h-3 w-0.5 animate-pulse rounded-full bg-current" />
                   <span class="h-2 w-0.5 animate-pulse rounded-full bg-current [animation-delay:120ms]" />
                   <span class="h-4 w-0.5 animate-pulse rounded-full bg-current [animation-delay:240ms]" />
@@ -240,15 +395,16 @@ onBeforeUnmount(resetPlayback)
             </div>
             <div class="mt-3 flex shrink-0 gap-2 sm:mt-0">
               <UButton
-                :icon="activeSegmentIndex === index && playbackState === 'playing' ? 'lucide:pause' : 'lucide:play'"
+                :icon="activeSentenceIndex === index && playbackState === 'playing' ? 'lucide:pause' : 'lucide:play'"
                 color="neutral"
                 variant="ghost"
                 size="sm"
                 square
-                :aria-label="activeSegmentIndex === index && playbackState === 'playing'
-                  ? `Playing segment ${index + 1}`
-                  : `Play segment ${index + 1}`"
-                @click="toggleSegmentPlayback(index)"
+                :disabled="!audioUrls[index]"
+                :aria-label="activeSentenceIndex === index && playbackState === 'playing'
+                  ? `Playing sentence ${index + 1}`
+                  : `Play sentence ${index + 1}`"
+                @click="toggleSentencePlayback(index)"
               />
             </div>
           </section>

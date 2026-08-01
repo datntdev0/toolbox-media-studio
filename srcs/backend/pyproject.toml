@@ -11,6 +11,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
     "azure-cosmos>=4.7",
+    "azure-cognitiveservices-speech>=1.46",
     "azure-storage-blob>=12.24",
     "azure-storage-queue>=12.11",
     "apscheduler>=3.11,<4",

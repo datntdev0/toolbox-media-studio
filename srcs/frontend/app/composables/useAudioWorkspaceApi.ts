@@ -5,6 +5,7 @@ import type {
   AudioWorkspaceChapter,
   AudioWorkspaceNovel,
   AudioWorkspaceTask,
+  AudioWorkspaceTaskResult,
   AudioWorkspaceTaskStatus
 } from '~/types/audio-workspace'
 import {
@@ -80,6 +81,27 @@ function normalizeTask(value: unknown): AudioWorkspaceTask {
     sourceRemoved: Boolean(task.sourceRemoved),
     provider: task.provider ? String(task.provider) : null,
     voice: task.voice ? String(task.voice) : null
+  }
+}
+
+function normalizeTaskResult(value: unknown): AudioWorkspaceTaskResult {
+  const result = asRecord(value)
+  return {
+    taskId: String(result.taskId || ''),
+    workspaceId: String(result.workspaceId || ''),
+    provider: String(result.provider || ''),
+    voice: String(result.voice || ''),
+    sentences: Array.isArray(result.sentences)
+      ? result.sentences.map((value) => {
+          const sentence = asRecord(value)
+          return {
+            index: Number(sentence.index),
+            audioUrl: String(sentence.audioUrl || '')
+          }
+        })
+      : [],
+    createdAt: asDateString(result.createdAt),
+    updatedAt: asDateString(result.updatedAt)
   }
 }
 
@@ -193,6 +215,11 @@ export function useAudioWorkspaceApi() {
           : Number(response.chapterNumber),
         content: (response.content || []).map(String)
       } satisfies AudioChapterContent
+    },
+    async getTaskResult(id: string, taskId: string) {
+      const { workspaces } = useApiClient()
+      const response = await workspaces.get_workspace_task_result(id, taskId)
+      return normalizeTaskResult(response.toJSON())
     }
   }
 }

@@ -8,7 +8,7 @@ from datetime import datetime
 
 @dataclass(slots=True)
 class WorkspaceResult:
-    """Ordered sentence hashes for one workspace chapter task."""
+    """Ordered sentence hashes and audio URLs for one workspace chapter task."""
 
     id: str
     workspace_id: str
@@ -18,4 +18,5 @@ class WorkspaceResult:
     created_at: datetime
     updated_at: datetime
     content_key: list[str] = field(default_factory=list)
+    audio_urls: list[str] = field(default_factory=list)
     etag: str | None = None

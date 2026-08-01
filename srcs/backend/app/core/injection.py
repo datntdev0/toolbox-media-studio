@@ -16,6 +16,7 @@ from app.events.workspace_handler import WorkspaceTaskQueueListener
 from app.providers.blob_storage_provider import PublicBlobProvider, build_public_blob_provider
 from app.providers.cache_provider import CacheProvider, build_cosmos_cache_provider
 from app.providers.proxy_service_provider import ProxyProvider, build_proxy_provider
+from app.providers.speech_service_provider import build_speech_service_provider
 from app.providers.translation_service_provider import (
     TranslationServiceProviderFactory,
     build_translation_service_provider_factory,
@@ -78,6 +79,7 @@ provider_proxy = build_proxy_provider(config)
 provider_public_blob = build_public_blob_provider(config)
 provider_cache = build_cosmos_cache_provider(config)
 provider_translation_service_factory = build_translation_service_provider_factory(config)
+provider_speech_service = build_speech_service_provider(config)
 realtime_hub = RealtimeHub()
 
 # Queue publishers and subscribers can be registered
@@ -181,6 +183,8 @@ queue_listener_workspace = WorkspaceTaskQueueListener(
     workspace_repository=repository_workspace,
     workspace_result_repository=repository_workspace_result,
     novel_language_service=_get_novel_language_service(),
+    speech_provider=provider_speech_service,
+    blob_provider=provider_public_blob,
     realtime_hub=realtime_hub,
     workers=1,
 )

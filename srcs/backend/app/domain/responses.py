@@ -15,6 +15,7 @@ from app.domain.translations import (
     TranslationView,
 )
 from app.domain.users import User, UserRole, UserStatus
+from app.domain.workspace_results import WorkspaceResult
 from app.domain.workspaces import (
     WorkspaceProgress,
     WorkspaceSourceType,
@@ -313,6 +314,29 @@ class WorkspaceListResponse(BaseModel):
     continuation_token: str | None = Field(default=None, alias="continuationToken")
 
 
+class WorkspaceTaskResultSentenceResponse(BaseModel):
+    """One sentence audio file in a completed workspace task result."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    index: int
+    audio_url: str = Field(alias="audioUrl")
+
+
+class WorkspaceTaskResultResponse(BaseModel):
+    """Completed audio output for one workspace chapter task."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    task_id: str = Field(alias="taskId")
+    workspace_id: str = Field(alias="workspaceId")
+    provider: str
+    voice: str
+    sentences: list[WorkspaceTaskResultSentenceResponse]
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")
+
+
 def to_user_response(current_user: User) -> UserResponse:
     """Convert a User domain model to a UserResponse model."""
 
@@ -546,6 +570,25 @@ def _to_workspace_task_response(task: WorkspaceTask) -> WorkspaceTaskResponse:
         source_removed=task.source_removed,
         provider=task.provider,
         voice=task.voice,
+    )
+
+
+def to_workspace_task_result_response(
+    result: WorkspaceResult,
+) -> WorkspaceTaskResultResponse:
+    """Convert a complete workspace result to its indexed API representation."""
+
+    return WorkspaceTaskResultResponse(
+        task_id=result.task_id,
+        workspace_id=result.workspace_id,
+        provider=result.provider,
+        voice=result.voice,
+        sentences=[
+            WorkspaceTaskResultSentenceResponse(index=index, audio_url=audio_url)
+            for index, audio_url in enumerate(result.audio_urls)
+        ],
+        created_at=result.created_at,
+        updated_at=result.updated_at,
     )
 
 

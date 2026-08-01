@@ -2,12 +2,13 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body, HTTPException, Query, Response, status
+from fastapi import APIRouter, Body, HTTPException, Path, Query, Response, status
 
 from app.core.injection import (
     PollingQueuePublisherDep,
     RealtimeHubDep,
     RepositoryWorkspaceDep,
+    RepositoryWorkspaceResultDep,
     ServiceWorkspaceDep,
 )
 from app.core.security.authorization import SessionUser
@@ -21,8 +22,10 @@ from app.domain.responses import (
     WorkspaceDetailResponse,
     WorkspaceListResponse,
     WorkspaceResponse,
+    WorkspaceTaskResultResponse,
     to_workspace_detail_response,
     to_workspace_response,
+    to_workspace_task_result_response,
 )
 from app.domain.workspaces import WorkspaceType
 from app.events.workspace_handler import (
@@ -117,6 +120,59 @@ def get_workspace_route(
             detail="Workspace not found",
         )
     return to_workspace_detail_response(view)
+
+
+@router.get(
+    "/{id}/tasks/{taskId}/result",
+    response_model=WorkspaceTaskResultResponse,
+    operation_id="get_workspace_task_result",
+)
+def get_workspace_task_result_route(
+    session_user: SessionUser,
+    repository_workspace: RepositoryWorkspaceDep,
+    repository_workspace_result: RepositoryWorkspaceResultDep,
+    id: str,
+    task_id: Annotated[str, Path(alias="taskId")],
+) -> WorkspaceTaskResultResponse:
+    """Return sentence audio URLs for one completed workspace task."""
+
+    del session_user
+    try:
+        workspace = repository_workspace.get_by_id(id)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Workspace is unavailable",
+        ) from exc
+    if workspace is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found",
+        )
+    task = next((item for item in workspace.tasks if item.id == task_id), None)
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace task not found",
+        )
+    if not task.result_available or task.source_updated:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace task result is not available",
+        )
+    try:
+        result = repository_workspace_result.get(workspace.id, task.id)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Workspace task result is unavailable",
+        ) from exc
+    if result is None or len(result.content_key) != len(result.audio_urls):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Workspace task result is unavailable",
+        )
+    return to_workspace_task_result_response(result)
 
 
 @router.put(

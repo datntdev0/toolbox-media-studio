@@ -69,6 +69,7 @@ class CosmosWorkspaceResultRepository:
             "provider": result.provider,
             "voice": result.voice,
             "contentKey": result.content_key,
+            "audioUrls": result.audio_urls,
             "createdAt": result.created_at.isoformat(),
             "updatedAt": result.updated_at.isoformat(),
         }
@@ -82,6 +83,7 @@ class CosmosWorkspaceResultRepository:
             provider=cast(str, item["provider"]),
             voice=cast(str, item["voice"]),
             content_key=list(cast(list[str], item.get("contentKey", []))),
+            audio_urls=list(cast(list[str], item.get("audioUrls", []))),
             created_at=datetime.fromisoformat(cast(str, item["createdAt"])),
             updated_at=datetime.fromisoformat(cast(str, item["updatedAt"])),
             etag=cast(str | None, item.get("_etag")),

@@ -19,7 +19,11 @@ from app.domain.workspaces import (
     WorkspaceTaskStatus,
     WorkspaceType,
 )
-from app.events.workspace_handler import WorkspaceTaskHandler, build_workspace_task_event
+from app.events.workspace_handler import (
+    MICROSOFT_FOUNDRY_SPEECH_PROVIDER,
+    WorkspaceTaskHandler,
+    build_workspace_task_event,
+)
 from app.repositories.novel_chapter_repository import InMemoryNovelChapterRepository
 from app.repositories.novel_repository import InMemoryNovelRepository
 from app.repositories.translation_repository import InMemoryTranslationRepository
@@ -40,16 +44,46 @@ class RecordingWorkspaceResultRepository(InMemoryWorkspaceResultRepository):
         return saved
 
 
+class FakeSpeechProvider:
+    def __init__(self, fail_at: int | None = None) -> None:
+        self.calls: list[tuple[str, str]] = []
+        self._fail_at = fail_at
+
+    def synthesize(self, text: str, voice: str) -> bytes:
+        call_index = len(self.calls)
+        self.calls.append((text, voice))
+        if call_index == self._fail_at:
+            raise RuntimeError("mock TTS failure")
+        return f"audio:{voice}:{text}".encode()
+
+
+class FakeAudioBlobProvider:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, int, bytes]] = []
+
+    def upload_audio(
+        self,
+        workspace_id: str,
+        task_id: str,
+        index: int,
+        content: bytes,
+    ) -> str:
+        self.calls.append((workspace_id, task_id, index, content))
+        return f"https://storage.test/{workspace_id}/{task_id}/{index}.wav"
+
+
 def test_handler_hashes_and_persists_each_sentence() -> None:
     workspaces, results, languages, queued = _queued_workspace()
-    sleeps: list[float] = []
+    speech = FakeSpeechProvider()
+    blobs = FakeAudioBlobProvider()
     handler = WorkspaceTaskHandler(
         getLogger("test.workspace"),
         workspaces,
         results,
         languages,
+        speech,
+        blobs,
         RealtimeHub(),
-        sleeper=sleeps.append,
     )
 
     handler.handle(
@@ -67,7 +101,6 @@ def test_handler_hashes_and_persists_each_sentence() -> None:
         sha256(sentence.encode("utf-8")).hexdigest()
         for sentence in ["First sentence", "Second sentence"]
     ]
-    assert sleeps == [5, 5]
     assert [snapshot.content_key for snapshot in results.snapshots] == [
         [],
         [expected[0]],
@@ -76,6 +109,10 @@ def test_handler_hashes_and_persists_each_sentence() -> None:
     result = results.get(queued.workspace.id, "chapter-1")
     assert result is not None
     assert result.content_key == expected
+    assert result.audio_urls == [
+        "https://storage.test/workspace-1/chapter-1/0.wav",
+        "https://storage.test/workspace-1/chapter-1/1.wav",
+    ]
     completed = workspaces.get_by_id(queued.workspace.id)
     assert completed is not None
     assert completed.tasks[0].status == WorkspaceTaskStatus.COMPLETED
@@ -85,19 +122,19 @@ def test_handler_hashes_and_persists_each_sentence() -> None:
         completed.id,
         chapter_index_from=1,
         chapter_index_to=1,
-        provider="foundry",
+        provider=MICROSOFT_FOUNDRY_SPEECH_PROVIDER,
         voice="voice-1",
         force=False,
         etag=completed.etag,
     )
-    reuse_sleeps: list[float] = []
     reuse_handler = WorkspaceTaskHandler(
         getLogger("test.workspace.reuse"),
         workspaces,
         results,
         languages,
+        speech,
+        blobs,
         RealtimeHub(),
-        sleeper=reuse_sleeps.append,
     )
     reuse_handler.handle(
         QueueMessage(
@@ -109,27 +146,23 @@ def test_handler_hashes_and_persists_each_sentence() -> None:
             ),
         )
     )
-    assert reuse_sleeps == []
+    assert len(speech.calls) == 2
+    assert len(blobs.calls) == 2
     assert len(results.snapshots) == 3
 
 
 def test_handler_keeps_partial_result_and_marks_failure() -> None:
     workspaces, results, languages, queued = _queued_workspace()
-    calls = 0
-
-    def fail_second(_: float) -> None:
-        nonlocal calls
-        calls += 1
-        if calls == 2:
-            raise RuntimeError("mock TTS failure")
+    speech = FakeSpeechProvider(fail_at=1)
 
     handler = WorkspaceTaskHandler(
         getLogger("test.workspace"),
         workspaces,
         results,
         languages,
+        speech,
+        FakeAudioBlobProvider(),
         RealtimeHub(),
-        sleeper=fail_second,
     )
     with pytest.raises(RuntimeError, match="mock TTS failure"):
         handler.handle(
@@ -223,7 +256,7 @@ def _queued_workspace() -> tuple[
         created.id,
         chapter_index_from=1,
         chapter_index_to=1,
-        provider="foundry",
+        provider=MICROSOFT_FOUNDRY_SPEECH_PROVIDER,
         voice="voice-1",
         force=False,
         etag=created.etag,

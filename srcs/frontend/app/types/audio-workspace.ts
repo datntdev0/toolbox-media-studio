@@ -83,3 +83,18 @@ export interface AudioChapterContent {
   chapterNumber: number | null
   content: string[]
 }
+
+export interface AudioWorkspaceTaskResultSentence {
+  index: number
+  audioUrl: string
+}
+
+export interface AudioWorkspaceTaskResult {
+  taskId: string
+  workspaceId: string
+  provider: string
+  voice: string
+  sentences: AudioWorkspaceTaskResultSentence[]
+  createdAt: string
+  updatedAt: string
+}

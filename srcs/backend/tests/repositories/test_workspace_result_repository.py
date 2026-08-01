@@ -44,6 +44,7 @@ def test_cosmos_workspace_result_wire_shape() -> None:
             provider="foundry",
             voice="voice-1",
             content_key=["hash"],
+            audio_urls=["https://storage.test/audio.wav"],
             created_at=now,
             updated_at=now,
         )
@@ -53,3 +54,4 @@ def test_cosmos_workspace_result_wire_shape() -> None:
     assert item["id"] == "chapter-1"
     assert item["workspaceId"] == "workspace-1"
     assert item["contentKey"] == ["hash"]
+    assert item["audioUrls"] == ["https://storage.test/audio.wav"]

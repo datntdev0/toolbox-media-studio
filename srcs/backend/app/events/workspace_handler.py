@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
 from logging import Logger
-from time import sleep
 from typing import Any
 
 from app.core.events.message_handler import MessageHandler, QueueMessage
@@ -15,6 +14,8 @@ from app.core.events.polling_queue_subscriber import PollingQueueSubscriber
 from app.core.realtime import RealtimeHub
 from app.domain.workspace_results import WorkspaceResult
 from app.domain.workspaces import Workspace, WorkspaceTask, WorkspaceTaskStatus
+from app.providers.blob_storage_provider import PublicBlobProvider
+from app.providers.speech_service_provider import SpeechServiceProvider
 from app.repositories.workspace_repository import (
     WorkspaceConflictError,
     WorkspaceNotFoundError,
@@ -26,6 +27,7 @@ from app.services.novel_language_service import NovelLanguageService
 WORKSPACE_TASK_QUEUE_NAME = "workspaces-tasks"
 WORKSPACE_TASK_EVENT_TYPE = "workspace.task.requested"
 WORKSPACE_TASK_EVENT_SCHEMA_VERSION = 1
+MICROSOFT_FOUNDRY_SPEECH_PROVIDER = "Built-in Microsoft Foundry"
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,15 +71,17 @@ class WorkspaceTaskHandler(MessageHandler):
         workspace_repository: WorkspaceRepository,
         workspace_result_repository: WorkspaceResultRepository,
         novel_language_service: NovelLanguageService,
+        speech_provider: SpeechServiceProvider,
+        blob_provider: PublicBlobProvider,
         realtime_hub: RealtimeHub,
-        sleeper: Callable[[float], None] = sleep,
     ) -> None:
         self._logger = logger
         self._workspaces = workspace_repository
         self._results = workspace_result_repository
         self._languages = novel_language_service
+        self._speech = speech_provider
+        self._blob = blob_provider
         self._realtime = realtime_hub
-        self._sleep = sleeper
 
     def handle(self, message: QueueMessage) -> None:
         if message.content is None:
@@ -98,6 +102,8 @@ class WorkspaceTaskHandler(MessageHandler):
         existing = self._results.get(claimed.id, claimed_task.id)
 
         try:
+            if event.provider != MICROSOFT_FOUNDRY_SPEECH_PROVIDER:
+                raise ValueError(f"Unsupported speech provider: {event.provider}")
             reusable = (
                 existing is not None
                 and claimed_task.result_available
@@ -134,6 +140,7 @@ class WorkspaceTaskHandler(MessageHandler):
                         provider=event.provider,
                         voice=event.voice,
                         content_key=[],
+                        audio_urls=[],
                         created_at=now,
                         updated_at=now,
                     )
@@ -147,8 +154,31 @@ class WorkspaceTaskHandler(MessageHandler):
                         len(sentences),
                         content_key,
                     )
-                    self._sleep(1)
+                    audio_bytes = self._speech.synthesize(sentence, event.voice)
+                    self._logger.info(
+                        "Workspace task %s sentence %d/%d hash %s synthesized %d bytes",
+                        claimed_task.id,
+                        index + 1,
+                        len(sentences),
+                        content_key,
+                        len(audio_bytes),
+                    )
+                    audio_url = self._blob.upload_audio(
+                        claimed.id,
+                        claimed_task.id,
+                        index,
+                        audio_bytes,
+                    )
+                    self._logger.info(
+                        "Workspace task %s sentence %d/%d hash %s uploaded to %s",
+                        claimed_task.id,
+                        index + 1,
+                        len(sentences),
+                        content_key,
+                        audio_url,
+                    )
                     result.content_key.append(content_key)
+                    result.audio_urls.append(audio_url)
                     result = self._results.upsert(result)
                 completed_at = datetime.now(UTC)
                 completed = self._update_task_with_retry(
@@ -255,6 +285,8 @@ class WorkspaceTaskQueueListener(PollingQueueSubscriber):
         workspace_repository: WorkspaceRepository,
         workspace_result_repository: WorkspaceResultRepository,
         novel_language_service: NovelLanguageService,
+        speech_provider: SpeechServiceProvider,
+        blob_provider: PublicBlobProvider,
         realtime_hub: RealtimeHub,
         workers: int = 1,
     ) -> None:
@@ -266,6 +298,8 @@ class WorkspaceTaskQueueListener(PollingQueueSubscriber):
                 workspace_repository,
                 workspace_result_repository,
                 novel_language_service,
+                speech_provider,
+                blob_provider,
                 realtime_hub,
             ),
             workers=workers,
