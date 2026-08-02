@@ -88,19 +88,9 @@ const configuredModel = computed(() => props.workspace.configuration
           </p>
         </div>
 
-        <div class="space-y-1.5">
-          <div class="flex items-center justify-between gap-3 text-xs text-muted">
-            <span>Translation progress</span>
-            <span class="tabular-nums">
-              {{ workspace.progress.translated }} / {{ workspace.progress.total }} chapters
-            </span>
-          </div>
-          <UProgress
-            :model-value="workspace.progress.translated"
-            :max="Math.max(workspace.progress.total, 1)"
-            size="xs"
-          />
-        </div>
+        <p class="text-xs text-muted">
+          {{ workspace.novelChapterCount }} novel chapters
+        </p>
       </div>
     </template>
 

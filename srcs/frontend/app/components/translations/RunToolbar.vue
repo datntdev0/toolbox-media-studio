@@ -3,11 +3,9 @@ import type { TranslationWorkspace } from '~/types/translation-workspace'
 
 const props = withDefaults(defineProps<{
   workspace: TranslationWorkspace
-  syncing?: boolean
   starting?: boolean
   stopping?: boolean
 }>(), {
-  syncing: false,
   starting: false,
   stopping: false
 })
@@ -18,13 +16,12 @@ const force = defineModel<boolean>('force', { default: false })
 
 const emit = defineEmits<{
   configure: []
-  sync: []
   start: []
   stop: []
 }>()
 
 const availableChapters = computed(() =>
-  props.workspace.chapters.filter(chapter => !chapter.sourceRemoved)
+  props.workspace.chapters.filter(chapter => chapter.contentAvailable && !chapter.sourceRemoved)
 )
 const rangeStartChapterIndex = computed<number | undefined>({
   get: () => availableChapters.value.find(
@@ -58,7 +55,7 @@ const endIndex = computed(() =>
 const rangeInvalid = computed(() =>
   startIndex.value < 0 || endIndex.value < startIndex.value
 )
-const busy = computed(() => props.syncing || props.starting || props.stopping)
+const busy = computed(() => props.starting || props.stopping)
 </script>
 
 <template>
@@ -68,16 +65,6 @@ const busy = computed(() => props.syncing || props.starting || props.stopping)
         Start translation chapters by index
       </h2>
       <div class="ml-auto flex items-center gap-2">
-        <UButton
-          label="Sync chapters"
-          icon="lucide:refresh-cw"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          :loading="syncing"
-          :disabled="busy"
-          @click="emit('sync')"
-        />
         <UButton
           label="Configure AI"
           icon="lucide:settings-2"

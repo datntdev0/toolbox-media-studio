@@ -62,17 +62,15 @@ def test_in_memory_repository_queues_claims_completes_and_stops_tasks() -> None:
     repository = InMemoryTranslationRepository()
     translation = _translation("translation-1")
     now = datetime.now(UTC)
-    translation.tasks = [
+    snapshots = [
         TranslationTask("chapter-1", "One", 1, 0, now),
         TranslationTask("chapter-2", "Two", 2, 1, now),
     ]
-    translation.progress = TranslationProgress.from_tasks(translation.tasks)
     created = repository.create(translation)
 
     queued = repository.queue_tasks(
         created.id,
-        chapter_index_from=1,
-        chapter_index_to=2,
+        tasks=snapshots,
         force=False,
         etag=created.etag,
     )
@@ -100,6 +98,41 @@ def test_in_memory_repository_queues_claims_completes_and_stops_tasks() -> None:
     assert stopped.status == TranslationStatus.STOPPED
     assert stopped.progress.completed == 1
     assert stopped.progress.created == 1
+
+
+def test_in_memory_repository_upserts_snapshots_without_resetting_results() -> None:
+    repository = InMemoryTranslationRepository()
+    now = datetime.now(UTC)
+    existing = TranslationTask(
+        "chapter-1",
+        "Old title",
+        1,
+        0,
+        now,
+        status=TranslationTaskStatus.COMPLETED,
+        result_available=True,
+    )
+    translation = _translation("translation-1")
+    translation.tasks = [existing]
+    translation.progress = TranslationProgress.from_tasks(translation.tasks)
+    created = repository.create(translation)
+    refreshed_at = datetime.now(UTC)
+
+    queued = repository.queue_tasks(
+        created.id,
+        tasks=[
+            TranslationTask("chapter-1", "New title", 1, 1, refreshed_at),
+            TranslationTask("chapter-2", "Two", 2, 2, refreshed_at),
+        ],
+        force=False,
+        etag=created.etag,
+    )
+
+    tasks = {task.id: task for task in queued.translation.tasks}
+    assert tasks["chapter-1"].title == "New title"
+    assert tasks["chapter-1"].result_available is True
+    assert tasks["chapter-1"].source_updated is True
+    assert tasks["chapter-2"].status == TranslationTaskStatus.QUEUED
 
 
 class _FakeContainer:

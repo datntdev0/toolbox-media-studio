@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
+
+from pydantic import BaseModel, ConfigDict
 
 from app.core.config.app_config import AppConfig
 
@@ -26,6 +27,12 @@ class TranslationPreview:
     content: list[str]
 
 
+class _StructuredTranslation(BaseModel):
+    """Structured chapter payload required from Azure OpenAI."""
+    title: str
+    content: str
+
+
 class TranslationServiceProvider(Protocol):
     """Contract implemented by a concrete translation service."""
 
@@ -41,7 +48,7 @@ class TranslationServiceProvider(Protocol):
 
 
 class MicrosoftFoundryServiceProvider:
-    """Translation service backed by a Microsoft Foundry deployment."""
+    """Translation service backed by an Azure OpenAI deployment."""
 
     def __init__(self, config: AppConfig) -> None:
         self._config = config
@@ -55,44 +62,64 @@ class MicrosoftFoundryServiceProvider:
         chapter_title: str,
         chapter_content: list[str],
     ) -> TranslationPreview:
-        if not self._config.ai_foundry.api_key:
-            raise TranslationServiceProviderError("Azure AI Foundry API key is not configured")
+        if not self._config.azure_openai.endpoint:
+            raise TranslationServiceProviderError("Azure OpenAI endpoint is not configured")
+        if not self._config.azure_openai.api_key:
+            raise TranslationServiceProviderError("Azure OpenAI API key is not configured")
 
         try:
             from openai import OpenAI
 
             client = OpenAI(
-                base_url=self._config.ai_foundry.endpoint,
-                api_key=self._config.ai_foundry.api_key,
+                base_url=self._config.azure_openai.endpoint,
+                api_key=self._config.azure_openai.api_key,
             )
-            chapter_text = "\n\n".join(chapter_content)
-            response: Any = client.responses.create(
+            chapter_text = "\n".join(chapter_content)
+            completion: Any = client.chat.completions.parse(
                 model=model,
-                instructions=f"""
-                You are a novel translator and editor. You're translating to {language}.
-                Here are the global instructions for this translation:
-                ---
-                {instruction}
-                ---
-                Return formatting:
-                ```
-                <title>translated_title</title>
-                <content>translated_content</content>
-                ```
-                """,
-                input=f"""
-                <title>{chapter_title}</title>
-                <content>{chapter_text}</content>
-                """,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            f"You are a novel translator and editor translating into {language}. "
+                            "Translate both the chapter title and content faithfully. Preserve "
+                            "paragraph boundaries in the content by separating paragraphs with a "
+                            f"blank line. Follow these global instructions:\n\n{instruction}"
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Title:\n{chapter_title}\n\nContent:\n{chapter_text}",
+                    },
+                ],
+                response_format=_StructuredTranslation,
             )
-            output = getattr(response, "output_text", None)
-            if not isinstance(output, str) or not output.strip():
-                raise TranslationServiceProviderError("AI Foundry returned an empty translation")
-            return parse_translation_output(output, fallback_title=chapter_title)
+            choices = getattr(completion, "choices", None)
+            if not choices:
+                raise TranslationServiceProviderError("Azure OpenAI returned no translation choice")
+
+            message = getattr(choices[0], "message", None)
+            if message is None:
+                raise TranslationServiceProviderError(
+                    "Azure OpenAI returned no translation message"
+                )
+            if getattr(message, "refusal", None):
+                raise TranslationServiceProviderError("Azure OpenAI refused the translation")
+
+            parsed = getattr(message, "parsed", None)
+            if parsed is None:
+                raise TranslationServiceProviderError(
+                    "Azure OpenAI returned no structured translation"
+                )
+            if not isinstance(parsed, _StructuredTranslation):
+                raise TranslationServiceProviderError(
+                    "Azure OpenAI returned an invalid structured translation"
+                )
+            return _to_translation_preview(parsed)
         except TranslationServiceProviderError:
             raise
         except Exception as exc:
-            raise TranslationServiceProviderError("Azure AI Foundry translation failed") from exc
+            raise TranslationServiceProviderError("Azure OpenAI translation failed") from exc
 
 
 class TranslationServiceProviderFactory:
@@ -126,49 +153,25 @@ def build_translation_service_provider_factory(
     )
 
 
-def parse_translation_output(output: str, *, fallback_title: str) -> TranslationPreview:
-    """Parse the provider's ``Title``/``Content`` response into API fields."""
-
-    normalized = output.strip()
-    normalized = _strip_code_fence(normalized)
-    xml_content_match = _xml_content_marker.search(normalized)
-    if xml_content_match is not None:
-        xml_title_match = _xml_title_marker.search(normalized)
-        title = (
-            xml_title_match.group(1).strip()
-            if xml_title_match is not None
-            else fallback_title
-        )
-        content_text = xml_content_match.group(1).strip()
-    else:
-        content_match = _content_marker.search(normalized)
-        if content_match is None:
-            title = fallback_title
-            content_text = normalized
-        else:
-            header = normalized[: content_match.start()].strip()
-            title_match = _title_marker.search(header)
-            title = title_match.group(1).strip() if title_match else fallback_title
-            content_text = normalized[content_match.end() :].strip()
-
-    content_text = _strip_code_fence(content_text).strip()
-    content = [
-        paragraph.strip()
-        for paragraph in _paragraph_splitter.split(content_text)
-        if paragraph.strip()
-    ]
+def _to_translation_preview(parsed: _StructuredTranslation) -> TranslationPreview:
+    title = parsed.title.strip()
+    content = _split_paragraphs(parsed.content)
     if not title or not content:
-        raise TranslationServiceProviderError("AI Foundry returned an invalid translation")
+        raise TranslationServiceProviderError(
+            "Azure OpenAI returned an invalid structured translation"
+        )
     return TranslationPreview(title=title, content=content)
 
 
-def _strip_code_fence(value: str) -> str:
-    return _code_fence.sub("", value).strip()
-
-
-_title_marker = re.compile(r"^\s*Title\s*:\s*(.+?)\s*$", re.MULTILINE | re.IGNORECASE)
-_content_marker = re.compile(r"^\s*Content\s*:\s*\n?", re.MULTILINE | re.IGNORECASE)
-_xml_title_marker = re.compile(r"<title>\s*(.*?)\s*</title>", re.DOTALL | re.IGNORECASE)
-_xml_content_marker = re.compile(r"<content>\s*(.*?)\s*</content>", re.DOTALL | re.IGNORECASE)
-_paragraph_splitter = re.compile(r"\r?\n\s*\r?\n")
-_code_fence = re.compile(r"^```(?:text|markdown)?\s*|\s*```$", re.IGNORECASE)
+def _split_paragraphs(content: str) -> list[str]:
+    paragraphs: list[str] = []
+    paragraph_lines: list[str] = []
+    for line in content.splitlines():
+        if line.strip():
+            paragraph_lines.append(line.strip())
+        elif paragraph_lines:
+            paragraphs.append("\n".join(paragraph_lines))
+            paragraph_lines = []
+    if paragraph_lines:
+        paragraphs.append("\n".join(paragraph_lines))
+    return paragraphs

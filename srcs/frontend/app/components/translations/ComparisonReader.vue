@@ -49,7 +49,8 @@ const chapterStatus = computed(() =>
   chapterStatusMeta[props.chapter.status]
 )
 const canEdit = computed(() =>
-  !['unavailable', 'queued', 'translating'].includes(props.chapter.status)
+  props.chapter.taskExists
+  && !['unavailable', 'queued', 'translating'].includes(props.chapter.status)
   && props.chapter.originalParagraphs.length > 0
 )
 const originalCharacterCount = computed(() => formatCharacterCount(props.chapter.originalParagraphs))
@@ -410,7 +411,7 @@ defineExpose({ confirmDiscard, focusChapters })
             <UEmpty
               icon="lucide:file-clock"
               title="Source chapter removed"
-              description="Sync again if the source chapter reappears in the connected novel."
+              description="This chapter is no longer available in the connected novel."
               size="lg"
             />
           </div>

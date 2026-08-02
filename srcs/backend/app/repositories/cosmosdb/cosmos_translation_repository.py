@@ -26,6 +26,7 @@ from app.repositories.translation_repository import (
     TranslationContinuationTokenError,
     TranslationNotFoundError,
     reconcile_translation_status,
+    upsert_translation_tasks,
 )
 
 TRANSLATIONS_CONTAINER_NAME = "domain.translations"
@@ -142,19 +143,13 @@ class CosmosTranslationRepository:
         self,
         id: str,
         *,
-        chapter_index_from: int,
-        chapter_index_to: int,
+        tasks: Sequence[TranslationTask],
         force: bool,
         etag: str | None,
     ) -> TranslationQueueResult:
         translation = self._require(id)
         self._check_etag(translation, etag)
-        matching = [
-            task
-            for task in translation.tasks
-            if not task.source_removed
-            and chapter_index_from <= task.manifest_index + 1 <= chapter_index_to
-        ]
+        matching = upsert_translation_tasks(translation, tasks)
         if not matching:
             raise TranslationChapterRangeError(
                 "No translation tasks match the requested chapter index range"
@@ -166,13 +161,12 @@ class CosmosTranslationRepository:
             or task.status
             not in {TranslationTaskStatus.QUEUED, TranslationTaskStatus.RUNNING}
         ]
-        if not queued:
-            return TranslationQueueResult(translation=translation, tasks=[])
         queued_ids = {task.id for task in queued}
         for task in queued:
             task.status = TranslationTaskStatus.QUEUED
             task.last_error = None
-        translation.status = TranslationStatus.RUNNING
+        if queued:
+            translation.status = TranslationStatus.RUNNING
         self._touch(translation)
         updated = self.update(translation, etag or translation.etag)
         return TranslationQueueResult(

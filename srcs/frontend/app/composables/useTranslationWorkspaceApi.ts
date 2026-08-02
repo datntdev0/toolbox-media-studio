@@ -3,12 +3,12 @@ import type {
   TranslationChapterStatus,
   TranslationConfigurationInput,
   TranslationDetailApiRecord,
-  TranslationSyncChanges,
   TranslationTaskApiRecord,
   TranslationResult,
   TranslationWorkspace,
   TranslationWorkspaceStatus
 } from '~/types/translation-workspace'
+import type { NovelWorkspace } from '~/types/novel-workspace'
 import { resolveLanguage } from '~/constants/supported-languages'
 import { translationProviders } from '~/types/translation-workspace'
 import {
@@ -28,7 +28,6 @@ const statuses = new Set<TranslationWorkspaceStatus>([
 ])
 
 function normalizeTaskStatus(task: TranslationTaskApiRecord): TranslationChapterStatus {
-  if (task.sourceRemoved) return 'unavailable'
   const statuses: Record<TranslationTaskApiRecord['status'], TranslationChapterStatus> = {
     created: 'not_started',
     queued: 'queued',
@@ -44,7 +43,7 @@ export function normalizeTranslationWorkspace(
 ): TranslationWorkspace {
   const novel = record.novel
   const detail = 'progress' in record ? record : null
-  const total = Number(detail?.progress.total ?? novel?.chapterCount ?? 0)
+  const total = Number(detail?.progress.total ?? 0)
   const configuration = record.configuration
   const provider = translationProviders.find(item => item.id === configuration?.providerId)
   const model = provider?.models.find(item => item.id === configuration?.modelId)
@@ -53,6 +52,7 @@ export function normalizeTranslationWorkspace(
     name: record.name,
     novelId: record.novelId,
     novelTitle: novel?.title || 'Novel unavailable',
+    novelChapterCount: Number(novel?.chapterCount || 0),
     coverImageUrl: novel?.coverImageUrl || null,
     sourceLanguage: resolveLanguage(novel?.language),
     targetLanguage: resolveLanguage(record.targetLanguage),
@@ -75,6 +75,7 @@ export function normalizeTranslationWorkspace(
     chapters: (detail?.tasks || [])
       .map(task => ({
         id: task.id,
+        taskExists: true,
         chapterIndex: task.manifestIndex + 1,
         number: task.chapterNumber ?? task.manifestIndex + 1,
         title: task.title,
@@ -85,12 +86,60 @@ export function normalizeTranslationWorkspace(
         attempts: Number(task.attempts || 0),
         lastError: task.lastError || null,
         resultAvailable: Boolean(task.resultAvailable),
+        contentAvailable: !task.sourceRemoved,
         sourceUpdated: Boolean(task.sourceUpdated),
         sourceRemoved: Boolean(task.sourceRemoved)
       }))
       .sort((left, right) => left.chapterIndex - right.chapterIndex),
     updatedAt: record.updatedAt,
     etag: record.etag || null
+  }
+}
+
+/** Combines live novel chapters with the translation tasks created by submitted jobs. */
+export function mergeTranslationWorkspaceWithNovel(
+  workspace: TranslationWorkspace,
+  novel: NovelWorkspace
+): TranslationWorkspace {
+  const tasks = new Map(workspace.chapters.map(chapter => [chapter.id, chapter]))
+  const chapters = [...novel.chapters]
+    .sort((left, right) => left.manifestIndex - right.manifestIndex)
+    .map((chapter, index) => {
+      const task = tasks.get(chapter.id)
+      const sourceRemoved = Boolean(chapter.sourceRemoved)
+      const contentAvailable = Boolean(chapter.contentAvailable)
+      return {
+        id: chapter.id,
+        taskExists: Boolean(task?.taskExists),
+        chapterIndex: chapter.manifestIndex + 1,
+        number: chapter.chapterNumber ?? index + 1,
+        title: chapter.title,
+        translatedTitle: task?.translatedTitle || null,
+        status: sourceRemoved || !contentAvailable
+          ? 'unavailable'
+          : task?.status || 'not_started',
+        originalParagraphs: task?.originalParagraphs || [],
+        translatedParagraphs: task?.translatedParagraphs || [],
+        attempts: task?.attempts || 0,
+        lastError: task?.lastError || null,
+        resultAvailable: Boolean(task?.resultAvailable),
+        contentAvailable,
+        sourceUpdated: Boolean(chapter.sourceUpdated),
+        sourceRemoved
+      } satisfies TranslationWorkspace['chapters'][number]
+    })
+
+  return {
+    ...workspace,
+    novelTitle: novel.title || workspace.novelTitle,
+    novelChapterCount: Number(novel.chapterCount ?? chapters.length),
+    coverImageUrl: typeof novel.coverImageUrl === 'string'
+      ? novel.coverImageUrl
+      : workspace.coverImageUrl,
+    sourceLanguage: resolveLanguage(
+      typeof novel.language === 'string' ? novel.language : workspace.sourceLanguage.code
+    ),
+    chapters
   }
 }
 
@@ -144,15 +193,6 @@ export function useTranslationWorkspaceApi() {
     },
     async delete(id: string) {
       return translations.delete_translation(id)
-    },
-    async sync(id: string) {
-      const response = await translations.sync_translation(id)
-      return {
-        workspace: normalizeTranslationWorkspace(
-          toRecord<TranslationDetailApiRecord>(response.translation)
-        ),
-        changes: toRecord<TranslationSyncChanges>(response.changes)
-      }
     },
     async start(
       id: string,

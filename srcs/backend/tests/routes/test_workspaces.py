@@ -7,7 +7,11 @@ from fastapi.testclient import TestClient
 
 from app.domain.novels import NovelChapter
 from app.domain.translation_results import TranslationResult
-from app.domain.translations import TranslationProgress, TranslationTaskStatus
+from app.domain.translations import (
+    TranslationProgress,
+    TranslationTask,
+    TranslationTaskStatus,
+)
 from app.repositories.novel_chapter_repository import InMemoryNovelChapterRepository
 from app.repositories.translation_repository import InMemoryTranslationRepository
 from app.repositories.translation_result_repository import (
@@ -242,6 +246,20 @@ def test_translated_chapter_returns_not_found_when_result_is_missing(
     )
     translation = translation_repository.get_by_id(translation_data["id"])
     assert translation is not None
+    translation = translation_repository.queue_tasks(
+        translation.id,
+        tasks=[
+            TranslationTask(
+                id="chapter-1",
+                title="Original chapter 1",
+                chapter_number=1,
+                manifest_index=0,
+                source_chapter_updated_at=datetime.now(UTC),
+            )
+        ],
+        force=False,
+        etag=translation.etag,
+    ).translation
     translation.tasks[0].status = TranslationTaskStatus.COMPLETED
     translation.tasks[0].result_available = True
     translation.progress = TranslationProgress.from_tasks(translation.tasks)
@@ -378,6 +396,20 @@ def _complete_translation(
 ) -> None:
     translation = translations.get_by_id(translation_id)
     assert translation is not None
+    translation = translations.queue_tasks(
+        translation.id,
+        tasks=[
+            TranslationTask(
+                id=chapter_id,
+                title=title,
+                chapter_number=1,
+                manifest_index=0,
+                source_chapter_updated_at=updated_at,
+            )
+        ],
+        force=False,
+        etag=translation.etag,
+    ).translation
     task = next(item for item in translation.tasks if item.id == chapter_id)
     task.status = TranslationTaskStatus.COMPLETED
     task.result_available = True

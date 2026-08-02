@@ -45,7 +45,6 @@ from app.repositories.workspace_repository import WorkspaceRepository
 from app.repositories.workspace_result_repository import WorkspaceResultRepository
 from app.services.novel_binding_service import NovelBindingService
 from app.services.novel_language_service import NovelLanguageService
-from app.services.translation_service import TranslationService
 from app.services.workspace_service import WorkspaceService
 
 # ============================================================================
@@ -94,16 +93,6 @@ def _get_novel_binding_service() -> NovelBindingService:
         repository_scraping,
         repository_scraping_result,
         repository_novel_chapter,
-    )
-
-
-def _get_translation_service() -> TranslationService:
-    """Factory function for TranslationService dependency injection."""
-    return TranslationService(
-        repository_translation,
-        repository_novel,
-        repository_novel_chapter,
-        repository_translation_result,
     )
 
 
@@ -190,7 +179,6 @@ RepositoryWorkspaceResultDep = Annotated[WorkspaceResultRepository, Depends(lamb
 # Service dependencies
 ServiceNovelBindingDep = Annotated[NovelBindingService, Depends(_get_novel_binding_service)]
 ServiceNovelLanguageDep = Annotated[NovelLanguageService, Depends(_get_novel_language_service)]
-ServiceTranslationDep = Annotated[TranslationService, Depends(_get_translation_service)]
 ServiceWorkspaceDep = Annotated[WorkspaceService, Depends(_get_workspace_service)]
 
 # Provider dependencies - alphabetically ordered

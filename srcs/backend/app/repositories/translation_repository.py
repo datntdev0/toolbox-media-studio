@@ -37,8 +37,7 @@ class TranslationRepository(Protocol):
         self,
         id: str,
         *,
-        chapter_index_from: int,
-        chapter_index_to: int,
+        tasks: Sequence[TranslationTask],
         force: bool,
         etag: str | None,
     ) -> TranslationQueueResult: ...
@@ -163,19 +162,13 @@ class InMemoryTranslationRepository:
         self,
         id: str,
         *,
-        chapter_index_from: int,
-        chapter_index_to: int,
+        tasks: Sequence[TranslationTask],
         force: bool,
         etag: str | None,
     ) -> TranslationQueueResult:
         translation = self._require(id)
         self._check_etag(translation, etag)
-        matching = [
-            task
-            for task in translation.tasks
-            if not task.source_removed
-            and chapter_index_from <= task.manifest_index + 1 <= chapter_index_to
-        ]
+        matching = upsert_translation_tasks(translation, tasks)
         if not matching:
             raise TranslationChapterRangeError(
                 "No translation tasks match the requested chapter index range"
@@ -192,7 +185,7 @@ class InMemoryTranslationRepository:
             task.last_error = None
         if queued:
             translation.status = TranslationStatus.RUNNING
-            self._touch(translation)
+        self._touch(translation)
         return TranslationQueueResult(
             translation=deepcopy(translation),
             tasks=deepcopy(queued),
@@ -309,3 +302,36 @@ def reconcile_translation_status(translation: Translation) -> TranslationStatus:
         if translation.configuration is not None
         else TranslationStatus.NEEDS_SETUP
     )
+
+
+def upsert_translation_tasks(
+    translation: Translation,
+    snapshots: Sequence[TranslationTask],
+) -> list[TranslationTask]:
+    """Merge selected live chapter snapshots without resetting task processing state."""
+
+    current = {task.id: task for task in translation.tasks}
+    selected: list[TranslationTask] = []
+    selected_ids: set[str] = set()
+    for snapshot in sorted(snapshots, key=lambda item: (item.manifest_index, item.id)):
+        if snapshot.id in selected_ids:
+            continue
+        selected_ids.add(snapshot.id)
+        task = current.get(snapshot.id)
+        if task is None:
+            task = deepcopy(snapshot)
+            translation.tasks.append(task)
+            current[task.id] = task
+        else:
+            source_is_newer = snapshot.source_chapter_updated_at > task.source_chapter_updated_at
+            if source_is_newer and task.result_available:
+                task.source_updated = True
+            task.title = snapshot.title
+            task.chapter_number = snapshot.chapter_number
+            task.manifest_index = snapshot.manifest_index
+            task.source_chapter_updated_at = snapshot.source_chapter_updated_at
+            task.source_removed = False
+        selected.append(task)
+
+    translation.tasks.sort(key=lambda item: (item.manifest_index, item.id))
+    return selected

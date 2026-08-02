@@ -1,21 +1,32 @@
 """Translation-management routes."""
 
+# ruff: noqa: E501
+
 import re
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Body, HTTPException, Path, Query, Response, status
+from fastapi import APIRouter, Body, Path, Query, Response, status
 
+from app.core.exceptions import (
+    BadGatewayException,
+    ConflictException,
+    NotFoundException,
+    ServiceUnavailableException,
+    StateConflictException,
+    ValidationException,
+)
 from app.core.injection import (
     PollingQueuePublisherDep,
     ProviderTranslationServiceFactoryDep,
     RealtimeHubDep,
     RepositoryNovelChapterDep,
+    RepositoryNovelDep,
     RepositoryTranslationDep,
     RepositoryTranslationResultDep,
-    ServiceTranslationDep,
 )
 from app.core.security.authorization import SessionUser
+from app.domain.novels import Novel, NovelChapter
 from app.domain.requests import (
     TranslationCreateRequest,
     TranslationPreviewRequest,
@@ -29,10 +40,8 @@ from app.domain.responses import (
     TranslationDetailResponse,
     TranslationListResponse,
     TranslationResponse,
-    TranslationSyncResponse,
     to_translation_detail_response,
     to_translation_response,
-    to_translation_sync_response,
 )
 from app.domain.translation_results import (
     TranslationResult,
@@ -40,7 +49,13 @@ from app.domain.translation_results import (
     TranslationResultUpdateRequest,
     to_translation_result_response,
 )
-from app.domain.translations import TranslationTaskStatus, TranslationView
+from app.domain.translations import (
+    Translation,
+    TranslationStatus,
+    TranslationTask,
+    TranslationTaskStatus,
+    TranslationView,
+)
 from app.events.translation_handler import (
     TRANSLATION_QUEUE_NAME,
     build_translation_event,
@@ -50,6 +65,7 @@ from app.providers.translation_service_provider import (
     TranslationServiceProviderError,
     UnsupportedTranslationServiceProviderError,
 )
+from app.repositories.novel_repository import NovelNotFoundError, NovelRepository
 from app.repositories.translation_repository import (
     TranslationChapterRangeError,
     TranslationConflictError,
@@ -57,20 +73,11 @@ from app.repositories.translation_repository import (
     TranslationNotFoundError,
 )
 from app.repositories.translation_result_repository import TranslationResultTooLargeError
-from app.services.translation_service import (
-    TranslationNovelNotFoundError,
-    TranslationResultDeleteError,
-    TranslationSyncConflictError,
-)
 
 router = APIRouter(prefix="/api/translations", tags=["translations"])
 
 
-@router.post(
-    "/preview",
-    response_model=TranslationPreviewResponse,
-    operation_id="preview_translation",
-)
+@router.post("/preview", response_model=TranslationPreviewResponse, operation_id="preview_translation")
 def preview_translation_route(
     session_user: SessionUser,
     repository_novel_chapter: RepositoryNovelChapterDep,
@@ -82,15 +89,9 @@ def preview_translation_route(
     del session_user
     chapter = repository_novel_chapter.get_by_id(body.chapter)
     if chapter is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Novel chapter not found",
-        )
+        raise NotFoundException("Novel chapter not found")
     if chapter.source_removed or not chapter.content_available:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Novel chapter content is unavailable",
-        )
+        raise StateConflictException("Novel chapter content is unavailable")
     try:
         provider = translation_service_provider_factory.get(body.provider)
         translated = provider.translate(
@@ -101,117 +102,68 @@ def preview_translation_route(
             chapter_content=chapter.content,
         )
     except UnsupportedTranslationServiceProviderError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
+        raise ValidationException(str(exc)) from exc
     except TranslationServiceProviderError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(exc),
-        ) from exc
+        raise BadGatewayException(str(exc)) from exc
     return TranslationPreviewResponse(title=translated.title, content=translated.content)
 
 
-@router.post(
-    "",
-    response_model=TranslationResponse,
-    status_code=status.HTTP_201_CREATED,
-    operation_id="create_translation",
-)
+@router.post("", response_model=TranslationResponse, status_code=status.HTTP_201_CREATED, operation_id="create_translation")
 def create_translation_route(
     session_user: SessionUser,
-    service_translation: ServiceTranslationDep,
+    repository_novel: RepositoryNovelDep,
+    repository_translation: RepositoryTranslationDep,
     body: Annotated[TranslationCreateRequest, Body(...)],
 ) -> TranslationResponse:
-    try:
-        view = service_translation.create(to_translation_entity(body, session_user.id))
-    except TranslationNovelNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Novel not found",
-        ) from exc
-    return to_translation_response(view)
+    novel = _require_novel(repository_novel, body.novel_id)
+    translation = to_translation_entity(body, session_user.id)
+    translation.tasks = []
+    created = repository_translation.create(translation)
+    return to_translation_response(TranslationView(translation=created, novel=novel))
 
 
 @router.get("", response_model=TranslationListResponse, operation_id="list_translations")
 def list_translations_route(
     session_user: SessionUser,
-    service_translation: ServiceTranslationDep,
+    repository_novel: RepositoryNovelDep,
+    repository_translation: RepositoryTranslationDep,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     continuation_token: Annotated[str | None, Query(alias="continuationToken")] = None,
 ) -> TranslationListResponse:
     del session_user
     try:
-        page = service_translation.list(limit, continuation_token)
+        page = repository_translation.list(limit, continuation_token)
     except TranslationContinuationTokenError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
+        raise ValidationException(str(exc)) from exc
     return TranslationListResponse(
-        items=[to_translation_response(item) for item in page.items],
+        items=[
+            to_translation_response(_translation_view(item, repository_novel))
+            for item in page.items
+        ],
         continuationToken=page.continuation_token,
     )
 
 
-@router.get(
-    "/{id}",
-    response_model=TranslationDetailResponse,
-    operation_id="get_translation",
-)
+@router.get("/{id}", response_model=TranslationDetailResponse, operation_id="get_translation")
 def get_translation_route(
     session_user: SessionUser,
-    service_translation: ServiceTranslationDep,
+    repository_novel: RepositoryNovelDep,
+    repository_translation: RepositoryTranslationDep,
     id: str,
 ) -> TranslationDetailResponse:
     del session_user
-    view = service_translation.get_by_id(id)
-    if view is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Translation not found")
-    return to_translation_detail_response(view)
+    translation = repository_translation.get_by_id(id)
+    if translation is None:
+        raise NotFoundException("Translation not found")
+    return to_translation_detail_response(_translation_view(translation, repository_novel))
 
 
-@router.patch(
-    "/{id}/sync",
-    response_model=TranslationSyncResponse,
-    operation_id="sync_translation",
-)
-def sync_translation_route(
-    session_user: SessionUser,
-    service_translation: ServiceTranslationDep,
-    realtime_hub: RealtimeHubDep,
-    id: str,
-) -> TranslationSyncResponse:
-    try:
-        result = service_translation.sync(id, updated_by=session_user.id)
-    except (TranslationNotFoundError, TranslationNovelNotFoundError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Translation or connected novel not found",
-        ) from exc
-    except TranslationSyncConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_412_PRECONDITION_FAILED,
-            detail=str(exc),
-        ) from exc
-    realtime_hub.publish(
-        "translation.updated",
-        build_translation_updated_payload(result.view.translation),
-    )
-    return to_translation_sync_response(result)
-
-
-@router.patch(
-    "/{id}/start",
-    response_model=TranslationDetailResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-    operation_id="start_translation",
-)
+@router.patch("/{id}/start", response_model=TranslationDetailResponse, status_code=status.HTTP_202_ACCEPTED, operation_id="start_translation")
 def start_translation_route(
     session_user: SessionUser,
+    repository_novel: RepositoryNovelDep,
+    repository_novel_chapter: RepositoryNovelChapterDep,
     repository_translation: RepositoryTranslationDep,
-    service_translation: ServiceTranslationDep,
     queue_publisher: PollingQueuePublisherDep,
     realtime_hub: RealtimeHubDep,
     id: str,
@@ -220,19 +172,24 @@ def start_translation_route(
     del session_user
     translation = repository_translation.get_by_id(id)
     if translation is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Translation not found")
+        raise NotFoundException("Translation not found")
     if translation.configuration is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Translation is not configured",
-        )
+        raise StateConflictException("Translation is not configured")
+
+    chapter_snapshots = [
+        _task_from_chapter(chapter)
+        for chapter in repository_novel_chapter.list(translation.novel_id).items
+        if not chapter.source_removed
+        and body.chapter_index_from <= chapter.manifest_index + 1 <= body.chapter_index_to
+    ]
+    if not chapter_snapshots:
+        raise ValidationException("No novel chapters match the requested chapter index range")
 
     for _ in range(3):
         try:
             queued = repository_translation.queue_tasks(
                 translation.id,
-                chapter_index_from=body.chapter_index_from,
-                chapter_index_to=body.chapter_index_to,
+                tasks=chapter_snapshots,
                 force=body.force,
                 etag=translation.etag,
             )
@@ -240,21 +197,12 @@ def start_translation_route(
         except TranslationConflictError:
             latest = repository_translation.get_by_id(translation.id)
             if latest is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Translation not found",
-                ) from None
+                raise NotFoundException("Translation not found") from None
             translation = latest
         except TranslationChapterRangeError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail=str(exc),
-            ) from exc
+            raise ValidationException(str(exc)) from exc
     else:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Translation changed while tasks were being queued",
-        )
+        raise StateConflictException("Translation changed while tasks were being queued")
 
     translation = queued.translation
     if queued.tasks:
@@ -273,32 +221,24 @@ def start_translation_route(
                 ),
             )
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Some translation tasks could not be queued; retry with force",
+        raise ServiceUnavailableException(
+            "Some translation tasks could not be queued; retry with force"
         ) from exc
-    view = service_translation.get_by_id(translation.id)
-    return to_translation_detail_response(
-        view or TranslationView(translation=translation, novel=None)
-    )
+    return to_translation_detail_response(_translation_view(translation, repository_novel))
 
 
-@router.patch(
-    "/{id}/stop",
-    response_model=TranslationDetailResponse,
-    operation_id="stop_translation",
-)
+@router.patch("/{id}/stop", response_model=TranslationDetailResponse, operation_id="stop_translation")
 def stop_translation_route(
     session_user: SessionUser,
+    repository_novel: RepositoryNovelDep,
     repository_translation: RepositoryTranslationDep,
-    service_translation: ServiceTranslationDep,
     realtime_hub: RealtimeHubDep,
     id: str,
 ) -> TranslationDetailResponse:
     del session_user
     translation = repository_translation.get_by_id(id)
     if translation is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Translation not found")
+        raise NotFoundException("Translation not found")
     for _ in range(3):
         try:
             updated = repository_translation.stop_queued_tasks(
@@ -309,31 +249,18 @@ def stop_translation_route(
         except TranslationConflictError:
             latest = repository_translation.get_by_id(translation.id)
             if latest is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Translation not found",
-                ) from None
+                raise NotFoundException("Translation not found") from None
             translation = latest
     else:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Translation changed while queued tasks were being stopped",
-        )
+        raise StateConflictException("Translation changed while queued tasks were being stopped")
     realtime_hub.publish(
         "translation.updated",
         build_translation_updated_payload(updated),
     )
-    view = service_translation.get_by_id(updated.id)
-    return to_translation_detail_response(
-        view or TranslationView(translation=updated, novel=None)
-    )
+    return to_translation_detail_response(_translation_view(updated, repository_novel))
 
 
-@router.get(
-    "/{id}/result/{taskId}",
-    response_model=TranslationResultResponse,
-    operation_id="get_translation_result",
-)
+@router.get("/{id}/result/{taskId}", response_model=TranslationResultResponse, operation_id="get_translation_result")
 def get_translation_result_route(
     session_user: SessionUser,
     repository_translation: RepositoryTranslationDep,
@@ -344,38 +271,22 @@ def get_translation_result_route(
     del session_user
     translation = repository_translation.get_by_id(id)
     if translation is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Translation not found")
+        raise NotFoundException("Translation not found")
     task = next((item for item in translation.tasks if item.id == task_id), None)
     if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Translation task not found",
-        )
+        raise NotFoundException("Translation task not found")
     if not task.result_available:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Translation result is not available",
-        )
+        raise StateConflictException("Translation result is not available")
     try:
         result = repository_translation_result.get(translation.id, task.id)
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Translation result is unavailable",
-        ) from exc
+        raise ServiceUnavailableException("Translation result is unavailable") from exc
     if result is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Translation result is unavailable",
-        )
+        raise ServiceUnavailableException("Translation result is unavailable")
     return to_translation_result_response(result)
 
 
-@router.put(
-    "/{id}/result/{taskId}",
-    response_model=TranslationResultResponse,
-    operation_id="update_translation_result",
-)
+@router.put("/{id}/result/{taskId}", response_model=TranslationResultResponse, operation_id="update_translation_result")
 def update_translation_result_route(
     session_user: SessionUser,
     repository_translation: RepositoryTranslationDep,
@@ -389,23 +300,14 @@ def update_translation_result_route(
     del session_user
     translation = repository_translation.get_by_id(id)
     if translation is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Translation not found")
+        raise NotFoundException("Translation not found")
     task = next((item for item in translation.tasks if item.id == task_id), None)
     if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Translation task not found",
-        )
+        raise NotFoundException("Translation task not found")
     if task.source_removed:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Source chapter is unavailable",
-        )
+        raise StateConflictException("Source chapter is unavailable")
     if task.status in {TranslationTaskStatus.QUEUED, TranslationTaskStatus.RUNNING}:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Translation task is currently processing",
-        )
+        raise StateConflictException("Translation task is currently processing")
 
     paragraphs = _split_translation_content(body.content)
     now = datetime.now(UTC)
@@ -430,15 +332,9 @@ def update_translation_result_route(
             )
         )
     except TranslationResultTooLargeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
+        raise ValidationException(str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Translation result could not be saved",
-        ) from exc
+        raise ServiceUnavailableException("Translation result could not be saved") from exc
 
     for _ in range(3):
         try:
@@ -458,32 +354,17 @@ def update_translation_result_route(
         except TranslationConflictError:
             latest = repository_translation.get_by_id(translation.id)
             if latest is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Translation not found",
-                ) from None
+                raise NotFoundException("Translation not found") from None
             translation = latest
             task = next((item for item in translation.tasks if item.id == task_id), None)
             if task is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Translation task not found",
-                ) from None
+                raise NotFoundException("Translation task not found") from None
             if task.source_removed:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Source chapter is unavailable",
-                ) from None
+                raise StateConflictException("Source chapter is unavailable") from None
             if task.status in {TranslationTaskStatus.QUEUED, TranslationTaskStatus.RUNNING}:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Translation task is currently processing",
-                ) from None
+                raise StateConflictException("Translation task is currently processing") from None
     else:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Translation changed while the result was being saved",
-        )
+        raise StateConflictException("Translation changed while the result was being saved")
 
     return to_translation_result_response(result)
 
@@ -502,68 +383,91 @@ def _split_translation_content(content: str) -> list[str]:
 @router.put("/{id}", response_model=TranslationResponse, operation_id="update_translation")
 def update_translation_route(
     session_user: SessionUser,
-    service_translation: ServiceTranslationDep,
+    repository_novel: RepositoryNovelDep,
+    repository_translation: RepositoryTranslationDep,
     id: str,
     body: Annotated[TranslationUpdateRequest, Body(...)],
 ) -> TranslationResponse:
-    try:
-        view = service_translation.update(
-            id,
-            name=body.name,
-            novel_id=body.novel_id,
-            target_language=body.target_language,
-            configuration=to_translation_configuration(body.configuration),
-            etag=body.etag,
-            updated_by=session_user.id,
+    translation = repository_translation.get_by_id(id)
+    if translation is None:
+        raise NotFoundException("Translation not found")
+    novel = _require_novel(repository_novel, body.novel_id)
+    if body.novel_id != translation.novel_id and translation.tasks:
+        raise StateConflictException(
+            "Translation novel cannot change after tasks have been created"
         )
-    except TranslationNovelNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Novel not found",
-        ) from exc
-    except TranslationSyncConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(exc),
-        ) from exc
+
+    translation.name = body.name.strip()
+    translation.novel_id = body.novel_id
+    translation.target_language = body.target_language.strip()
+    translation.configuration = to_translation_configuration(body.configuration)
+    translation.updated_at = datetime.now(UTC)
+    translation.updated_by = session_user.id
+    if (
+        translation.status == TranslationStatus.NEEDS_SETUP
+        and translation.configuration is not None
+    ):
+        translation.status = TranslationStatus.READY
+    elif (
+        translation.status == TranslationStatus.READY
+        and translation.configuration is None
+    ):
+        translation.status = TranslationStatus.NEEDS_SETUP
+    try:
+        updated = repository_translation.update(translation, body.etag)
     except TranslationConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_412_PRECONDITION_FAILED,
-            detail=str(exc),
-        ) from exc
+        raise ConflictException(str(exc)) from exc
     except TranslationNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Translation not found",
-        ) from exc
-    return to_translation_response(view)
+        raise NotFoundException("Translation not found") from exc
+    return to_translation_response(TranslationView(translation=updated, novel=novel))
 
 
-@router.delete(
-    "/{id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    operation_id="delete_translation",
-)
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT, operation_id="delete_translation")
 def delete_translation_route(
     session_user: SessionUser,
-    service_translation: ServiceTranslationDep,
+    repository_translation: RepositoryTranslationDep,
+    repository_translation_result: RepositoryTranslationResultDep,
     id: str,
 ) -> Response:
+    translation = repository_translation.get_by_id(id)
+    if translation is None:
+        raise NotFoundException("Translation not found")
     try:
-        service_translation.delete(id, session_user.id)
+        repository_translation_result.delete_by_translation(id)
+    except Exception as exc:
+        raise ServiceUnavailableException("Translation results could not be deleted") from exc
+    try:
+        repository_translation.delete(id, etag=None, deleted_by=session_user.id)
     except TranslationNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Translation not found",
-        ) from exc
+        raise NotFoundException("Translation not found") from exc
     except TranslationConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_412_PRECONDITION_FAILED,
-            detail=str(exc),
-        ) from exc
-    except TranslationResultDeleteError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Translation results could not be deleted",
-        ) from exc
+        raise ConflictException(str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _task_from_chapter(chapter: NovelChapter) -> TranslationTask:
+    return TranslationTask(
+        id=chapter.id,
+        title=chapter.title,
+        chapter_number=chapter.chapter_number,
+        manifest_index=chapter.manifest_index,
+        source_chapter_updated_at=chapter.updated_at,
+    )
+
+
+def _translation_view(
+    translation: Translation,
+    repository_novel: NovelRepository,
+) -> TranslationView:
+    try:
+        novel = repository_novel.get_by_id(translation.novel_id)
+    except NovelNotFoundError:
+        novel = None
+    return TranslationView(translation=translation, novel=novel)
+
+
+def _require_novel(repository_novel: NovelRepository, novel_id: str) -> Novel:
+    try:
+        return repository_novel.get_by_id(novel_id)
+    except NovelNotFoundError as exc:
+        raise NotFoundException("Novel not found") from exc

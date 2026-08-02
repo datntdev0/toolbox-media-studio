@@ -9,7 +9,6 @@ from app.domain.translations import (
     TranslationConfiguration,
     TranslationProgress,
     TranslationStatus,
-    TranslationSyncResult,
     TranslationTask,
     TranslationTaskStatus,
     TranslationView,
@@ -218,22 +217,6 @@ class TranslationDetailResponse(TranslationResponse):
 
     progress: TranslationProgressResponse
     tasks: list[TranslationTaskResponse] = Field(default_factory=list)
-
-
-class TranslationSyncChangesResponse(BaseModel):
-    """Task manifest changes returned by translation sync."""
-
-    added: int
-    refreshed: int
-    preserved: int
-    removed: int
-
-
-class TranslationSyncResponse(BaseModel):
-    """Translation sync result."""
-
-    translation: TranslationDetailResponse
-    changes: TranslationSyncChangesResponse
 
 
 class TranslationListResponse(BaseModel):
@@ -458,20 +441,6 @@ def to_translation_detail_response(
         **base.model_dump(),
         progress=_to_translation_progress_response(translation.progress),
         tasks=[_to_translation_task_response(task) for task in translation.tasks],
-    )
-
-
-def to_translation_sync_response(
-    result: TranslationSyncResult,
-) -> TranslationSyncResponse:
-    return TranslationSyncResponse(
-        translation=to_translation_detail_response(result.view),
-        changes=TranslationSyncChangesResponse(
-            added=result.changes.added,
-            refreshed=result.changes.refreshed,
-            preserved=result.changes.preserved,
-            removed=result.changes.removed,
-        ),
     )
 
 

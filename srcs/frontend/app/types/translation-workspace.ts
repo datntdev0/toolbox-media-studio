@@ -86,6 +86,7 @@ export interface TranslationProgress {
 
 export interface TranslationChapter {
   id: string
+  taskExists: boolean
   chapterIndex: number
   number: number
   title: string
@@ -96,6 +97,7 @@ export interface TranslationChapter {
   attempts: number
   lastError: string | null
   resultAvailable: boolean
+  contentAvailable: boolean
   sourceUpdated: boolean
   sourceRemoved: boolean
 }
@@ -110,6 +112,7 @@ export interface TranslationWorkspace {
   name: string
   novelId: string
   novelTitle: string
+  novelChapterCount: number
   coverImageUrl: string | null
   sourceLanguage: TranslationLanguageOption
   targetLanguage: TranslationLanguageOption
@@ -167,13 +170,6 @@ export interface TranslationDetailApiRecord extends TranslationApiRecord {
     failed: number
   }
   tasks?: TranslationTaskApiRecord[]
-}
-
-export interface TranslationSyncChanges {
-  added: number
-  refreshed: number
-  preserved: number
-  removed: number
 }
 
 export interface TranslationListApiRecord {

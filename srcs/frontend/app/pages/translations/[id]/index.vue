@@ -21,12 +21,11 @@ const novelApi = useNovelWorkspaceApi()
 const loading = ref(true)
 const loadError = ref<unknown>()
 const workspace = ref<TranslationWorkspace | null>(null)
-const sourceContentChapterIds = ref(new Set<string>())
+const novelWorkspace = ref<NovelWorkspace | null>(null)
 const originalLoading = ref(false)
 const originalLoadError = ref(false)
 const translationLoading = ref(false)
 const translationLoadError = ref(false)
-const syncing = ref(false)
 const starting = ref(false)
 const stopping = ref(false)
 const chaptersOpen = ref(false)
@@ -44,21 +43,16 @@ const workspaceId = computed(() => String(route.params.id || ''))
 
 function applyWorkspace(
   nextWorkspace: TranslationWorkspace,
-  novel?: NovelWorkspace
+  novel: NovelWorkspace
 ) {
+  const mergedWorkspace = mergeTranslationWorkspaceWithNovel(nextWorkspace, novel)
   const currentChapters = new Map(
     (workspace.value?.chapters || []).map(chapter => [chapter.id, chapter])
   )
 
-  if (novel) {
-    sourceContentChapterIds.value = new Set(
-      novel.chapters
-        .filter(chapter => chapter.contentAvailable && !chapter.sourceRemoved)
-        .map(chapter => chapter.id)
-    )
-  }
+  novelWorkspace.value = novel
 
-  nextWorkspace.chapters = nextWorkspace.chapters.map((chapter) => {
+  mergedWorkspace.chapters = mergedWorkspace.chapters.map((chapter) => {
     const current = currentChapters.get(chapter.id)
     const sourceBecameUpdated = chapter.sourceUpdated && !current?.sourceUpdated
     return {
@@ -74,9 +68,11 @@ function applyWorkspace(
         : null
     }
   })
-  workspace.value = nextWorkspace
+  workspace.value = mergedWorkspace
 
-  const availableChapters = nextWorkspace.chapters.filter(chapter => !chapter.sourceRemoved)
+  const availableChapters = mergedWorkspace.chapters.filter(
+    chapter => chapter.contentAvailable && !chapter.sourceRemoved
+  )
   if (!availableChapters.some(chapter => chapter.id === rangeStart.value)) {
     rangeStart.value = availableChapters[0]?.id || ''
   }
@@ -84,13 +80,24 @@ function applyWorkspace(
     rangeEnd.value = availableChapters.at(-1)?.id || ''
   }
 
-  const selectedExists = nextWorkspace.chapters.some(
+  const selectedExists = mergedWorkspace.chapters.some(
     chapter => chapter.id === selectedChapterId.value
   )
-  if ((!selectedChapterId.value || !selectedExists) && nextWorkspace.chapters[0]) {
+  if ((!selectedChapterId.value || !selectedExists) && mergedWorkspace.chapters[0]) {
     void router.replace({
-      query: { ...route.query, chapter: nextWorkspace.chapters[0].id }
+      query: { ...route.query, chapter: mergedWorkspace.chapters[0].id }
     })
+  }
+}
+
+async function hydrateWorkspace(nextWorkspace: TranslationWorkspace) {
+  try {
+    const novel = await novelApi.getNovel(nextWorkspace.novelId)
+    applyWorkspace(nextWorkspace, novel)
+  } catch (cause) {
+    const currentNovel = novelWorkspace.value
+    if (!currentNovel || currentNovel.id !== nextWorkspace.novelId) throw cause
+    applyWorkspace(nextWorkspace, currentNovel)
   }
 }
 
@@ -99,8 +106,7 @@ async function loadWorkspace() {
   loadError.value = undefined
   try {
     const loadedWorkspace = await translationApi.get(workspaceId.value)
-    const novel = await novelApi.getNovel(loadedWorkspace.novelId)
-    applyWorkspace(loadedWorkspace, novel)
+    await hydrateWorkspace(loadedWorkspace)
   } catch (cause) {
     loadError.value = cause
     workspace.value = null
@@ -147,7 +153,8 @@ watch([
   if (
     !chapter
     || chapter.originalParagraphs.length
-    || !sourceContentChapterIds.value.has(chapterId)
+    || !chapter.contentAvailable
+    || chapter.sourceRemoved
   ) return
 
   originalLoading.value = true
@@ -242,14 +249,14 @@ async function openConfiguration() {
 
 async function refreshWorkspace() {
   try {
-    applyWorkspace(await translationApi.get(workspaceId.value))
+    await hydrateWorkspace(await translationApi.get(workspaceId.value))
   } catch {
     // Keep the current workspace visible when a background refresh races another update.
   }
 }
 
 async function saveTranslationContent(content: string, title: string) {
-  if (!workspace.value || !selectedChapter.value) {
+  if (!workspace.value || !selectedChapter.value?.taskExists) {
     throw new Error('Translation chapter is unavailable')
   }
   const chapterId = selectedChapter.value.id
@@ -266,39 +273,6 @@ async function saveTranslationContent(content: string, title: string) {
   return result
 }
 
-async function syncChapters() {
-  if (syncing.value) return
-  syncing.value = true
-  try {
-    const result = await translationApi.sync(workspaceId.value)
-    applyWorkspace(result.workspace)
-    try {
-      applyWorkspace(
-        result.workspace,
-        await novelApi.getNovel(result.workspace.novelId)
-      )
-    } catch {
-      // The task manifest is already current; source availability can refresh next load.
-    }
-    const changes = result.changes
-    toast.add({
-      title: 'Chapter tasks synchronized',
-      description: `${changes.added} added, ${changes.refreshed} refreshed, ${changes.removed} removed, and ${changes.preserved} preserved.`,
-      color: 'success',
-      icon: 'lucide:refresh-cw'
-    })
-  } catch {
-    toast.add({
-      title: 'Unable to sync chapter tasks',
-      description: 'The translation or connected novel may have changed. Try again.',
-      color: 'error',
-      icon: 'lucide:circle-alert'
-    })
-  } finally {
-    syncing.value = false
-  }
-}
-
 async function startTranslation() {
   if (!workspace.value || starting.value) return
   const from = workspace.value.chapters.find(chapter => chapter.id === rangeStart.value)
@@ -307,7 +281,7 @@ async function startTranslation() {
 
   starting.value = true
   try {
-    applyWorkspace(await translationApi.start(workspaceId.value, {
+    await hydrateWorkspace(await translationApi.start(workspaceId.value, {
       chapterIndexFrom: from.chapterIndex,
       chapterIndexTo: to.chapterIndex,
       refetch: refetch.value,
@@ -336,7 +310,7 @@ async function stopTranslation() {
   if (stopping.value) return
   stopping.value = true
   try {
-    applyWorkspace(await translationApi.stop(workspaceId.value))
+    await hydrateWorkspace(await translationApi.stop(workspaceId.value))
     toast.add({
       title: 'Queued translations stopped',
       description: 'Queued chapters were reset. A chapter already running will finish normally.',
@@ -472,7 +446,7 @@ onBeforeUnmount(() => {
                     Chapters
                   </dt>
                   <dd class="text-toned">
-                    {{ workspace.progress.total }}
+                    {{ workspace.novelChapterCount }}
                   </dd>
                 </div>
               </dl>
@@ -480,7 +454,7 @@ onBeforeUnmount(() => {
                 <div class="flex justify-between gap-3 text-xs text-muted">
                   <span>Translation progress</span>
                   <span class="tabular-nums">
-                    {{ workspace.progress.translated }} / {{ workspace.progress.total }} chapters
+                    {{ workspace.progress.translated }} / {{ workspace.progress.total }} tasks
                   </span>
                 </div>
                 <UProgress
@@ -517,11 +491,9 @@ onBeforeUnmount(() => {
           v-model:refetch="refetch"
           v-model:force="force"
           :workspace="workspace"
-          :syncing="syncing"
           :starting="starting"
           :stopping="stopping"
           @configure="openConfiguration"
-          @sync="syncChapters"
           @start="startTranslation"
           @stop="stopTranslation"
         />

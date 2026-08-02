@@ -83,7 +83,7 @@ watch(open, async (isOpen) => {
   <USlideover
     v-model:open="open"
     title="Chapters"
-    :description="`${workspace.progress.translated} of ${workspace.progress.total} chapters translated`"
+    :description="`${workspace.progress.translated} of ${workspace.progress.total} tasks translated · ${workspace.novelChapterCount} novel chapters`"
     :ui="{ content: 'w-full max-w-lg' }"
   >
     <template #body>

@@ -77,8 +77,7 @@ def test_handler_translates_source_content() -> None:
     )
     queued = translations.queue_tasks(
         created.id,
-        chapter_index_from=1,
-        chapter_index_to=1,
+        tasks=[task],
         force=False,
         etag=created.etag,
     )
@@ -178,8 +177,7 @@ def test_handler_reuses_existing_result_without_sleeping() -> None:
     )
     queued = translations.queue_tasks(
         created.id,
-        chapter_index_from=1,
-        chapter_index_to=1,
+        tasks=[task],
         force=False,
         etag=created.etag,
     )

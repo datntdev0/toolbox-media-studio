@@ -39,33 +39,14 @@ async function loadWorkspace() {
     const loadedWorkspace = await useTranslationWorkspaceApi().get(workspaceId.value)
     const novelApi = useNovelWorkspaceApi()
     const novel = await novelApi.getNovel(loadedWorkspace.novelId)
+    const hydratedWorkspace = mergeTranslationWorkspaceWithNovel(loadedWorkspace, novel)
     const requestedChapter = novel.chapters.find(chapter =>
       chapter.id === previewChapterId.value
     )
-    const translationChapters = new Map(
-      loadedWorkspace.chapters.map(chapter => [chapter.id, chapter])
-    )
-
-    loadedWorkspace.chapters = novel.chapters.map((chapter, index) => ({
-      id: chapter.id,
-      chapterIndex: chapter.manifestIndex + 1,
-      number: chapter.chapterNumber ?? index + 1,
-      title: chapter.title,
-      translatedTitle: translationChapters.get(chapter.id)?.translatedTitle || null,
-      status: translationChapters.get(chapter.id)?.status || 'not_started',
-      originalParagraphs: [],
-      translatedParagraphs: [],
-      attempts: translationChapters.get(chapter.id)?.attempts || 0,
-      lastError: translationChapters.get(chapter.id)?.lastError || null,
-      resultAvailable: translationChapters.get(chapter.id)?.resultAvailable || false,
-      sourceUpdated: translationChapters.get(chapter.id)?.sourceUpdated || false,
-      sourceRemoved: translationChapters.get(chapter.id)?.sourceRemoved
-        || chapter.sourceRemoved
-    }))
 
     if (requestedChapter?.contentAvailable) {
       const content = await novelApi.getChapter(loadedWorkspace.novelId, requestedChapter.id)
-      const previewChapter = loadedWorkspace.chapters.find(chapter =>
+      const previewChapter = hydratedWorkspace.chapters.find(chapter =>
         chapter.id === requestedChapter.id
       )
       if (previewChapter) {
@@ -76,12 +57,12 @@ async function loadWorkspace() {
       }
     }
 
-    workspace.value = loadedWorkspace
-    if (loadedWorkspace.configuration) {
+    workspace.value = hydratedWorkspace
+    if (hydratedWorkspace.configuration) {
       configuration.value = {
-        providerId: loadedWorkspace.configuration.providerId,
-        modelId: loadedWorkspace.configuration.modelId,
-        globalPrompt: loadedWorkspace.configuration.globalPrompt
+        providerId: hydratedWorkspace.configuration.providerId,
+        modelId: hydratedWorkspace.configuration.modelId,
+        globalPrompt: hydratedWorkspace.configuration.globalPrompt
       }
     }
   } catch (cause) {

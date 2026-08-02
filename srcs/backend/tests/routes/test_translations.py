@@ -1,6 +1,6 @@
 """Translation-management endpoint tests."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -378,11 +378,8 @@ def test_translation_start_stop_and_result_workflow(
 
     detail = client.get(f"/api/translations/{translation['id']}", headers=headers)
     assert detail.status_code == 200
-    assert detail.json()["progress"]["created"] == 2
-    assert [task["id"] for task in detail.json()["tasks"]] == [
-        "chapter-1",
-        "chapter-2",
-    ]
+    assert detail.json()["progress"]["total"] == 0
+    assert detail.json()["tasks"] == []
     unconfigured = client.patch(
         f"/api/translations/{translation['id']}/start",
         headers=headers,
@@ -438,6 +435,20 @@ def test_translation_start_stop_and_result_workflow(
     assert stopped.json()["status"] == "stopped"
     assert stopped.json()["progress"]["created"] == 2
 
+    blocked_novel = _create_novel(client, headers, "Replacement Novel")
+    blocked = client.put(
+        f"/api/translations/{translation['id']}",
+        headers=headers,
+        json={
+            "name": translation["name"],
+            "novelId": blocked_novel["id"],
+            "targetLanguage": translation["targetLanguage"],
+            "configuration": configured["configuration"],
+            "etag": stopped.json()["etag"],
+        },
+    )
+    assert blocked.status_code == 409
+
     stored = translation_repository.get_by_id(configured["id"])
     assert stored is not None
     stored.tasks[0].status = TranslationTaskStatus.COMPLETED
@@ -474,6 +485,39 @@ def test_translation_result_can_be_manually_added_and_edited(
     novel = _create_novel(client, headers, "Manual Translation Novel")
     novel_chapter_repository.save(_chapter(novel["id"], "chapter-1", 0))
     translation = _create_translation(client, headers, novel["id"])
+
+    unavailable = client.put(
+        f"/api/translations/{translation['id']}/result/chapter-1",
+        headers=headers,
+        json={"title": "Not started", "content": "Translation"},
+    )
+    assert unavailable.status_code == 404
+
+    configured_response = client.put(
+        f"/api/translations/{translation['id']}",
+        headers=headers,
+        json={
+            "name": translation["name"],
+            "novelId": novel["id"],
+            "targetLanguage": translation["targetLanguage"],
+            "configuration": {
+                "providerId": "mock",
+                "modelId": "copy",
+                "globalPrompt": "Copy.",
+            },
+            "etag": translation["etag"],
+        },
+    )
+    assert configured_response.status_code == 200
+    assert client.patch(
+        f"/api/translations/{translation['id']}/start",
+        headers=headers,
+        json={"chapterIndexFrom": 1, "chapterIndexTo": 1},
+    ).status_code == 202
+    assert client.patch(
+        f"/api/translations/{translation['id']}/stop",
+        headers=headers,
+    ).status_code == 200
 
     created = client.put(
         f"/api/translations/{translation['id']}/result/chapter-1",
@@ -516,46 +560,42 @@ def test_translation_result_can_be_manually_added_and_edited(
     assert fetched.json()["content"] == ["Replacement translation"]
 
 
-def test_translation_sync_preserves_results_and_marks_removed_sources(
+def test_translation_job_upserts_only_selected_chapters_and_sync_route_is_removed(
     client: TestClient,
     novel_chapter_repository: InMemoryNovelChapterRepository,
-    translation_repository: InMemoryTranslationRepository,
 ) -> None:
     headers = _headers(_login(client))
-    novel = _create_novel(client, headers, "Sync Novel")
-    changed = novel_chapter_repository.save(_chapter(novel["id"], "changed", 0))
-    removed = novel_chapter_repository.save(_chapter(novel["id"], "removed", 1))
-    novel_chapter_repository.save(_chapter(novel["id"], "stable", 2))
+    novel = _create_novel(client, headers, "Job Novel")
+    novel_chapter_repository.save(_chapter(novel["id"], "first", 0))
+    novel_chapter_repository.save(_chapter(novel["id"], "second", 1))
+    novel_chapter_repository.save(_chapter(novel["id"], "third", 2))
     translation = _create_translation(client, headers, novel["id"])
-
-    stored = translation_repository.get_by_id(translation["id"])
-    assert stored is not None
-    changed_task = next(task for task in stored.tasks if task.id == "changed")
-    changed_task.status = TranslationTaskStatus.COMPLETED
-    changed_task.result_available = True
-    stored.progress = TranslationProgress.from_tasks(stored.tasks)
-    translation_repository.update(stored, stored.etag)
-
-    changed.title = "Changed title"
-    changed.updated_at = datetime.now(UTC) + timedelta(minutes=1)
-    novel_chapter_repository.save(changed, etag=changed.etag)
-    removed.source_removed = True
-    removed.updated_at = datetime.now(UTC) + timedelta(minutes=1)
-    novel_chapter_repository.save(removed, etag=removed.etag)
-    novel_chapter_repository.save(_chapter(novel["id"], "added", 3))
-
-    synced = client.patch(
-        f"/api/translations/{translation['id']}/sync",
+    configured = client.put(
+        f"/api/translations/{translation['id']}",
         headers=headers,
+        json={
+            "name": translation["name"],
+            "novelId": novel["id"],
+            "targetLanguage": translation["targetLanguage"],
+            "configuration": {
+                "providerId": "mock",
+                "modelId": "copy",
+                "globalPrompt": "Copy.",
+            },
+            "etag": translation["etag"],
+        },
+    ).json()
+
+    started = client.patch(
+        f"/api/translations/{configured['id']}/start",
+        headers=headers,
+        json={"chapterIndexFrom": 2, "chapterIndexTo": 3},
     )
-    assert synced.status_code == 200
-    assert synced.json()["changes"] == {
-        "added": 1,
-        "refreshed": 0,
-        "preserved": 1,
-        "removed": 1,
-    }
-    tasks = {task["id"]: task for task in synced.json()["translation"]["tasks"]}
-    assert tasks["changed"]["sourceUpdated"] is True
-    assert tasks["removed"]["sourceRemoved"] is True
-    assert tasks["changed"]["resultAvailable"] is True
+
+    assert started.status_code == 202
+    assert [task["id"] for task in started.json()["tasks"]] == ["second", "third"]
+    assert started.json()["progress"]["total"] == 2
+    assert client.patch(
+        f"/api/translations/{configured['id']}/sync",
+        headers=headers,
+    ).status_code == 404

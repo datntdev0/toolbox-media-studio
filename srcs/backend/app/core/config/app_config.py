@@ -15,9 +15,9 @@ class Security:
     jwt_algorithm: str
     jwt_signing_key: str
     jwt_expire_minutes: int
-    default_admin_email: str
-    default_admin_password: str
-    cors_allowed_origins: list[str] = None
+    default_admin_email: str | None
+    default_admin_password: str | None
+    cors_allowed_origins: list[str]
 
 @dataclass
 class CacheSettings:
@@ -31,7 +31,7 @@ class FlareSolverrSettings:
 
 
 @dataclass
-class AiFoundrySettings:
+class AzureOpenAISettings:
     endpoint: str
     api_key: str
 
@@ -48,7 +48,7 @@ CACHE_TTL_CRAWLER = 3600 * 24 * 30
 @singleton
 class AppConfig:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.appName: str = "Toolbox Media Studio"
         self.environment: str = os.environ.get("FAST_ENVIRONMENT", "localhost")
 
@@ -90,9 +90,9 @@ class AppConfig:
         self.public_blob_container: str = os.environ.get(
             "FAST_AZ_STORAGE_BLOB_PUBLIC_CONTAINER", "public"
         )
-        self.ai_foundry: AiFoundrySettings = AiFoundrySettings(
-            endpoint=os.environ.get("FAST_AZURE_AI_FOUNDRY_ENDPOINT", ""),
-            api_key=os.environ.get("FAST_AZURE_AI_FOUNDRY_API_KEY", ""),
+        self.azure_openai: AzureOpenAISettings = AzureOpenAISettings(
+            endpoint=os.environ.get("FAST_AZURE_OPENAI_ENDPOINT", ""),
+            api_key=os.environ.get("FAST_AZURE_OPENAI_API_KEY", ""),
         )
         self.azure_speech: AzureSpeechSettings = AzureSpeechSettings(
             endpoint=os.environ.get("FAST_AZURE_SPEECH_ENDPOINT", ""),

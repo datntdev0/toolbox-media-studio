@@ -137,21 +137,3 @@ class TranslationQueueResult:
 
     translation: Translation
     tasks: list[TranslationTask]
-
-
-@dataclass(frozen=True, slots=True)
-class TranslationSyncChanges:
-    """Task manifest changes produced by a translation sync."""
-
-    added: int
-    refreshed: int
-    preserved: int
-    removed: int
-
-
-@dataclass(frozen=True, slots=True)
-class TranslationSyncResult:
-    """Updated translation view and its manifest changes."""
-
-    view: TranslationView
-    changes: TranslationSyncChanges

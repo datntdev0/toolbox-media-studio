@@ -69,10 +69,10 @@ async def lifespan(app: FastAPI):
     from app.core.security.authentication import seed_admin_user
     seed_admin_user(logger, app_config, repository_user)
 
-    # queue_subscriber_sample.start()
-    # queue_listener_scraping.start()
-    # queue_listener_translation.start()
-    # queue_listener_workspace.start()
+    queue_subscriber_sample.start()
+    queue_listener_scraping.start()
+    queue_listener_translation.start()
+    queue_listener_workspace.start()
 
     try:
         yield
