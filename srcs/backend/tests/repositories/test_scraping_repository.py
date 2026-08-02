@@ -207,7 +207,8 @@ def test_delete_is_scoped_to_the_scraping_owner() -> None:
     with pytest.raises(ScrapingNotFoundError):
         repository.delete(scraping.id, "other-user")
     repository.delete(scraping.id, scraping.created_by)
-    assert repository.get(scraping.id, scraping.created_by) is None
+    with pytest.raises(ScrapingNotFoundError):
+        repository.get_by_id(scraping.id, scraping.created_by)
 
 
 def test_scraping_results_are_isolated_and_upsert_preserves_created_at() -> None:

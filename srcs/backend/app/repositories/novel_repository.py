@@ -6,6 +6,7 @@ from copy import deepcopy
 from datetime import UTC, datetime
 from typing import Protocol
 
+from app.core.exceptions import ConflictException, NotFoundException
 from app.domain.novels import Novel, NovelPage, NovelStatus
 
 
@@ -14,7 +15,7 @@ class NovelRepository(Protocol):
 
     def create(self, novel: Novel) -> Novel: ...
 
-    def get_by_id(self, id: str) -> Novel | None: ...
+    def get_by_id(self, id: str) -> Novel: ...
 
     def list(self, limit: int, continuation_token: str | None) -> NovelPage: ...
 
@@ -23,12 +24,18 @@ class NovelRepository(Protocol):
     def delete(self, id: str, etag: str | None, deleted_by: str) -> None: ...
 
 
-class NovelNotFoundError(Exception):
+class NovelNotFoundError(NotFoundException):
     """Raised when a novel cannot be found."""
 
+    def __init__(self) -> None:
+        super().__init__("Novel not found")
 
-class NovelConflictError(Exception):
+
+class NovelConflictError(ConflictException):
     """Raised when optimistic concurrency validation fails."""
+
+    def __init__(self) -> None:
+        super().__init__("Novel has changed")
 
 
 class InMemoryNovelRepository:
@@ -43,10 +50,10 @@ class InMemoryNovelRepository:
         self._novels[stored.id] = stored
         return deepcopy(stored)
 
-    def get_by_id(self, id: str) -> Novel | None:
+    def get_by_id(self, id: str) -> Novel:
         novel = self._novels.get(id)
         if novel is None or novel.status == NovelStatus.DELETED:
-            return None
+            raise NovelNotFoundError()
         return deepcopy(novel)
 
     def list(self, limit: int, continuation_token: str | None) -> NovelPage:
@@ -62,11 +69,11 @@ class InMemoryNovelRepository:
     def update(self, novel: Novel, etag: str | None) -> Novel:
         current = self._novels.get(novel.id)
         if current is None or current.status == NovelStatus.DELETED:
-            raise NovelNotFoundError
+            raise NovelNotFoundError()
         if current.created_by != novel.created_by:
-            raise NovelNotFoundError
+            raise NovelNotFoundError()
         if etag is not None and current.etag != etag:
-            raise NovelConflictError
+            raise NovelConflictError()
 
         stored = deepcopy(novel)
         stored.etag = self._next_etag()
@@ -76,9 +83,9 @@ class InMemoryNovelRepository:
     def delete(self, id: str, etag: str | None, deleted_by: str) -> None:
         current = self._novels.get(id)
         if current is None or current.status == NovelStatus.DELETED:
-            raise NovelNotFoundError
+            raise NovelNotFoundError()
         if etag is not None and current.etag != etag:
-            raise NovelConflictError
+            raise NovelConflictError()
 
         now = datetime.now(UTC)
         current.status = NovelStatus.DELETED

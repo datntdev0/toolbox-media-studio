@@ -1,5 +1,3 @@
-"""Global FastAPI exception handlers."""
-
 from __future__ import annotations
 
 import logging
@@ -11,14 +9,23 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from app.core.config.app_config import AppConfig
-from app.core.exceptions import NotImplementException
+from app.core.exceptions import (
+    AlreadyExistsException,
+    BadGatewayException,
+    ConflictException,
+    GatewayTimeoutException,
+    NotFoundException,
+    NotImplementException,
+    ServiceUnavailableException,
+    StateConflictException,
+    UnauthorizedException,
+    ValidationException,
+)
 
 settings = AppConfig()  # Singleton instance of AppSettings
 
 async def global_exception_handlers(request: Request, exc: Exception) -> JSONResponse:
-    status_code = {
-        NotImplementException: 501,
-    }.get(type(exc), 500)
+    status_code = _resolve_status_code(exc)
 
     logger = cast(logging.Logger, request.app.state.logger)
     logger.exception("Unhandled exception: %s", exc)
@@ -40,10 +47,36 @@ def _build_error_payload(message: str, exc: BaseException) -> dict[str, object]:
     }
 
 
+def _resolve_status_code(exc: Exception) -> int:
+    if isinstance(exc, NotImplementException):
+        return 501
+    if isinstance(exc, UnauthorizedException):
+        return 401
+    if isinstance(exc, NotFoundException):
+        return 404
+    if isinstance(exc, AlreadyExistsException):
+        return 409
+    if isinstance(exc, StateConflictException):
+        return 409
+    if isinstance(exc, ConflictException):
+        return 412
+    if isinstance(exc, ValidationException):
+        return 422
+    if isinstance(exc, BadGatewayException):
+        return 502
+    if isinstance(exc, ServiceUnavailableException):
+        return 503
+    if isinstance(exc, GatewayTimeoutException):
+        return 504
+    return 500
+
+
 def _format_traceback(exc: BaseException) -> list[str]:
     """Render the current exception traceback as a list of lines."""
-    if settings.environment == "production": return []
-    if exc.__traceback__ is None: return []
+    if settings.environment == "production":
+        return []
+    if exc.__traceback__ is None:
+        return []
 
     lines: list[str] = ["Traceback (most recent call last):"]
     for frame in extract_tb(exc.__traceback__):

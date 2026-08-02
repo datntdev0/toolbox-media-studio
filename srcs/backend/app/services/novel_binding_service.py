@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
+from app.core.exceptions import ConflictException, NotFoundException
 from app.domain.novels import Novel, NovelBinding, NovelChapter, NovelSyncResult
 from app.repositories.novel_chapter_repository import (
     NovelChapterConflictError,
@@ -15,11 +16,11 @@ from app.repositories.novel_repository import (
     NovelNotFoundError,
     NovelRepository,
 )
-from app.repositories.scraping_repository import ScrapingRepository
+from app.repositories.scraping_repository import ScrapingNotFoundError, ScrapingRepository
 from app.repositories.scraping_result_repository import ScrapingResultRepository
 
 
-class NovelBindingNotFoundError(Exception):
+class NovelBindingNotFoundError(NotFoundException):
     """Raised when a novel, scraping, or chapter cannot be found."""
 
 
@@ -27,7 +28,7 @@ class NovelBindingConflictError(Exception):
     """Raised when the requested workflow conflicts with current state."""
 
 
-class NovelBindingConcurrencyError(Exception):
+class NovelBindingConcurrencyError(ConflictException):
     """Raised when a write loses an optimistic-concurrency race."""
 
 
@@ -47,9 +48,10 @@ class NovelBindingService:
         self._chapters = chapter_repository
 
     def get_detail(self, novel_id: str) -> tuple[Novel, list[NovelChapter]]:
-        novel = self._novels.get_by_id(novel_id)
-        if novel is None:
-            raise NovelBindingNotFoundError("Novel not found")
+        try:
+            novel = self._novels.get_by_id(novel_id)
+        except NovelNotFoundError as exc:
+            raise NovelBindingNotFoundError("Novel not found") from exc
         return novel, self._chapters.list(novel_id).items
 
     def bind(
@@ -59,17 +61,19 @@ class NovelBindingService:
         *,
         updated_by: str,
     ) -> NovelSyncResult:
-        novel = self._novels.get_by_id(novel_id)
-        if novel is None:
-            raise NovelBindingNotFoundError("Novel not found")
+        try:
+            novel = self._novels.get_by_id(novel_id)
+        except NovelNotFoundError as exc:
+            raise NovelBindingNotFoundError("Novel not found") from exc
         existing_chapters = self._chapters.list(novel_id).items
         if novel.binding is not None or novel.chapter_count != 0 or existing_chapters:
             raise NovelBindingConflictError(
                 "Novel must be unbound and have no chapters"
             )
-        scraping = self._scrapings.get(scraping_id)
-        if scraping is None:
-            raise NovelBindingNotFoundError("Scraping not found")
+        try:
+            scraping = self._scrapings.get_by_id(scraping_id)
+        except ScrapingNotFoundError as exc:
+            raise NovelBindingNotFoundError("Scraping not found") from exc
 
         now = datetime.now(UTC)
         chapters: list[NovelChapter] = []
@@ -131,14 +135,16 @@ class NovelBindingService:
         )
 
     def sync(self, novel_id: str, *, updated_by: str) -> NovelSyncResult:
-        novel = self._novels.get_by_id(novel_id)
-        if novel is None:
-            raise NovelBindingNotFoundError("Novel not found")
+        try:
+            novel = self._novels.get_by_id(novel_id)
+        except NovelNotFoundError as exc:
+            raise NovelBindingNotFoundError("Novel not found") from exc
         if novel.binding is None:
             raise NovelBindingConflictError("Novel is not bound")
-        scraping = self._scrapings.get(novel.binding.scraping_id)
-        if scraping is None:
-            raise NovelBindingNotFoundError("Bound scraping not found")
+        try:
+            scraping = self._scrapings.get_by_id(novel.binding.scraping_id)
+        except ScrapingNotFoundError as exc:
+            raise NovelBindingNotFoundError("Bound scraping not found") from exc
 
         now = datetime.now(UTC)
         existing = {
@@ -269,8 +275,10 @@ class NovelBindingService:
         novel_id: str,
         chapter_id: str,
     ) -> tuple[NovelChapter, list[str]]:
-        if self._novels.get_by_id(novel_id) is None:
-            raise NovelBindingNotFoundError("Novel not found")
+        try:
+            self._novels.get_by_id(novel_id)
+        except NovelNotFoundError as exc:
+            raise NovelBindingNotFoundError("Novel not found") from exc
         chapter = self._chapters.get(novel_id, chapter_id)
         if chapter is None:
             raise NovelBindingNotFoundError("Novel chapter not found")
@@ -285,8 +293,10 @@ class NovelBindingService:
         etag: str,
         updated_by: str | None = None,
     ) -> tuple[NovelChapter, list[str]]:
-        if self._novels.get_by_id(novel_id) is None:
-            raise NovelBindingNotFoundError("Novel not found")
+        try:
+            self._novels.get_by_id(novel_id)
+        except NovelNotFoundError as exc:
+            raise NovelBindingNotFoundError("Novel not found") from exc
         chapter = self._chapters.get(novel_id, chapter_id)
         if chapter is None:
             raise NovelBindingNotFoundError("Novel chapter not found")

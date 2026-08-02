@@ -15,6 +15,7 @@ from app.core.injection import RepositoryUserDep, realtime_hub
 from app.core.realtime import RealtimeConnection
 from app.core.security.jwt_helper import decode_access_token
 from app.domain.users import UserStatus
+from app.repositories.user_repository import UserNotFoundError
 
 router = APIRouter(tags=["realtime"])
 app_config = AppConfig()
@@ -39,7 +40,10 @@ async def realtime_socket(
         return
 
     subject = claims.get("sub")
-    user = repository_user.get_by_id(str(subject)) if subject else None
+    try:
+        user = repository_user.get_by_id(str(subject)) if subject else None
+    except UserNotFoundError:
+        user = None
     if user is None or user.status != UserStatus.ACTIVE:
         await websocket.close(code=4401, reason="Unauthorized")
         return

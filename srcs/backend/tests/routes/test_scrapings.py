@@ -87,7 +87,7 @@ def test_create_persists_created_tasks_without_publishing(
     assert second.json()["reused"] is True
     assert queue_publisher.messages == []
 
-    stored = scraping_repository.get(first.json()["id"], _admin_id(client, token))
+    stored = scraping_repository.get_by_id(first.json()["id"], _admin_id(client, token))
     assert stored is not None
     assert [task.title for task in stored.tasks] == ["Chapter 1", "Chapter 2"]
     assert [task.manifest_index for task in stored.tasks] == [0, 1]
@@ -156,7 +156,7 @@ def test_update_replaces_editable_scraping_metadata(
         "coverImageUrl": "https://www.novel543.com/cover.jpg",
         "fetchedAt": updated.json()["metadata"]["fetchedAt"],
     }
-    stored = scraping_repository.get(created["id"], _admin_id(client, token))
+    stored = scraping_repository.get_by_id(created["id"], _admin_id(client, token))
     assert stored is not None
     assert stored.metadata.title == "Edited Novel"
 
@@ -204,7 +204,7 @@ def test_duplicate_create_refreshes_metadata_and_appends_new_chapters(
     assert second.status_code == 202
     assert second.json()["id"] == first["id"]
     assert second.json()["reused"] is True
-    stored = scraping_repository.get(first["id"], _admin_id(client, token))
+    stored = scraping_repository.get_by_id(first["id"], _admin_id(client, token))
     assert stored is not None
     assert stored.metadata.title == "Refreshed Novel"
     assert [task.chapter_number for task in stored.tasks] == [1, 2, 3]
@@ -262,7 +262,7 @@ def test_start_and_stop_manage_task_queue_messages(
     assert stopped.status_code == 200
     assert stopped.json()["progress"]["created"] == 2
     assert stopped.json()["progress"]["queued"] == 0
-    stored = scraping_repository.get(created["id"], _admin_id(client, token))
+    stored = scraping_repository.get_by_id(created["id"], _admin_id(client, token))
     assert stored is not None
     assert all(task.status == ScrapingTaskStatus.CREATED for task in stored.tasks)
 
@@ -288,7 +288,7 @@ def test_start_by_index_queues_additional_chapter_without_parsed_number(
 
     assert started.status_code == 202
     assert started.json()["progress"]["queued"] == 1
-    stored = scraping_repository.get(created["id"], _admin_id(client, token))
+    stored = scraping_repository.get_by_id(created["id"], _admin_id(client, token))
     assert stored is not None
     assert stored.tasks[2].chapter_number is None
     assert stored.tasks[2].manifest_index == 2
@@ -359,10 +359,11 @@ def test_start_publication_failure_leaves_tasks_queued_for_force_retry(
     )
 
     assert response.status_code == 503
-    assert response.json()["detail"] == (
+    assert response.json()["message"] == (
         "Some scraping tasks could not be queued; retry with force"
     )
-    stored = scraping_repository.get(created["id"], _admin_id(client, token))
+    assert isinstance(response.json()["traceStack"], list)
+    stored = scraping_repository.get_by_id(created["id"], _admin_id(client, token))
     assert stored is not None
     assert stored.progress.queued == 2
 
@@ -377,7 +378,7 @@ def test_result_endpoint_reads_one_completed_task_result(
     token = _login(client)
     created = _create(client, token)
     owner_id = _admin_id(client, token)
-    scraping = scraping_repository.get(created["id"], owner_id)
+    scraping = scraping_repository.get_by_id(created["id"], owner_id)
     assert scraping is not None
     task = scraping.tasks[0]
 
@@ -443,7 +444,7 @@ def test_delete_scraping_removes_owned_resource(
     flaresolverr_client.html = METADATA_HTML
     token = _login(client)
     created = _create(client, token)
-    scraping = scraping_repository.get(created["id"], _admin_id(client, token))
+    scraping = scraping_repository.get_by_id(created["id"], _admin_id(client, token))
     assert scraping is not None
     task = scraping.tasks[0]
     now = datetime.now(UTC)
@@ -491,7 +492,7 @@ def test_scraping_endpoints_are_not_owner_scoped(
     flaresolverr_client.html = METADATA_HTML
     admin_token = _login(client)
     created = _create(client, admin_token)
-    scraping = scraping_repository.get(created["id"], _admin_id(client, admin_token))
+    scraping = scraping_repository.get_by_id(created["id"], _admin_id(client, admin_token))
     assert scraping is not None
     task = scraping.tasks[0]
     now = datetime.now(UTC)
@@ -589,8 +590,9 @@ def test_delete_scraping_keeps_parent_when_result_cleanup_fails(
     )
 
     assert response.status_code == 503
-    assert response.json()["detail"] == "Scraping results could not be deleted"
-    assert scraping_repository.get(created["id"], owner_id) is not None
+    assert response.json()["message"] == "Scraping results could not be deleted"
+    assert isinstance(response.json()["traceStack"], list)
+    assert scraping_repository.get_by_id(created["id"], owner_id) is not None
 
 
 def _create(client: TestClient, token: str) -> dict[str, Any]:

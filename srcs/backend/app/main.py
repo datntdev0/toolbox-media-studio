@@ -4,6 +4,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config.app_config import AppConfig
+from app.core.exceptions import (
+    AlreadyExistsException,
+    BadGatewayException,
+    ConflictException,
+    GatewayTimeoutException,
+    NotFoundException,
+    NotImplementException,
+    ServiceUnavailableException,
+    StateConflictException,
+    UnauthorizedException,
+    ValidationException,
+)
 from app.core.exceptions.handler import global_exception_handlers
 from app.core.injection import (
     config,
@@ -57,10 +69,10 @@ async def lifespan(app: FastAPI):
     from app.core.security.authentication import seed_admin_user
     seed_admin_user(logger, app_config, repository_user)
 
-    queue_subscriber_sample.start()
-    queue_listener_scraping.start()
-    queue_listener_translation.start()
-    queue_listener_workspace.start()
+    # queue_subscriber_sample.start()
+    # queue_listener_scraping.start()
+    # queue_listener_translation.start()
+    # queue_listener_workspace.start()
 
     try:
         yield
@@ -92,6 +104,16 @@ app.add_middleware(CORSMiddleware,
     allow_headers=["*"],
 )
 
+app.add_exception_handler(NotImplementException, global_exception_handlers)
+app.add_exception_handler(UnauthorizedException, global_exception_handlers)
+app.add_exception_handler(NotFoundException, global_exception_handlers)
+app.add_exception_handler(AlreadyExistsException, global_exception_handlers)
+app.add_exception_handler(ConflictException, global_exception_handlers)
+app.add_exception_handler(StateConflictException, global_exception_handlers)
+app.add_exception_handler(ValidationException, global_exception_handlers)
+app.add_exception_handler(BadGatewayException, global_exception_handlers)
+app.add_exception_handler(ServiceUnavailableException, global_exception_handlers)
+app.add_exception_handler(GatewayTimeoutException, global_exception_handlers)
 app.add_exception_handler(Exception, global_exception_handlers)
 
 app.include_router(health.router)

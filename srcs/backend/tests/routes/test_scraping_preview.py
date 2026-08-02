@@ -6,8 +6,11 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from app.providers.proxy_service_provider import (
+    FlareSolverrBadResponseError,
+    FlareSolverrTimeoutError,
+)
 from tests.conftest import TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD
-
 
 METADATA_HTML = """
 <html><body>
@@ -55,6 +58,36 @@ def test_preview_rejects_unknown_crawler(client: TestClient) -> None:
     )
 
     assert response.status_code == 404
+
+
+def test_preview_maps_upstream_crawler_failures_to_gateway_errors(
+    client: TestClient,
+    flaresolverr_client: Any,
+) -> None:
+    token = _login(client)
+    params = {
+        "crawlerId": "novel543",
+        "sourceUrl": "https://www.novel543.com/0603625457/dir",
+    }
+
+    flaresolverr_client.exception = FlareSolverrBadResponseError("proxy unavailable")
+    bad_gateway = client.get(
+        "/api/scrapings/preview",
+        headers={"Authorization": f"Bearer {token}"},
+        params=params,
+    )
+
+    flaresolverr_client.exception = FlareSolverrTimeoutError("proxy timed out")
+    timeout = client.get(
+        "/api/scrapings/preview",
+        headers={"Authorization": f"Bearer {token}"},
+        params=params,
+    )
+
+    assert bad_gateway.status_code == 502
+    assert bad_gateway.json()["message"] == "Crawler source could not be fetched"
+    assert timeout.status_code == 504
+    assert timeout.json()["message"] == "Crawler source timed out"
 
 
 def _login(client: TestClient) -> str:

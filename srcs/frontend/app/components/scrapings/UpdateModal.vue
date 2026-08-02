@@ -134,7 +134,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         @submit="onSubmit"
       >
         <div class="flex items-start gap-4">
-          <div class="w-48 shrink-0">
+          <div class="w-41 shrink-0">
             <UFormField label="Cover image" name="coverImage">
               <UFileUpload
                 v-model="coverImage"
@@ -144,7 +144,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
                 description="JPEG or PNG, max 1 MB"
                 :file-image="true"
                 :preview="true"
-                class="w-48 aspect-[2/3]"
+                class="w-41 aspect-[2/3]"
               />
               <UCheckbox v-if="detail?.metadata.coverImageUrl" v-model="clearCoverImage" label="Remove current cover" />
             </UFormField>

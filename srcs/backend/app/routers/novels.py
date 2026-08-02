@@ -1,10 +1,13 @@
 """Novel-management routes."""
 
+# ruff: noqa: E501
+
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Body, File, HTTPException, Path, Query, Response, UploadFile, status
+from fastapi import APIRouter, Body, File, Path, Query, Response, UploadFile, status
 
+from app.core.exceptions import NotFoundException, StateConflictException, ValidationException
 from app.core.injection import (
     ProviderPublicBlobDep,
     RepositoryNovelDep,
@@ -28,26 +31,12 @@ from app.domain.responses import (
     to_novel_sync_response,
 )
 from app.providers.blob_storage_provider import BlobStorageError, validate_cover_content
-from app.repositories.novel_repository import NovelConflictError
-from app.services.novel_binding_service import (
-    NovelBindingConcurrencyError,
-    NovelBindingConflictError,
-    NovelBindingNotFoundError,
-)
-from app.services.novel_language_service import (
-    NovelLanguageContentNotFoundError,
-    NovelLanguageNotFoundError,
-)
+from app.services.novel_binding_service import NovelBindingConflictError
 
 router = APIRouter(prefix="/api/novels", tags=["novels"])
 
 
-@router.post(
-    "",
-    response_model=NovelResponse,
-    status_code=status.HTTP_201_CREATED,
-    operation_id="create_novel",
-)
+@router.post("", response_model=NovelResponse, status_code=status.HTTP_201_CREATED, operation_id="create_novel")
 def create_novel_route(
     session_user: SessionUser,
     repository_novel: RepositoryNovelDep,
@@ -58,7 +47,7 @@ def create_novel_route(
     return to_novel_response(novel_return)
 
 
-@router.get("", response_model=NovelListResponse, operation_id="list_novels")
+@router.get("", response_model=NovelListResponse, status_code=status.HTTP_200_OK, operation_id="list_novels")
 def list_novels_route(
     session_user: SessionUser,
     repository_novel: RepositoryNovelDep,
@@ -76,7 +65,7 @@ def list_novels_route(
     )
 
 
-@router.get("/{id}", response_model=NovelDetailResponse, operation_id="get_novel")
+@router.get("/{id}", response_model=NovelDetailResponse, status_code=status.HTTP_200_OK, operation_id="get_novel")
 def get_novel_route(
     session_user: SessionUser,
     repository_novel: RepositoryNovelDep,
@@ -84,23 +73,11 @@ def get_novel_route(
     id: str,
 ) -> NovelDetailResponse:
     novel_return = repository_novel.get_by_id(id=id)
-    if novel_return is None or novel_return.created_by != session_user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Novel not found")
-    try:
-        novel_return, chapters = binding_service.get_detail(id)
-    except NovelBindingNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
+    novel_return, chapters = binding_service.get_detail(id)
     return to_novel_detail_response(novel_return, chapters)
 
 
-@router.patch(
-    "/{id}/bind",
-    response_model=NovelSyncResponse,
-    operation_id="bind_novel",
-)
+@router.patch("/{id}/bind", response_model=NovelSyncResponse, status_code=status.HTTP_200_OK, operation_id="bind_novel")
 def bind_novel_route(
     session_user: SessionUser,
     binding_service: ServiceNovelBindingDep,
@@ -110,34 +87,13 @@ def bind_novel_route(
     """Bind any scraping to an empty novel and clone its current chapters."""
 
     try:
-        result = binding_service.bind(
-            id,
-            body.scraping_id,
-            updated_by=session_user.id,
-        )
-    except NovelBindingNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
+        result = binding_service.bind(id, body.scraping_id, updated_by=session_user.id)
     except NovelBindingConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(exc),
-        ) from exc
-    except NovelBindingConcurrencyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_412_PRECONDITION_FAILED,
-            detail=str(exc),
-        ) from exc
+        raise StateConflictException(str(exc)) from exc
     return to_novel_sync_response(result)
 
 
-@router.patch(
-    "/{id}/sync",
-    response_model=NovelSyncResponse,
-    operation_id="sync_novel",
-)
+@router.patch("/{id}/sync", response_model=NovelSyncResponse, status_code=status.HTTP_200_OK, operation_id="sync_novel")
 def sync_novel_route(
     session_user: SessionUser,
     binding_service: ServiceNovelBindingDep,
@@ -147,29 +103,12 @@ def sync_novel_route(
 
     try:
         result = binding_service.sync(id, updated_by=session_user.id)
-    except NovelBindingNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
     except NovelBindingConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(exc),
-        ) from exc
-    except NovelBindingConcurrencyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_412_PRECONDITION_FAILED,
-            detail=str(exc),
-        ) from exc
+        raise StateConflictException(str(exc)) from exc
     return to_novel_sync_response(result)
 
 
-@router.get(
-    "/{id}/languages",
-    response_model=NovelLanguageListResponse,
-    operation_id="list_novel_languages",
-)
+@router.get("/{id}/languages", response_model=NovelLanguageListResponse, status_code=status.HTTP_200_OK, operation_id="list_novel_languages")
 def list_novel_languages_route(
     session_user: SessionUser,
     service_novel_language: ServiceNovelLanguageDep,
@@ -178,13 +117,7 @@ def list_novel_languages_route(
     """Return the original and unique translated languages for a novel."""
 
     del session_user
-    try:
-        languages = service_novel_language.list_languages(id)
-    except NovelLanguageNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
+    languages = service_novel_language.list_languages(id)
     return NovelLanguageListResponse(
         items=[
             NovelLanguageResponse(code=item.code, source_type=item.source_type)
@@ -193,11 +126,7 @@ def list_novel_languages_route(
     )
 
 
-@router.get(
-    "/{id}/chapters/{chapterId}",
-    response_model=NovelChapterContentResponse,
-    operation_id="get_novel_chapter",
-)
+@router.get("/{id}/chapters/{chapterId}", response_model=NovelChapterContentResponse, status_code=status.HTTP_200_OK, operation_id="get_novel_chapter")
 def get_novel_chapter_route(
     session_user: SessionUser,
     service_novel_language: ServiceNovelLanguageDep,
@@ -208,28 +137,18 @@ def get_novel_chapter_route(
     """Return original or translated chapter content without ownership filtering."""
 
     del session_user
-    try:
-        chapter, content = service_novel_language.get_chapter_content(
-            id,
-            chapter_id,
-            language,
-        )
-    except (NovelLanguageNotFoundError, NovelLanguageContentNotFoundError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
+    chapter, content = service_novel_language.get_chapter_content(
+        id,
+        chapter_id,
+        language,
+    )
     return NovelChapterContentResponse(
         **to_novel_chapter_summary(chapter).model_dump(),
         content=content,
     )
 
 
-@router.put(
-    "/{id}/chapters/{chapterId}",
-    response_model=NovelChapterContentResponse,
-    operation_id="update_novel_chapter",
-)
+@router.put("/{id}/chapters/{chapterId}", response_model=NovelChapterContentResponse, status_code=status.HTTP_200_OK, operation_id="update_novel_chapter")
 def update_novel_chapter_route(
     session_user: SessionUser,
     binding_service: ServiceNovelBindingDep,
@@ -239,35 +158,20 @@ def update_novel_chapter_route(
 ) -> NovelChapterContentResponse:
     """Replace cloned content without applying an ownership constraint."""
 
-    try:
-        chapter, content = binding_service.update_chapter_content(
-            id,
-            chapter_id,
-            body.content,
-            etag=body.etag,
-            updated_by=session_user.id,
-        )
-    except NovelBindingNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-    except NovelBindingConcurrencyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_412_PRECONDITION_FAILED,
-            detail=str(exc),
-        ) from exc
+    chapter, content = binding_service.update_chapter_content(
+        id,
+        chapter_id,
+        body.content,
+        etag=body.etag,
+        updated_by=session_user.id,
+    )
     return NovelChapterContentResponse(
         **to_novel_chapter_summary(chapter).model_dump(),
         content=content,
     )
 
 
-@router.put(
-    "/{id}/cover",
-    response_model=NovelResponse,
-    operation_id="upload_novel_cover",
-)
+@router.put("/{id}/cover", response_model=NovelResponse, status_code=status.HTTP_200_OK, operation_id="upload_novel_cover")
 def upload_novel_cover_route(
     session_user: SessionUser,
     repository_novel: RepositoryNovelDep,
@@ -278,28 +182,20 @@ def upload_novel_cover_route(
     """Upload and attach a JPEG or PNG cover image to a novel."""
 
     novel = repository_novel.get_by_id(id=id)
-    if novel is None or novel.created_by != session_user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Novel not found")
+    if novel.created_by != session_user.id:
+        raise NotFoundException("Novel not found")
     try:
         content = cover_image.file.read(1024 * 1024 + 1)
         content_type = validate_cover_content(content, cover_image.content_type or "")
         novel.cover_image_url = provider_public_blob.upload_cover(id, content, content_type)
-        novel.updated_at = datetime.now(UTC)
-        novel.updated_by = session_user.id
-        return to_novel_response(repository_novel.update(novel, novel.etag))
     except BlobStorageError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
-    except NovelConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_412_PRECONDITION_FAILED,
-            detail="Novel has changed",
-        ) from exc
+        raise ValidationException(str(exc)) from exc
+    novel.updated_at = datetime.now(UTC)
+    novel.updated_by = session_user.id
+    return to_novel_response(repository_novel.update(novel, novel.etag))
 
 
-@router.put("/{id}", response_model=NovelResponse, operation_id="update_novel")
+@router.put("/{id}", response_model=NovelResponse, status_code=status.HTTP_200_OK, operation_id="update_novel")
 def update_novel_route(
     session_user: SessionUser,
     repository_novel: RepositoryNovelDep,
@@ -307,15 +203,12 @@ def update_novel_route(
     body: Annotated[NovelUpdateRequest, Body(...)],
 ) -> NovelResponse:
     novel_existing = repository_novel.get_by_id(id=id)
-    if novel_existing is None or novel_existing.created_by != session_user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Novel not found")
+    if novel_existing.created_by != session_user.id:
+        raise NotFoundException("Novel not found")
 
     supplied = body.model_fields_set - {"etag"}
     if not supplied:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="At least one property is required",
-        )
+        raise ValidationException("At least one property is required")
 
     for field in supplied:
         value = getattr(body, field)
@@ -325,30 +218,18 @@ def update_novel_route(
 
     novel_existing.updated_at = datetime.now(UTC)
     novel_existing.updated_by = session_user.id
-    try:
-        novel_return = repository_novel.update(novel_existing, body.etag)
-    except NovelConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_412_PRECONDITION_FAILED,
-            detail="Novel has changed",
-        ) from exc
+    novel_return = repository_novel.update(novel_existing, body.etag)
     return to_novel_response(novel_return)
 
 
-@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{id}", response_model=None, status_code=status.HTTP_204_NO_CONTENT, operation_id="delete_novel")
 def delete_novel_route(
     session_user: SessionUser,
     repository_novel: RepositoryNovelDep,
     id: str,
 ) -> Response:
     novel_existing = repository_novel.get_by_id(id=id)
-    if novel_existing is None or novel_existing.created_by != session_user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Novel not found")
-    try:
-        repository_novel.delete(id=novel_existing.id, etag=None, deleted_by=session_user.id)
-    except NovelConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_412_PRECONDITION_FAILED,
-            detail="Novel has changed",
-        ) from exc
+    if novel_existing.created_by != session_user.id:
+        raise NotFoundException("Novel not found")
+    repository_novel.delete(id=novel_existing.id, etag=None, deleted_by=session_user.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

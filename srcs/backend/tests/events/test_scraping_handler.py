@@ -64,7 +64,7 @@ def test_handler_processes_only_the_queued_message_task() -> None:
         _message(queued.scraping, queued.tasks[0], refetch=False)
     )
 
-    stored = scrapings.get(scraping.id, scraping.created_by)
+    stored = scrapings.get_by_id(scraping.id, scraping.created_by)
     assert stored is not None
     assert [task.status for task in stored.tasks] == [
         ScrapingTaskStatus.COMPLETED,
@@ -96,7 +96,7 @@ def test_handler_skips_created_and_duplicate_completed_messages() -> None:
     handler.handle(message)
 
     assert len(proxy.calls) == 1
-    stored = scrapings.get(scraping.id, scraping.created_by)
+    stored = scrapings.get_by_id(scraping.id, scraping.created_by)
     assert stored is not None
     assert stored.tasks[0].attempts == 1
 
@@ -120,7 +120,7 @@ def test_existing_result_completes_without_fetching_when_refetch_is_false() -> N
         _message(queued.scraping, queued.tasks[0], refetch=False)
     )
 
-    stored = scrapings.get(scraping.id, scraping.created_by)
+    stored = scrapings.get_by_id(scraping.id, scraping.created_by)
     assert stored is not None
     assert stored.tasks[0].status == ScrapingTaskStatus.COMPLETED
     assert stored.tasks[0].completed_at == persisted.updated_at
@@ -183,7 +183,7 @@ def test_failed_refetch_preserves_previous_result_availability() -> None:
         _Proxy(error=RuntimeError("temporary")),
     ).handle(_message(queued.scraping, queued.tasks[0], refetch=True))
 
-    stored = scrapings.get(scraping.id, scraping.created_by)
+    stored = scrapings.get_by_id(scraping.id, scraping.created_by)
     assert stored is not None
     assert stored.tasks[0].status == ScrapingTaskStatus.FAILED
     assert stored.tasks[0].last_error == "Proxy request failed"

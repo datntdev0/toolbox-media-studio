@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from app.domain.novels import NovelChapter
+from app.domain.novels import Novel, NovelChapter
 from app.domain.translations import (
     Translation,
     TranslationConfiguration,
@@ -16,7 +16,7 @@ from app.domain.translations import (
     TranslationViewPage,
 )
 from app.repositories.novel_chapter_repository import NovelChapterRepository
-from app.repositories.novel_repository import NovelRepository
+from app.repositories.novel_repository import NovelNotFoundError, NovelRepository
 from app.repositories.translation_repository import (
     TranslationConflictError,
     TranslationNotFoundError,
@@ -54,9 +54,7 @@ class TranslationService:
         self._results = translation_result_repository
 
     def create(self, translation: Translation) -> TranslationView:
-        novel = self._novels.get_by_id(translation.novel_id)
-        if novel is None:
-            raise TranslationNovelNotFoundError
+        novel = self._require_novel(translation.novel_id)
         if self._chapters is not None:
             translation.tasks = [
                 _task_from_chapter(chapter)
@@ -73,7 +71,7 @@ class TranslationService:
             items=[
                 TranslationView(
                     translation=translation,
-                    novel=self._novels.get_by_id(translation.novel_id),
+                    novel=self._find_novel(translation.novel_id),
                 )
                 for translation in page.items
             ],
@@ -86,7 +84,7 @@ class TranslationService:
             return None
         return TranslationView(
             translation=translation,
-            novel=self._novels.get_by_id(translation.novel_id),
+            novel=self._find_novel(translation.novel_id),
         )
 
     def update(
@@ -104,9 +102,7 @@ class TranslationService:
         if translation is None:
             raise TranslationNotFoundError
 
-        novel = self._novels.get_by_id(novel_id)
-        if novel is None:
-            raise TranslationNovelNotFoundError
+        novel = self._require_novel(novel_id)
 
         if novel_id != translation.novel_id:
             active = any(
@@ -162,9 +158,7 @@ class TranslationService:
             translation = self._translations.get_by_id(id)
             if translation is None:
                 raise TranslationNotFoundError
-            novel = self._novels.get_by_id(translation.novel_id)
-            if novel is None:
-                raise TranslationNovelNotFoundError
+            novel = self._require_novel(translation.novel_id)
 
             chapters = [
                 chapter
@@ -185,6 +179,18 @@ class TranslationService:
                 changes=changes,
             )
         raise TranslationSyncConflictError("Translation has changed")
+
+    def _find_novel(self, novel_id: str) -> Novel | None:
+        try:
+            return self._novels.get_by_id(novel_id)
+        except NovelNotFoundError:
+            return None
+
+    def _require_novel(self, novel_id: str) -> Novel:
+        novel = self._find_novel(novel_id)
+        if novel is None:
+            raise TranslationNovelNotFoundError
+        return novel
 
 
 def _task_from_chapter(chapter: NovelChapter) -> TranslationTask:

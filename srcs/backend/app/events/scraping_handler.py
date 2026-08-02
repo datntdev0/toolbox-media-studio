@@ -81,8 +81,11 @@ class ScrapingHandler(MessageHandler):
         if message.content is None:
             raise ValueError("Scraping queue message has no content")
         event = ScrapingEvent.from_mapping(message.content)
-        scraping = self._scrapings.get(event.scraping_id, event.created_by)
-        if scraping is None or scraping.idempotency_key != event.idempotency_key:
+        try:
+            scraping = self._scrapings.get_by_id(event.scraping_id, event.created_by)
+        except ScrapingNotFoundError:
+            return
+        if scraping.idempotency_key != event.idempotency_key:
             return
         task = _find_task(scraping, event.task_id)
         if task is None or task.status != ScrapingTaskStatus.QUEUED:
@@ -145,7 +148,10 @@ class ScrapingHandler(MessageHandler):
                 },
             )
         except Exception as exc:
-            latest = self._scrapings.get(claimed.id, claimed.created_by) or claimed
+            try:
+                latest = self._scrapings.get_by_id(claimed.id, claimed.created_by)
+            except ScrapingNotFoundError:
+                latest = claimed
             latest_task = _find_task(latest, task.id) or task
             preserved_result = self._results.get(claimed.id, task.id)
             self._update_task_with_retry(
@@ -177,8 +183,9 @@ class ScrapingHandler(MessageHandler):
                     etag=scraping.etag,
                 )
             except ScrapingConflictError:
-                latest = self._scrapings.get(scraping.id, scraping.created_by)
-                if latest is None:
+                try:
+                    latest = self._scrapings.get_by_id(scraping.id, scraping.created_by)
+                except ScrapingNotFoundError:
                     return None
                 task = _find_task(latest, task_id)
                 if task is None or task.status != ScrapingTaskStatus.QUEUED:
@@ -215,8 +222,9 @@ class ScrapingHandler(MessageHandler):
                 self._publish_update(updated, task_id=task_id)
                 return updated
             except ScrapingConflictError:
-                latest = self._scrapings.get(scraping.id, scraping.created_by)
-                if latest is None:
+                try:
+                    latest = self._scrapings.get_by_id(scraping.id, scraping.created_by)
+                except ScrapingNotFoundError:
                     raise ScrapingNotFoundError from None
                 scraping = latest
         raise ScrapingConflictError("Scraping task update conflicted repeatedly")

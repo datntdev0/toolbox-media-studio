@@ -74,10 +74,10 @@ class CosmosScrapingRepository:
                     candidate.idempotency_key,
                 )
                 if existing is None:
-                    raise ScrapingNotFoundError from None
+                    raise ScrapingNotFoundError() from None
         raise ScrapingConflictError("Scraping merge conflicted repeatedly")
 
-    def get(self, id: str, created_by: str | None = None) -> Scraping | None:
+    def get_by_id(self, id: str, created_by: str | None = None) -> Scraping:
         if created_by is None:
             items = list(
                 self._container.query_items(
@@ -86,22 +86,24 @@ class CosmosScrapingRepository:
                     enable_cross_partition_query=True,
                 )
             )
-            return self._deserialize(items[0]) if items else None
+            if not items:
+                raise ScrapingNotFoundError()
+            return self._deserialize(items[0])
 
         try:
             item = cast(
                 dict[str, Any],
                 self._container.read_item(item=id, partition_key=created_by),
             )
-        except exceptions.CosmosResourceNotFoundError:
-            return None
+        except exceptions.CosmosResourceNotFoundError as exc:
+            raise ScrapingNotFoundError() from exc
         return self._deserialize(item)
 
     def delete(self, id: str, created_by: str) -> None:
         try:
             self._container.delete_item(item=id, partition_key=created_by)
         except exceptions.CosmosResourceNotFoundError as exc:
-            raise ScrapingNotFoundError from exc
+            raise ScrapingNotFoundError() from exc
 
     def list(
         self,
@@ -317,10 +319,7 @@ class CosmosScrapingRepository:
         return self._deserialize(items[0]) if items else None
 
     def _require(self, id: str, created_by: str) -> Scraping:
-        scraping = self.get(id, created_by)
-        if scraping is None:
-            raise ScrapingNotFoundError
-        return scraping
+        return self.get_by_id(id, created_by)
 
     @staticmethod
     def _check_etag(scraping: Scraping, etag: str | None) -> None:
@@ -352,7 +351,7 @@ class CosmosScrapingRepository:
         except exceptions.CosmosAccessConditionFailedError as exc:
             raise ScrapingConflictError("Scraping has changed") from exc
         except exceptions.CosmosResourceNotFoundError as exc:
-            raise ScrapingNotFoundError from exc
+            raise ScrapingNotFoundError() from exc
         return self._deserialize(cast(dict[str, Any], item))
 
     def _replace(self, scraping: Scraping, *, etag: str | None) -> Scraping:
@@ -372,7 +371,7 @@ class CosmosScrapingRepository:
         except exceptions.CosmosAccessConditionFailedError as exc:
             raise ScrapingConflictError("Scraping has changed") from exc
         except exceptions.CosmosResourceNotFoundError as exc:
-            raise ScrapingNotFoundError from exc
+            raise ScrapingNotFoundError() from exc
         return self._deserialize(cast(dict[str, Any], item))
 
     @classmethod
@@ -495,7 +494,7 @@ def _task_index(scraping: Scraping, task_id: str) -> int:
         None,
     )
     if index is None:
-        raise ScrapingNotFoundError
+        raise ScrapingNotFoundError()
     return index
 
 

@@ -29,25 +29,25 @@ class CosmosUserRepository:
 
     def create(self, user: User) -> User:
         if self.get_by_email(user.email) is not None:
-            raise UserAlreadyExistsError
+            raise UserAlreadyExistsError()
 
         try:
             item = cast(dict[str, Any], self._container.create_item(body=self._serialize(user)))
         except exceptions.CosmosResourceExistsError as exc:
-            raise UserAlreadyExistsError from exc
+            raise UserAlreadyExistsError() from exc
         return self._deserialize(item)
 
-    def get_by_id(self, id: str) -> User | None:
+    def get_by_id(self, id: str) -> User:
         try:
             item = cast(
                 dict[str, Any],
                 self._container.read_item(item=id, partition_key=id),
             )
-        except exceptions.CosmosResourceNotFoundError:
-            raise UserNotFoundError
+        except exceptions.CosmosResourceNotFoundError as exc:
+            raise UserNotFoundError() from exc
         user = self._deserialize(item)
         if user.status == UserStatus.DELETED:
-            return None
+            raise UserNotFoundError()
         return user
 
     def get_by_email(self, email: str) -> User | None:
@@ -89,13 +89,11 @@ class CosmosUserRepository:
 
     def update(self, user: User, etag: str | None) -> User:
         existing = self.get_by_id(user.id)
-        if existing is None:
-            raise UserNotFoundError
         if (
             existing.normalized_email != user.normalized_email
             and self.get_by_email(user.email) is not None
         ):
-            raise UserAlreadyExistsError
+            raise UserAlreadyExistsError()
 
         serialized = self._serialize(user)
         options: dict[str, Any] = {}
@@ -109,16 +107,14 @@ class CosmosUserRepository:
                 self._container.replace_item(item=user.id, body=serialized, **options),
             )
         except exceptions.CosmosAccessConditionFailedError as exc:
-            raise UserConflictError from exc
+            raise UserConflictError() from exc
         except exceptions.CosmosResourceNotFoundError as exc:
-            raise UserNotFoundError from exc
+            raise UserNotFoundError() from exc
 
         return self._deserialize(item)
 
     def delete(self, id: str, etag: str | None, deleted_by: str) -> None:
         user = self.get_by_id(id)
-        if user is None:
-            raise UserNotFoundError
 
         now = datetime.now(UTC)
         user.status = UserStatus.DELETED

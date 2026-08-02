@@ -10,6 +10,7 @@ from enum import Enum
 from threading import Lock
 from typing import Protocol
 
+from app.core.exceptions import NotFoundException
 from app.domain.scrapings import (
     Scraping,
     ScrapingCreateResult,
@@ -27,7 +28,7 @@ class ScrapingRepository(Protocol):
 
     def create_or_merge(self, candidate: Scraping) -> ScrapingCreateResult: ...
 
-    def get(self, id: str, created_by: str | None = None) -> Scraping | None: ...
+    def get_by_id(self, id: str, created_by: str | None = None) -> Scraping: ...
 
     def delete(self, id: str, created_by: str) -> None: ...
 
@@ -84,8 +85,11 @@ class ScrapingRepository(Protocol):
     ) -> Scraping: ...
 
 
-class ScrapingNotFoundError(Exception):
+class ScrapingNotFoundError(NotFoundException):
     """Raised when a Scraping cannot be found."""
+
+    def __init__(self) -> None:
+        super().__init__("Scraping not found")
 
 
 class ScrapingConflictError(Exception):
@@ -129,7 +133,7 @@ class InMemoryScrapingRepository:
             self._scrapings[(stored.created_by, stored.id)] = stored
             return ScrapingCreateResult(scraping=deepcopy(stored), created=True)
 
-    def get(self, id: str, created_by: str | None = None) -> Scraping | None:
+    def get_by_id(self, id: str, created_by: str | None = None) -> Scraping:
         with self._lock:
             if created_by is None:
                 scraping = next(
@@ -142,12 +146,14 @@ class InMemoryScrapingRepository:
                 )
             else:
                 scraping = self._scrapings.get((created_by, id))
-            return deepcopy(scraping) if scraping is not None else None
+            if scraping is None:
+                raise ScrapingNotFoundError()
+            return deepcopy(scraping)
 
     def delete(self, id: str, created_by: str) -> None:
         with self._lock:
             if self._scrapings.pop((created_by, id), None) is None:
-                raise ScrapingNotFoundError
+                raise ScrapingNotFoundError()
 
     def list(
         self,
@@ -271,7 +277,7 @@ class InMemoryScrapingRepository:
             self._check_etag(scraping, etag)
             task = next((item for item in scraping.tasks if item.id == task_id), None)
             if task is None:
-                raise ScrapingNotFoundError
+                raise ScrapingNotFoundError()
             if task.status != ScrapingTaskStatus.QUEUED:
                 return None
 
@@ -301,7 +307,7 @@ class InMemoryScrapingRepository:
             self._check_etag(scraping, etag)
             task = next((item for item in scraping.tasks if item.id == task_id), None)
             if task is None:
-                raise ScrapingNotFoundError
+                raise ScrapingNotFoundError()
 
             task.status = status
             task.attempts = max(task.attempts, attempts)
@@ -331,7 +337,7 @@ class InMemoryScrapingRepository:
     def _require(self, id: str, created_by: str) -> Scraping:
         scraping = self._scrapings.get((created_by, id))
         if scraping is None:
-            raise ScrapingNotFoundError
+            raise ScrapingNotFoundError()
         return scraping
 
     @staticmethod

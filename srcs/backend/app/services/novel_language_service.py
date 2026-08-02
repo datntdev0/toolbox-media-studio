@@ -5,23 +5,24 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 
+from app.core.exceptions import NotFoundException
 from app.domain.novels import Novel, NovelChapter
 from app.domain.translation_results import TranslationResult
 from app.domain.translations import Translation
 from app.domain.workspaces import WorkspaceSourceType
 from app.repositories.novel_chapter_repository import NovelChapterRepository
-from app.repositories.novel_repository import NovelRepository
+from app.repositories.novel_repository import NovelNotFoundError, NovelRepository
 from app.repositories.translation_repository import TranslationRepository
 from app.repositories.translation_result_repository import TranslationResultRepository
 
 ORIGINAL_LANGUAGE_FALLBACK = "original"
 
 
-class NovelLanguageNotFoundError(Exception):
+class NovelLanguageNotFoundError(NotFoundException):
     """Raised when a novel or requested language is unavailable."""
 
 
-class NovelLanguageContentNotFoundError(Exception):
+class NovelLanguageContentNotFoundError(NotFoundException):
     """Raised when chapter content is unavailable in the requested language."""
 
 
@@ -170,7 +171,10 @@ class NovelLanguageService:
         )
 
     def get_novel(self, novel_id: str) -> Novel | None:
-        return self._novels.get_by_id(novel_id)
+        try:
+            return self._novels.get_by_id(novel_id)
+        except NovelNotFoundError:
+            return None
 
     @staticmethod
     def original_language(novel: Novel) -> str:
@@ -178,10 +182,10 @@ class NovelLanguageService:
         return language or ORIGINAL_LANGUAGE_FALLBACK
 
     def _require_novel(self, novel_id: str) -> Novel:
-        novel = self._novels.get_by_id(novel_id)
-        if novel is None:
-            raise NovelLanguageNotFoundError("Novel not found")
-        return novel
+        try:
+            return self._novels.get_by_id(novel_id)
+        except NovelNotFoundError as exc:
+            raise NovelLanguageNotFoundError("Novel not found") from exc
 
     @staticmethod
     def _translated_chapter(

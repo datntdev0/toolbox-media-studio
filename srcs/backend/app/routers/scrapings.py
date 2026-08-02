@@ -1,5 +1,7 @@
 """Scraping routes with direct HTTP orchestration."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -7,8 +9,16 @@ from hashlib import sha256
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, File, HTTPException, Path, Query, Response, UploadFile, status
+from fastapi import APIRouter, File, Path, Query, Response, UploadFile, status
 
+from app.core.exceptions import (
+    BadGatewayException,
+    GatewayTimeoutException,
+    NotFoundException,
+    ServiceUnavailableException,
+    StateConflictException,
+    ValidationException,
+)
 from app.core.injection import (
     PollingQueuePublisherDep,
     ProviderCacheDep,
@@ -52,18 +62,13 @@ from app.repositories.scraping_repository import (
     ScrapingChapterRangeError,
     ScrapingConflictError,
     ScrapingContinuationTokenError,
-    ScrapingNotFoundError,
     ScrapingTooLargeError,
 )
 
 router = APIRouter(prefix="/api/scrapings", tags=["scrapings"])
 
 
-@router.get(
-    "/preview",
-    response_model=CrawlerMetadataResponse,
-    operation_id="preview_scraping",
-)
+@router.get("/preview", response_model=CrawlerMetadataResponse, status_code=status.HTTP_200_OK, operation_id="preview_scraping")
 def preview_scraping_route(
     session_user: SessionUser,
     provider_cache: ProviderCacheDep,
@@ -84,33 +89,16 @@ def preview_scraping_route(
             use_cache=use_cache,
         )
     except UnknownCrawlerError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Crawler not found",
-        ) from exc
+        raise NotFoundException("Crawler not found") from exc
     except InvalidCrawlerUrlError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
+        raise ValidationException(str(exc)) from exc
     except CrawlerFetchTimeoutError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="Crawler source timed out",
-        ) from exc
+        raise GatewayTimeoutException("Crawler source timed out") from exc
     except CrawlerFetchError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Crawler source could not be fetched",
-        ) from exc
+        raise BadGatewayException("Crawler source could not be fetched") from exc
 
 
-@router.post(
-    "",
-    response_model=ScrapingCreateResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-    operation_id="create_scraping",
-)
+@router.post("", response_model=ScrapingCreateResponse, status_code=status.HTTP_202_ACCEPTED, operation_id="create_scraping")
 def create_scraping_route(
     session_user: SessionUser,
     repository_scraping: RepositoryScrapingDep,
@@ -128,28 +116,16 @@ def create_scraping_route(
             source_url=body.source_url,
             cache_provider=provider_cache,
             proxy_provider=provider_proxy,
-            use_cache=True,
+            use_cache=False,
         )
     except UnknownCrawlerError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Crawler not found",
-        ) from exc
+        raise NotFoundException("Crawler not found") from exc
     except InvalidCrawlerUrlError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
+        raise ValidationException(str(exc)) from exc
     except CrawlerFetchTimeoutError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="Crawler source timed out",
-        ) from exc
+        raise GatewayTimeoutException("Crawler source timed out") from exc
     except CrawlerFetchError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Crawler source could not be fetched",
-        ) from exc
+        raise BadGatewayException("Crawler source could not be fetched") from exc
 
     now = datetime.now(UTC)
     idempotency_key = _idempotency_key(
@@ -193,10 +169,7 @@ def create_scraping_route(
     try:
         create_result = repository_scraping.create_or_merge(candidate)
     except ScrapingTooLargeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
+        raise ValidationException(str(exc)) from exc
 
     scraping = create_result.scraping
     response.headers["Location"] = f"/api/scrapings/{scraping.id}"
@@ -211,11 +184,7 @@ def create_scraping_route(
     )
 
 
-@router.get(
-    "",
-    response_model=ScrapingListResponse,
-    operation_id="list_scrapings",
-)
+@router.get("", response_model=ScrapingListResponse, status_code=status.HTTP_200_OK, operation_id="list_scrapings")
 def list_scrapings_route(
     session_user: SessionUser,
     repository_scraping: RepositoryScrapingDep,
@@ -234,22 +203,14 @@ def list_scrapings_route(
             search=search,
         )
     except ScrapingContinuationTokenError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
+        raise ValidationException(str(exc)) from exc
     return ScrapingListResponse(
         items=[to_scraping_summary(scraping) for scraping in page.items],
         continuation_token=page.continuation_token,
     )
 
 
-@router.patch(
-    "/{id}/start",
-    response_model=ScrapingDetailResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-    operation_id="start_scraping",
-)
+@router.patch("/{id}/start", response_model=ScrapingDetailResponse, status_code=status.HTTP_202_ACCEPTED, operation_id="start_scraping")
 def start_scraping_route(
     session_user: SessionUser,
     repository_scraping: RepositoryScrapingDep,
@@ -261,12 +222,7 @@ def start_scraping_route(
     """Queue eligible tasks in an inclusive one-based manifest index range."""
 
     del session_user
-    scraping = repository_scraping.get(id)
-    if scraping is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Scraping not found",
-        )
+    scraping = repository_scraping.get_by_id(id)
 
     for _ in range(3):
         try:
@@ -280,23 +236,11 @@ def start_scraping_route(
             )
             break
         except ScrapingConflictError:
-            latest = repository_scraping.get(scraping.id, scraping.created_by)
-            if latest is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Scraping not found",
-                ) from None
-            scraping = latest
+            scraping = repository_scraping.get_by_id(scraping.id, scraping.created_by)
         except ScrapingChapterRangeError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail=str(exc),
-            ) from exc
+            raise ValidationException(str(exc)) from exc
     else:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Scraping changed while tasks were being queued",
-        )
+        raise StateConflictException("Scraping changed while tasks were being queued")
 
     scraping = queued.scraping
     if queued.tasks:
@@ -315,18 +259,13 @@ def start_scraping_route(
                 ),
             )
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Some scraping tasks could not be queued; retry with force",
+        raise ServiceUnavailableException(
+            "Some scraping tasks could not be queued; retry with force"
         ) from exc
     return to_scraping_detail(scraping)
 
 
-@router.patch(
-    "/{id}/stop",
-    response_model=ScrapingDetailResponse,
-    operation_id="stop_scraping",
-)
+@router.patch("/{id}/stop", response_model=ScrapingDetailResponse, status_code=status.HTTP_200_OK, operation_id="stop_scraping")
 def stop_scraping_route(
     session_user: SessionUser,
     repository_scraping: RepositoryScrapingDep,
@@ -336,12 +275,7 @@ def stop_scraping_route(
     """Reset all queued tasks to created without interrupting running work."""
 
     del session_user
-    scraping = repository_scraping.get(id)
-    if scraping is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Scraping not found",
-        )
+    scraping = repository_scraping.get_by_id(id)
 
     for _ in range(3):
         try:
@@ -352,18 +286,9 @@ def stop_scraping_route(
             )
             break
         except ScrapingConflictError:
-            latest = repository_scraping.get(scraping.id, scraping.created_by)
-            if latest is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Scraping not found",
-                ) from None
-            scraping = latest
+            scraping = repository_scraping.get_by_id(scraping.id, scraping.created_by)
     else:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Scraping changed while queued tasks were being stopped",
-        )
+        raise StateConflictException("Scraping changed while queued tasks were being stopped")
 
     realtime_hub.publish(
         "scraping.updated",
@@ -372,11 +297,7 @@ def stop_scraping_route(
     return to_scraping_detail(updated)
 
 
-@router.get(
-    "/{id}",
-    response_model=ScrapingDetailResponse,
-    operation_id="get_scraping",
-)
+@router.get("/{id}", response_model=ScrapingDetailResponse, status_code=status.HTTP_200_OK, operation_id="get_scraping")
 def get_scraping_route(
     session_user: SessionUser,
     repository_scraping: RepositoryScrapingDep,
@@ -385,20 +306,11 @@ def get_scraping_route(
     """Return one Scraping with embedded tasks."""
 
     del session_user
-    scraping = repository_scraping.get(id)
-    if scraping is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Scraping not found",
-        )
+    scraping = repository_scraping.get_by_id(id)
     return to_scraping_detail(scraping)
 
 
-@router.put(
-    "/{id}/cover",
-    response_model=ScrapingDetailResponse,
-    operation_id="upload_scraping_cover",
-)
+@router.put("/{id}/cover", response_model=ScrapingDetailResponse, status_code=status.HTTP_200_OK, operation_id="upload_scraping_cover")
 def upload_scraping_cover_route(
     session_user: SessionUser,
     repository_scraping: RepositoryScrapingDep,
@@ -410,9 +322,7 @@ def upload_scraping_cover_route(
     """Upload and attach a JPEG or PNG cover image to a scraping."""
 
     del session_user
-    scraping = repository_scraping.get(id)
-    if scraping is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scraping not found")
+    scraping = repository_scraping.get_by_id(id)
     try:
         content = cover_image.file.read(1024 * 1024 + 1)
         content_type = validate_cover_content(content, cover_image.content_type or "")
@@ -424,24 +334,14 @@ def upload_scraping_cover_route(
         scraping.updated_at = datetime.now(UTC)
         updated = repository_scraping.update(scraping, etag=scraping.etag)
     except BlobStorageError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
+        raise ValidationException(str(exc)) from exc
     except ScrapingConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Scraping has changed",
-        ) from exc
+        raise StateConflictException("Scraping has changed") from exc
     realtime_hub.publish("scraping.updated", build_scraping_updated_payload(updated))
     return to_scraping_detail(updated)
 
 
-@router.put(
-    "/{id}",
-    response_model=ScrapingDetailResponse,
-    operation_id="update_scraping",
-)
+@router.put("/{id}", response_model=ScrapingDetailResponse, status_code=status.HTTP_200_OK, operation_id="update_scraping")
 def update_scraping_route(
     session_user: SessionUser,
     repository_scraping: RepositoryScrapingDep,
@@ -452,9 +352,7 @@ def update_scraping_route(
     """Update the editable metadata and cover for a Scraping."""
 
     del session_user
-    scraping = repository_scraping.get(id)
-    if scraping is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scraping not found")
+    scraping = repository_scraping.get_by_id(id)
 
     metadata = scraping.metadata
     metadata.title = body.title.strip()
@@ -472,25 +370,15 @@ def update_scraping_route(
     try:
         updated = repository_scraping.update(scraping, etag=scraping.etag)
     except ScrapingConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Scraping has changed",
-        ) from exc
+        raise StateConflictException("Scraping has changed") from exc
     except ScrapingTooLargeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
+        raise ValidationException(str(exc)) from exc
 
     realtime_hub.publish("scraping.updated", build_scraping_updated_payload(updated))
     return to_scraping_detail(updated)
 
 
-@router.delete(
-    "/{id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    operation_id="delete_scraping",
-)
+@router.delete("/{id}", response_model=None, status_code=status.HTTP_204_NO_CONTENT, operation_id="delete_scraping")
 def delete_scraping_route(
     session_user: SessionUser,
     repository_scraping: RepositoryScrapingDep,
@@ -500,34 +388,16 @@ def delete_scraping_route(
     """Delete one Scraping and its results."""
 
     del session_user
-    scraping = repository_scraping.get(id)
-    if scraping is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Scraping not found",
-        )
+    scraping = repository_scraping.get_by_id(id)
     try:
         repository_scraping_result.delete_by_scraping(scraping.id)
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Scraping results could not be deleted",
-        ) from exc
-    try:
-        repository_scraping.delete(scraping.id, scraping.created_by)
-    except ScrapingNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Scraping not found",
-        ) from exc
+        raise ServiceUnavailableException("Scraping results could not be deleted") from exc
+    repository_scraping.delete(scraping.id, scraping.created_by)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get(
-    "/{id}/results/{taskId}",
-    response_model=ScrapingResultResponse,
-    operation_id="get_scraping_result",
-)
+@router.get("/{id}/results/{taskId}", response_model=ScrapingResultResponse, status_code=status.HTTP_200_OK, operation_id="get_scraping_result")
 def get_scraping_result_route(
     session_user: SessionUser,
     repository_scraping: RepositoryScrapingDep,
@@ -538,35 +408,18 @@ def get_scraping_result_route(
     """Return the isolated result for one completed embedded task."""
 
     del session_user
-    scraping = repository_scraping.get(id)
-    if scraping is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Scraping not found",
-        )
+    scraping = repository_scraping.get_by_id(id)
     task = next((item for item in scraping.tasks if item.id == task_id), None)
     if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Scraping task not found",
-        )
+        raise NotFoundException("Scraping task not found")
     if not task.result_available:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Scraping result is not available",
-        )
+        raise StateConflictException("Scraping result is not available")
     try:
         result = repository_scraping_result.get(scraping.id, task.id)
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Scraping result is unavailable",
-        ) from exc
+        raise ServiceUnavailableException("Scraping result is unavailable") from exc
     if result is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Scraping result is unavailable",
-        )
+        raise ServiceUnavailableException("Scraping result is unavailable")
     return to_scraping_result_response(result)
 
 

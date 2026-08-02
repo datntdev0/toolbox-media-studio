@@ -17,6 +17,7 @@ from app.domain.scrapings import (
 )
 from app.repositories.novel_chapter_repository import InMemoryNovelChapterRepository
 from app.repositories.novel_repository import InMemoryNovelRepository
+from app.repositories.scraping_repository import ScrapingNotFoundError
 from app.services.novel_binding_service import (
     NovelBindingConcurrencyError,
     NovelBindingConflictError,
@@ -28,9 +29,11 @@ class MutableScrapingRepository:
     def __init__(self, scraping: Scraping) -> None:
         self.scraping = scraping
 
-    def get(self, id: str, created_by: str | None = None) -> Scraping | None:
+    def get_by_id(self, id: str, created_by: str | None = None) -> Scraping:
         del created_by
-        return self.scraping if id == self.scraping.id else None
+        if id != self.scraping.id:
+            raise ScrapingNotFoundError()
+        return self.scraping
 
 
 class MutableResultRepository:

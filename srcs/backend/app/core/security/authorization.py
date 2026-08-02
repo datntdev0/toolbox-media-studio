@@ -1,12 +1,14 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import JWTError
 from typing import Annotated
 
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError
+
 from app.core.injection import RepositoryUserDep
-from app.domain.users import User, UserRole
 from app.core.security.jwt_helper import decode_access_token
-from app.domain.users import UserStatus
+from app.domain.users import User, UserRole, UserStatus
+from app.repositories.user_repository import UserNotFoundError
+
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 def get_session_user(
@@ -31,8 +33,11 @@ def get_session_user(
     if not subject:
         raise credentials_error
 
-    user = repositoryUser.get_by_id(str(subject))
-    if user is None or user.status != UserStatus.ACTIVE:
+    try:
+        user = repositoryUser.get_by_id(str(subject))
+    except UserNotFoundError as exc:
+        raise credentials_error from exc
+    if user.status != UserStatus.ACTIVE:
         raise credentials_error
 
     return user

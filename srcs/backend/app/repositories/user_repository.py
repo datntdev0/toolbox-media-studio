@@ -6,6 +6,7 @@ from copy import deepcopy
 from datetime import UTC, datetime
 from typing import Protocol
 
+from app.core.exceptions import AlreadyExistsException, ConflictException, NotFoundException
 from app.domain.users import User, UserPage, UserStatus
 
 
@@ -14,7 +15,7 @@ class UserRepository(Protocol):
 
     def create(self, user: User) -> User: ...
 
-    def get_by_id(self, id: str) -> User | None: ...
+    def get_by_id(self, id: str) -> User: ...
 
     def get_by_email(self, email: str) -> User | None: ...
 
@@ -27,16 +28,25 @@ class UserRepository(Protocol):
     def seed_admin(self, user: User) -> User | None: ...
 
 
-class UserAlreadyExistsError(Exception):
+class UserAlreadyExistsError(AlreadyExistsException):
     """Raised when a unique user identity already exists."""
 
+    def __init__(self) -> None:
+        super().__init__("User email already exists")
 
-class UserNotFoundError(Exception):
+
+class UserNotFoundError(NotFoundException):
     """Raised when a user cannot be found."""
 
+    def __init__(self) -> None:
+        super().__init__("User not found")
 
-class UserConflictError(Exception):
+
+class UserConflictError(ConflictException):
     """Raised when optimistic concurrency validation fails."""
+
+    def __init__(self) -> None:
+        super().__init__("User has changed")
 
 
 class InMemoryUserRepository:
@@ -50,17 +60,17 @@ class InMemoryUserRepository:
             existing.normalized_email == user.normalized_email
             for existing in self._users.values()
         ):
-            raise UserAlreadyExistsError
+            raise UserAlreadyExistsError()
 
         stored = deepcopy(user)
         stored.etag = self._next_etag()
         self._users[stored.id] = stored
         return deepcopy(stored)
 
-    def get_by_id(self, id: str) -> User | None:
+    def get_by_id(self, id: str) -> User:
         user = self._users.get(id)
         if user is None or user.status == UserStatus.DELETED:
-            return None
+            raise UserNotFoundError()
         return deepcopy(user)
 
     def get_by_email(self, email: str) -> User | None:
@@ -83,14 +93,14 @@ class InMemoryUserRepository:
     def update(self, user: User, etag: str | None) -> User:
         current = self._users.get(user.id)
         if current is None or current.status == UserStatus.DELETED:
-            raise UserNotFoundError
+            raise UserNotFoundError()
         if etag is not None and current.etag != etag:
-            raise UserConflictError
+            raise UserConflictError()
         if any(
             existing.id != user.id and existing.normalized_email == user.normalized_email
             for existing in self._users.values()
         ):
-            raise UserAlreadyExistsError
+            raise UserAlreadyExistsError()
 
         stored = deepcopy(user)
         stored.etag = self._next_etag()
@@ -100,9 +110,9 @@ class InMemoryUserRepository:
     def delete(self, id: str, etag: str | None, deleted_by: str) -> None:
         current = self._users.get(id)
         if current is None or current.status == UserStatus.DELETED:
-            raise UserNotFoundError
+            raise UserNotFoundError()
         if etag is not None and current.etag != etag:
-            raise UserConflictError
+            raise UserConflictError()
 
         now = datetime.now(UTC)
         current.status = UserStatus.DELETED

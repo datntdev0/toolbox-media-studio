@@ -5,12 +5,12 @@ import secrets
 from logging import Logger
 from uuid import uuid4
 
-from app.core.exceptions import InvalidCredentialsError
-from app.core.logging import LogManager
 from app.core.config.app_config import AppConfig
+from app.core.exceptions import InvalidCredentialsError
 from app.core.security.jwt_helper import create_access_token
-from app.repositories.user_repository import UserRepository
 from app.domain.users import User, UserRole, UserStatus
+from app.repositories.user_repository import UserRepository
+
 
 def hash_password(plain: str) -> str:
     """Return the SHA-256 digest for the supplied password."""
@@ -30,9 +30,9 @@ def authenticate(email: str, password: str, user_repository: UserRepository) -> 
     user = user_repository.get_by_email(email)
 
     if user is None or user.status != UserStatus.ACTIVE:
-        raise InvalidCredentialsError
+        raise InvalidCredentialsError()
     if not verify_password(password, user.password_hash):
-        raise InvalidCredentialsError
+        raise InvalidCredentialsError()
 
     return create_access_token(
         subject=user.id,
@@ -46,16 +46,19 @@ def seed_admin_user(logger: Logger, config: AppConfig, repository: UserRepositor
     email = config.security.default_admin_email
     password = config.security.default_admin_password
     if email is None or password is None:
-        logger.warn("Admin user seeding skipped: default admin email or password not set in configuration.")
+        logger.warn(
+            "Admin user seeding skipped: default admin email or password not set in"
+            " configuration."
+        )
         return
-    
+
     existing_user = repository.get_by_email(email)
     if existing_user is not None:
         return  # Admin user already exists
-    
-    now = datetime.datetime.now(datetime.timezone.utc)
+
+    now = datetime.datetime.now(datetime.UTC)
     normalized_email = email.lower()
-    
+
     seed_user = User(
         id=str(uuid4()),
         email=normalized_email,

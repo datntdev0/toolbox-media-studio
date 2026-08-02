@@ -1,0 +1,3 @@
+This document outlines the rules and conventions for backend repositories in the project.
+- All repository classes must have suffix `_repository` in their names. For example, a repository handling user data should be named `user_repository`. The CosmosDB repository class should be named `cosmos_{entity}_repository` and placed in the `app/repositories/cosmosdb`.
+- The `get_by_id` method must retrieve an entity by its ID and return it. If the entity is not found, it should raise a `NotFoundException` instead of returning `None`. This ensures that the global exception handler can handle it appropriately.

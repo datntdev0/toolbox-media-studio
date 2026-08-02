@@ -29,7 +29,7 @@ class CosmosNovelRepository:
         item = cast(dict[str, Any], self._container.create_item(body=self._serialize(novel)))
         return self._deserialize(item)
 
-    def get_by_id(self, id: str) -> Novel | None:
+    def get_by_id(self, id: str) -> Novel:
         query = """
         SELECT TOP 1 * FROM c
         WHERE c.id = @id
@@ -42,10 +42,10 @@ class CosmosNovelRepository:
             )
         )
         if not items:
-            return None
+            raise NovelNotFoundError()
         novel = self._deserialize(cast(dict[str, Any], items[0]))
         if novel.status == NovelStatus.DELETED:
-            return None
+            raise NovelNotFoundError()
         return novel
 
     def list(self, limit: int, continuation_token: str | None) -> NovelPage:
@@ -66,9 +66,7 @@ class CosmosNovelRepository:
         return NovelPage(items=items, continuation_token=None)
 
     def update(self, novel: Novel, etag: str | None) -> Novel:
-        existing = self.get_by_id(novel.id)
-        if existing is None:
-            raise NovelNotFoundError
+        self.get_by_id(novel.id)
 
         serialized = self._serialize(novel)
         options: dict[str, Any] = {}
@@ -82,16 +80,14 @@ class CosmosNovelRepository:
                 self._container.replace_item(item=novel.id, body=serialized, **options),
             )
         except exceptions.CosmosAccessConditionFailedError as exc:
-            raise NovelConflictError from exc
+            raise NovelConflictError() from exc
         except exceptions.CosmosResourceNotFoundError as exc:
-            raise NovelNotFoundError from exc
+            raise NovelNotFoundError() from exc
 
         return self._deserialize(item)
 
     def delete(self, id: str, etag: str | None, deleted_by: str) -> None:
         novel = self.get_by_id(id)
-        if novel is None:
-            raise NovelNotFoundError
 
         now = datetime.now(UTC)
         novel.status = NovelStatus.DELETED
