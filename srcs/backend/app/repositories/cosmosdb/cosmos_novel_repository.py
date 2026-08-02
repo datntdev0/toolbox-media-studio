@@ -9,7 +9,7 @@ from azure.core import MatchConditions
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 
 from app.core.config.app_config import AppConfig
-from app.domain.novels import Novel, NovelBinding, NovelPage, NovelStatus
+from app.domain.novels import Novel, NovelBinding, NovelPage
 from app.repositories.novel_repository import NovelConflictError, NovelNotFoundError
 
 NOVELS_CONTAINER_NAME = "domain.novels"
@@ -44,19 +44,18 @@ class CosmosNovelRepository:
         if not items:
             raise NovelNotFoundError()
         novel = self._deserialize(cast(dict[str, Any], items[0]))
-        if novel.status == NovelStatus.DELETED:
+        if novel.deleted_at is not None:
             raise NovelNotFoundError()
         return novel
 
     def list(self, limit: int, continuation_token: str | None) -> NovelPage:
         query = """
         SELECT * FROM c
-        WHERE c.status != @deleted_status
+        WHERE (NOT IS_DEFINED(c.deletedAt) OR c.deletedAt = null)
         ORDER BY c.createdAt
         """
         iterator = self._container.query_items(
             query=query,
-            parameters=[{"name": "@deleted_status", "value": NovelStatus.DELETED.value}],
             enable_cross_partition_query=True,
             max_item_count=limit,
         )
@@ -90,7 +89,6 @@ class CosmosNovelRepository:
         novel = self.get_by_id(id)
 
         now = datetime.now(UTC)
-        novel.status = NovelStatus.DELETED
         novel.deleted_at = now
         novel.deleted_by = deleted_by
         novel.updated_at = now
@@ -108,7 +106,6 @@ class CosmosNovelRepository:
             "author": novel.author,
             "tags": novel.tags,
             "notes": novel.notes,
-            "status": novel.status.value,
             "binding": (
                 {
                     "scrapingId": novel.binding.scraping_id,
@@ -139,7 +136,6 @@ class CosmosNovelRepository:
             author=cast(str | None, item.get("author")),
             tags=list(cast(list[str], item.get("tags", []))),
             notes=cast(str | None, item.get("notes")),
-            status=NovelStatus(cast(str, item["status"])),
             binding=(
                 NovelBinding(
                     scraping_id=cast(str, binding["scrapingId"]),

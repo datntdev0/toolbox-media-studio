@@ -9,7 +9,7 @@ import pytest
 
 from app.core.events.message_handler import QueueMessage
 from app.core.realtime import RealtimeHub
-from app.domain.novels import Novel, NovelChapter, NovelStatus
+from app.domain.novels import Novel, NovelChapter
 from app.domain.workspace_results import WorkspaceResult
 from app.domain.workspaces import (
     Workspace,
@@ -204,7 +204,6 @@ def _queued_workspace() -> tuple[
             author=None,
             tags=[],
             notes=None,
-            status=NovelStatus.DRAFT,
             created_by="user-1",
             created_at=now,
             updated_by="user-1",

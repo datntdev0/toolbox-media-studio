@@ -4,18 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
-
-
-class NovelStatus(StrEnum):
-    """Supported novel lifecycle states."""
-
-    DRAFT = "draft"
-    ACTIVE = "active"
-    ARCHIVED = "archived"
-    DELETED = "deleted"
 
 
 @dataclass(slots=True)
@@ -39,15 +29,14 @@ class Novel:
     author: str | None
     tags: list[str]
     notes: str | None
-    status: NovelStatus
-    created_by: str
-    created_at: datetime
-    updated_by: str
-    updated_at: datetime
     binding: NovelBinding | None = None
     chapter_count: int = 0
-    deleted_at: datetime | None = None
+    created_by: str | None = None
+    created_at: datetime | None = None
+    updated_by: str | None = None
+    updated_at: datetime | None = None
     deleted_by: str | None = None
+    deleted_at: datetime | None = None
     etag: str | None = None
 
 

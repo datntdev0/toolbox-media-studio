@@ -116,14 +116,6 @@ function readValue(value: unknown, fallback = '') {
               </div>
               <div>
                 <dt class="text-xs text-muted">
-                  Status
-                </dt>
-                <dd class="capitalize text-toned">
-                  {{ novel.status }}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-xs text-muted">
                   Chapters
                 </dt>
                 <dd class="text-toned">

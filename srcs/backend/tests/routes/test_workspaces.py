@@ -190,7 +190,6 @@ def test_original_sentinel_and_unknown_language(client: TestClient) -> None:
             "type": "audio",
             "novelId": novel["id"],
             "language": "original",
-            "status": "draft",
         },
     ).status_code == 422
     assert client.delete(f"/api/novels/{novel['id']}", headers=headers).status_code == 204

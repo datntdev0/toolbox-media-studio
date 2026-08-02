@@ -59,7 +59,6 @@ def test_legacy_novel_document_defaults_to_unbound_with_no_chapters() -> None:
             "author": None,
             "tags": [],
             "notes": None,
-            "status": "draft",
             "createdBy": "user-1",
             "createdAt": now,
             "updatedBy": "user-1",
@@ -111,7 +110,6 @@ def test_novel_binding_persists_only_novel_specific_relationship_data() -> None:
             "author": None,
             "tags": [],
             "notes": None,
-            "status": "draft",
             "binding": {
                 "scrapingId": "scraping-1",
                 "crawlerId": "legacy-crawler",

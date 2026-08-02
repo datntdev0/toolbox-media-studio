@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.domain.novels import Novel, NovelStatus
+from app.domain.novels import Novel
 from app.domain.scraping_results import ScrapingResult
 from app.domain.scrapings import (
     Scraping,
@@ -251,7 +251,6 @@ def _novel() -> Novel:
         author=None,
         tags=[],
         notes=None,
-        status=NovelStatus.DRAFT,
         created_by="owner",
         created_at=now,
         updated_by="owner",

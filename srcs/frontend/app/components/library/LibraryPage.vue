@@ -257,12 +257,6 @@ async function deleteNovel(novel: NovelResponse) {
             </div>
             <template #footer>
               <div class="flex flex-wrap items-center gap-2 text-xs text-muted">
-                <UBadge
-                  v-if="novel.status"
-                  :label="novel.status"
-                  variant="subtle"
-                  class="capitalize"
-                />
                 <span v-if="display(novel.author, '')">{{ display(novel.author, '') }}</span>
                 <span v-if="display(novel.language, '')">{{ display(novel.language, '') }}</span>
                 <UBadge

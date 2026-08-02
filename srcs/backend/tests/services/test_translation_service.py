@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.domain.novels import Novel, NovelStatus
+from app.domain.novels import Novel
 from app.domain.translations import (
     Translation,
     TranslationConfiguration,
@@ -29,7 +29,6 @@ def _novel(id: str = "novel-1") -> Novel:
         author=None,
         tags=[],
         notes=None,
-        status=NovelStatus.DRAFT,
         created_by="user-1",
         created_at=now,
         updated_by="user-1",

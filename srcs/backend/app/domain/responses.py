@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.domain.novels import Novel, NovelBinding, NovelChapter, NovelStatus, NovelSyncResult
+from app.domain.novels import Novel, NovelBinding, NovelChapter, NovelSyncResult
 from app.domain.translations import (
     TranslationConfiguration,
     TranslationProgress,
@@ -70,7 +70,6 @@ class NovelResponse(BaseModel):
     author: str | None = None
     tags: list[str]
     notes: str | None = None
-    status: NovelStatus
     chapter_count: int = Field(default=0, alias="chapterCount")
     binding: "NovelBindingResponse | None" = None
     created_at: datetime = Field(alias="createdAt")
@@ -373,7 +372,6 @@ def to_novel_response(novel: Novel) -> NovelResponse:
         author=novel.author,
         tags=novel.tags,
         notes=novel.notes,
-        status=novel.status,
         chapter_count=novel.chapter_count,
         binding=to_novel_binding_response(novel.binding),
         created_at=novel.created_at,

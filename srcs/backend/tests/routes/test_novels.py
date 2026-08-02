@@ -40,7 +40,6 @@ def test_user_can_create_list_update_and_delete_own_novel(client: TestClient) ->
     novel_id = created_body["id"]
     etag = created_body["etag"]
     assert created_body["title"] == "The First Novel"
-    assert created_body["status"] == "draft"
 
     listed = client.get("/api/novels", headers=headers)
     assert listed.status_code == 200
@@ -55,12 +54,11 @@ def test_user_can_create_list_update_and_delete_own_novel(client: TestClient) ->
     updated = client.put(
         f"/api/novels/{novel_id}",
         headers=headers,
-        json={"title": "Updated Title", "status": "active", "etag": etag},
+        json={"title": "Updated Title", "etag": etag},
     )
     assert updated.status_code == 200
     updated_body = updated.json()
     assert updated_body["title"] == "Updated Title"
-    assert updated_body["status"] == "active"
 
     cleared = client.put(
         f"/api/novels/{novel_id}",

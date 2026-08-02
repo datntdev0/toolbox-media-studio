@@ -18,7 +18,7 @@ export class AuthClient {
     }
 
     /**
-     * Login
+     * Login Route
      * @return Successful Response
      */
     login(body: LoginRequest): Promise<TokenResponse> {
@@ -67,7 +67,7 @@ export class AuthClient {
     }
 
     /**
-     * Me
+     * Me Route
      * @return Successful Response
      */
     me(): Promise<UserResponse> {
@@ -582,7 +582,7 @@ export class NovelsClient {
      * Delete Novel Route
      * @return Successful Response
      */
-    delete_novel_route_api_novels__id__delete(id: string): Promise<void> {
+    delete_novel(id: string): Promise<void> {
         let url_ = this.baseUrl + "/api/novels/{id}";
         if (id === undefined || id === null)
             throw new globalThis.Error("The parameter 'id' must be defined.");
@@ -596,11 +596,11 @@ export class NovelsClient {
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processDelete_novel_route_api_novels__id__delete(_response);
+            return this.processDelete_novel(_response);
         });
     }
 
-    protected processDelete_novel_route_api_novels__id__delete(response: Response): Promise<void> {
+    protected processDelete_novel(response: Response): Promise<void> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 204) {
@@ -3283,7 +3283,6 @@ export class NovelDetailResponse implements INovelDetailResponse {
     author?: Author3;
     tags!: string[];
     notes?: Notes2;
-    status!: NovelStatus;
     chapterCount?: number;
     binding?: Binding;
     createdAt!: Date;
@@ -3324,7 +3323,6 @@ export class NovelDetailResponse implements INovelDetailResponse {
                     this.tags!.push(item);
             }
             this.notes = _data["notes"];
-            this.status = _data["status"];
             this.chapterCount = _data["chapterCount"] !== undefined ? _data["chapterCount"] : 0;
             this.binding = _data["binding"];
             this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
@@ -3363,7 +3361,6 @@ export class NovelDetailResponse implements INovelDetailResponse {
                 data["tags"].push(item);
         }
         data["notes"] = this.notes;
-        data["status"] = this.status;
         data["chapterCount"] = this.chapterCount;
         data["binding"] = this.binding;
         data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
@@ -3388,7 +3385,6 @@ export interface INovelDetailResponse {
     author?: Author3;
     tags: string[];
     notes?: Notes2;
-    status: NovelStatus;
     chapterCount?: number;
     binding?: Binding;
     createdAt: Date;
@@ -3589,7 +3585,6 @@ export class NovelResponse implements INovelResponse {
     author?: Author4;
     tags!: string[];
     notes?: Notes3;
-    status!: NovelStatus;
     chapterCount?: number;
     binding?: Binding2;
     createdAt!: Date;
@@ -3629,7 +3624,6 @@ export class NovelResponse implements INovelResponse {
                     this.tags!.push(item);
             }
             this.notes = _data["notes"];
-            this.status = _data["status"];
             this.chapterCount = _data["chapterCount"] !== undefined ? _data["chapterCount"] : 0;
             this.binding = _data["binding"];
             this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
@@ -3663,7 +3657,6 @@ export class NovelResponse implements INovelResponse {
                 data["tags"].push(item);
         }
         data["notes"] = this.notes;
-        data["status"] = this.status;
         data["chapterCount"] = this.chapterCount;
         data["binding"] = this.binding;
         data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
@@ -3683,7 +3676,6 @@ export interface INovelResponse {
     author?: Author4;
     tags: string[];
     notes?: Notes3;
-    status: NovelStatus;
     chapterCount?: number;
     binding?: Binding2;
     createdAt: Date;
@@ -3691,14 +3683,6 @@ export interface INovelResponse {
     etag?: Etag4;
 
     [key: string]: any;
-}
-
-/** Supported novel lifecycle states. */
-export enum NovelStatus {
-    Draft = "draft",
-    Active = "active",
-    Archived = "archived",
-    Deleted = "deleted",
 }
 
 /** Counters describing the result of binding or synchronizing. */
@@ -3830,7 +3814,6 @@ export class NovelUpdateRequest implements INovelUpdateRequest {
     author?: Author5;
     tags?: Tags2;
     notes?: Notes4;
-    status?: Status;
     etag?: Etag5;
 
     [key: string]: any;
@@ -3857,7 +3840,6 @@ export class NovelUpdateRequest implements INovelUpdateRequest {
             this.author = _data["author"];
             this.tags = _data["tags"];
             this.notes = _data["notes"];
-            this.status = _data["status"];
             this.etag = _data["etag"];
         }
     }
@@ -3882,7 +3864,6 @@ export class NovelUpdateRequest implements INovelUpdateRequest {
         data["author"] = this.author;
         data["tags"] = this.tags;
         data["notes"] = this.notes;
-        data["status"] = this.status;
         data["etag"] = this.etag;
         return data;
     }
@@ -3897,7 +3878,6 @@ export interface INovelUpdateRequest {
     author?: Author5;
     tags?: Tags2;
     notes?: Notes4;
-    status?: Status;
     etag?: Etag5;
 
     [key: string]: any;
@@ -6075,7 +6055,7 @@ export class UserUpdateRequest implements IUserUpdateRequest {
     password?: Password;
     displayName?: DisplayName3;
     role?: Role;
-    status?: Status2;
+    status?: Status;
     etag?: Etag10;
 
     [key: string]: any;
@@ -6130,7 +6110,7 @@ export interface IUserUpdateRequest {
     password?: Password;
     displayName?: DisplayName3;
     role?: Role;
-    status?: Status2;
+    status?: Status;
     etag?: Etag10;
 
     [key: string]: any;
@@ -9054,50 +9034,6 @@ export interface INotes4 {
     [key: string]: any;
 }
 
-export class Status implements IStatus {
-
-    [key: string]: any;
-
-    constructor(data?: IStatus) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-        }
-    }
-
-    static fromJS(data: any): Status {
-        data = typeof data === 'object' ? data : {};
-        let result = new Status();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        return data;
-    }
-}
-
-export interface IStatus {
-
-    [key: string]: any;
-}
-
 export class Etag5 implements IEtag5 {
 
     [key: string]: any;
@@ -10770,11 +10706,11 @@ export interface IRole {
     [key: string]: any;
 }
 
-export class Status2 implements IStatus2 {
+export class Status implements IStatus {
 
     [key: string]: any;
 
-    constructor(data?: IStatus2) {
+    constructor(data?: IStatus) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -10792,9 +10728,9 @@ export class Status2 implements IStatus2 {
         }
     }
 
-    static fromJS(data: any): Status2 {
+    static fromJS(data: any): Status {
         data = typeof data === 'object' ? data : {};
-        let result = new Status2();
+        let result = new Status();
         result.init(data);
         return result;
     }
@@ -10809,7 +10745,7 @@ export class Status2 implements IStatus2 {
     }
 }
 
-export interface IStatus2 {
+export interface IStatus {
 
     [key: string]: any;
 }

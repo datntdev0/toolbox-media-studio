@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, model_validator
 
-from app.domain.novels import Novel, NovelStatus
+from app.domain.novels import Novel
 from app.domain.translations import Translation, TranslationConfiguration, TranslationStatus
 from app.domain.users import User, UserRole, UserStatus
 from app.domain.workspaces import Workspace, WorkspaceType
@@ -71,7 +71,6 @@ class NovelUpdateRequest(BaseModel):
     author: str | None = None
     tags: list[str] | None = None
     notes: str | None = None
-    status: NovelStatus | None = None
     etag: str | None = None
 
     @model_validator(mode="after")
@@ -80,7 +79,7 @@ class NovelUpdateRequest(BaseModel):
 
         invalid_fields = [
             field
-            for field in ("title", "status")
+            for field in ("title",)
             if field in self.model_fields_set and getattr(self, field) is None
         ]
         if invalid_fields:
@@ -232,7 +231,6 @@ def to_novel_entity(body: NovelCreateRequest, created_by: str) -> Novel:
         author=body.author,
         tags=list(body.tags or []),
         notes=body.notes,
-        status=NovelStatus.DRAFT,
         created_by=created_by,
         created_at=now,
         updated_by=created_by,
