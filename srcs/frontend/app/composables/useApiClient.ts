@@ -13,6 +13,60 @@ type GeneratedHttp = {
   fetch(url: RequestInfo, init?: RequestInit): Promise<Response>
 }
 
+type NovelExportDownload = {
+  blob: Blob
+  filename: string
+}
+
+function exportErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null
+  const detail = (payload as { detail?: unknown }).detail
+  if (typeof detail === 'string' && detail.trim()) return detail
+  if (!Array.isArray(detail)) return null
+
+  const messages = detail
+    .map(item => typeof item === 'object' && item
+      ? (item as { msg?: unknown }).msg
+      : null)
+    .filter((message): message is string => typeof message === 'string' && Boolean(message.trim()))
+  return messages.length ? messages.join(', ') : null
+}
+
+async function getResponseErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const message = exportErrorMessage(await response.json())
+    if (message) return message
+  } catch {
+    // Keep the fallback when the server did not return a JSON error body.
+  }
+  return fallback
+}
+
+function exportFilename(contentDisposition: string | null): string {
+  const encodedMatch = contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i)
+  const plainMatch = contentDisposition?.match(/filename=(?:"([^"]+)"|([^;\s]+))/i)
+  const encodedFilename = encodedMatch?.[1]
+  const rawFilename = encodedFilename
+    ? (() => {
+        try {
+          return decodeURIComponent(encodedFilename)
+        } catch {
+          return encodedFilename
+        }
+      })()
+    : plainMatch?.[1] || plainMatch?.[2] || 'novel-export.zip'
+  const safeFilename = [...rawFilename]
+    .filter((character) => {
+      const code = character.charCodeAt(0)
+      return code >= 32 && code !== 127 && character !== '/' && character !== '\\'
+    })
+    .join('')
+    .trim()
+  return safeFilename.toLowerCase().endsWith('.zip')
+    ? safeFilename || 'novel-export.zip'
+    : `${safeFilename || 'novel-export'}.zip`
+}
+
 /** Creates NSwag clients configured for the current runtime and auth token. */
 export function useApiClient() {
   const config = useRuntimeConfig()
@@ -38,6 +92,19 @@ export function useApiClient() {
     scrapings: new ScrapingsClient(baseUrl, http),
     translations: new TranslationsClient(baseUrl, http),
     workspaces: new WorkspacesClient(baseUrl, http),
+    async downloadNovelExport(id: string): Promise<NovelExportDownload> {
+      const response = await http.fetch(`${baseUrl}/api/novels/${encodeURIComponent(id)}/export`, {
+        method: 'GET',
+        headers: { Accept: 'application/zip' }
+      })
+      if (!response.ok) {
+        throw new Error(await getResponseErrorMessage(response, 'Unable to export novel'))
+      }
+      return {
+        blob: await response.blob(),
+        filename: exportFilename(response.headers.get('Content-Disposition'))
+      }
+    },
     async createNovel(body: Record<string, unknown>) {
       const response = await http.fetch(`${baseUrl}/api/novels`, {
         method: 'POST',

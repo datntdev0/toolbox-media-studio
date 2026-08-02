@@ -1,7 +1,15 @@
 """Novel-management endpoint tests."""
 
+import json
+from datetime import UTC, datetime
+from io import BytesIO
+from pathlib import Path
+from zipfile import ZipFile
+
 from fastapi.testclient import TestClient
 
+from app.domain.novels import NovelChapter
+from app.repositories.novel_chapter_repository import InMemoryNovelChapterRepository
 from tests.conftest import TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD
 
 
@@ -204,3 +212,154 @@ def test_novel_update_rejects_explicit_null_required_fields(client: TestClient) 
         json={"title": ""},
     )
     assert response.status_code == 422
+
+
+def test_owner_can_export_novel_as_zip_with_metadata_and_ordered_chapters(
+    client: TestClient,
+    novel_chapter_repository: InMemoryNovelChapterRepository,
+) -> None:
+    token = _login(client)
+    headers = _auth_headers(token)
+    created = client.post(
+        "/api/novels",
+        headers=headers,
+        json={
+            "title": "Export/Novel",
+            "description": "For offline reading",
+            "coverImageUrl": "https://images.test/cover.jpg",
+            "language": "en",
+            "author": "Export Author",
+            "tags": ["fantasy"],
+            "notes": "Archive this",
+        },
+    )
+    assert created.status_code == 201
+    novel = created.json()
+    now = datetime.now(UTC)
+    novel_chapter_repository.save(
+        _chapter(
+            novel_id=novel["id"],
+            id="chapter-b",
+            title="Duplicate: Title",
+            manifest_index=1,
+            content=["Stale content must not be exported"],
+            content_available=False,
+            now=now,
+        )
+    )
+    novel_chapter_repository.save(
+        _chapter(
+            novel_id=novel["id"],
+            id="chapter-a",
+            title="Duplicate/ Title",
+            manifest_index=0,
+            content=["First paragraph", "Second paragraph"],
+            content_available=True,
+            now=now,
+        )
+    )
+
+    exported = client.get(f"/api/novels/{novel['id']}/export", headers=headers)
+
+    assert exported.status_code == 200
+    assert exported.headers["content-type"] == "application/zip"
+    assert exported.headers["content-disposition"] == (
+        'attachment; filename="Export_Novel.zip"; '
+        "filename*=UTF-8''Export_Novel.zip"
+    )
+    with ZipFile(BytesIO(exported.content)) as archive:
+        assert archive.namelist() == [
+            "novel.json",
+            "001 - Duplicate_ Title.txt",
+            "002 - Duplicate_ Title_2.txt",
+            "glossary-vi.template.md",
+            "SKILL-vi.md",
+        ]
+        metadata = json.loads(archive.read("novel.json"))
+        assert metadata == {
+            "id": novel["id"],
+            "title": "Export/Novel",
+            "description": "For offline reading",
+            "coverImageUrl": "https://images.test/cover.jpg",
+            "language": "en",
+            "author": "Export Author",
+            "tags": ["fantasy"],
+            "notes": "Archive this",
+            "chapterCount": 0,
+            "binding": None,
+            "createdAt": novel["createdAt"],
+            "updatedAt": novel["updatedAt"],
+            "etag": novel["etag"],
+        }
+        assert archive.read("001 - Duplicate_ Title.txt") == b"First paragraph\n\nSecond paragraph"
+        assert archive.read("002 - Duplicate_ Title_2.txt") == b""
+        context_directory = Path(__file__).parents[2] / "app" / "skills" / "novel-context"
+        assert archive.read("glossary-vi.template.md") == (
+            context_directory / "glossary-vi.template.md"
+        ).read_bytes()
+        assert archive.read("SKILL-vi.md") == (context_directory / "SKILL-vi.md").read_bytes()
+
+
+def test_novel_export_requires_authentication_and_ownership(client: TestClient) -> None:
+    admin_token = _login(client)
+    admin_headers = _auth_headers(admin_token)
+    created = client.post("/api/novels", headers=admin_headers, json={"title": "Owner Novel"})
+    assert created.status_code == 201
+
+    unauthenticated = client.get(f"/api/novels/{created.json()['id']}/export")
+    assert unauthenticated.status_code == 401
+
+    user = client.post(
+        "/api/users",
+        headers=admin_headers,
+        json={
+            "email": "export-member@example.com",
+            "password": "member-password",
+            "displayName": "Export Member",
+        },
+    )
+    assert user.status_code == 201
+    member_headers = _auth_headers(
+        _login(client, email="export-member@example.com", password="member-password")
+    )
+
+    non_owner = client.get(f"/api/novels/{created.json()['id']}/export", headers=member_headers)
+    assert non_owner.status_code == 404
+
+
+def test_novel_export_openapi_declares_binary_zip_response(client: TestClient) -> None:
+    export_operation = client.get("/openapi.json").json()["paths"]["/api/novels/{id}/export"]["get"]
+
+    assert export_operation["operationId"] == "export_novel"
+    assert export_operation["responses"]["200"]["content"] == {
+        "application/zip": {"schema": {"type": "string", "format": "binary"}}
+    }
+
+
+def _chapter(
+    *,
+    novel_id: str,
+    id: str,
+    title: str,
+    manifest_index: int,
+    content: list[str],
+    content_available: bool,
+    now: datetime,
+) -> NovelChapter:
+    return NovelChapter(
+        id=id,
+        novel_id=novel_id,
+        scraping_task_id=id,
+        title=title,
+        chapter_number=manifest_index + 1,
+        manifest_index=manifest_index,
+        source_url=f"https://example.test/{id}",
+        content=content,
+        content_available=content_available,
+        manually_edited=False,
+        source_updated=False,
+        source_removed=False,
+        source_result_updated_at=None,
+        created_at=now,
+        updated_at=now,
+    )

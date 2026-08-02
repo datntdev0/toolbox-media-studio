@@ -63,6 +63,10 @@ function normalizeScraping(payload: ScrapingDetailResponse): ScrapingSearchPage[
 /** Adapts the generated API client to the reader/editor view model. */
 export function useNovelWorkspaceApi() {
   return {
+    async exportNovel(novelId: string) {
+      const { downloadNovelExport } = useApiClient()
+      return await downloadNovelExport(novelId)
+    },
     async getNovel(id: string) {
       const { novels } = useApiClient()
       return normalizeWorkspace(await novels.get_novel(id))

@@ -23,6 +23,7 @@ const content = ref<NovelChapterContent | null>(null)
 const draft = ref('')
 const loading = ref(false)
 const saving = ref(false)
+const exporting = ref(false)
 const error = ref(false)
 const editing = ref(false)
 
@@ -126,6 +127,38 @@ async function save() {
   }
 }
 
+async function exportNovel() {
+  if (!props.chapter || editing.value || exporting.value) return
+  exporting.value = true
+  try {
+    const { blob, filename } = await useNovelWorkspaceApi().exportNovel(props.novelId)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    toast.add({
+      title: 'Export started',
+      description: 'Your novel ZIP download should begin shortly.',
+      color: 'success',
+      icon: 'lucide:download'
+    })
+  } catch (cause) {
+    toast.add({
+      title: 'Export failed',
+      description: cause instanceof Error ? cause.message : 'Unable to export novel. Please try again.',
+      color: 'error',
+      icon: 'lucide:circle-alert'
+    })
+  } finally {
+    exporting.value = false
+  }
+}
+
 defineExpose({ confirmDiscard, refresh: load })
 </script>
 
@@ -150,7 +183,7 @@ defineExpose({ confirmDiscard, refresh: load })
           color="neutral"
           variant="ghost"
           aria-label="Previous chapter"
-          :disabled="!canPrevious || saving"
+          :disabled="!canPrevious || saving || exporting"
           @click="emit('navigate', -1)"
         />
         <UButton
@@ -158,7 +191,7 @@ defineExpose({ confirmDiscard, refresh: load })
           color="neutral"
           variant="ghost"
           aria-label="Next chapter"
-          :disabled="!canNext || saving"
+          :disabled="!canNext || saving || exporting"
           @click="emit('navigate', 1)"
         />
         <UButton
@@ -169,6 +202,17 @@ defineExpose({ confirmDiscard, refresh: load })
           variant="soft"
           size="sm"
           @click="startEdit"
+        />
+        <UButton
+          v-if="chapter && !editing"
+          label="Export"
+          icon="lucide:download"
+          color="primary"
+          variant="soft"
+          size="sm"
+          :loading="exporting"
+          :disabled="exporting"
+          @click="exportNovel"
         />
       </template>
     </UDashboardNavbar>
