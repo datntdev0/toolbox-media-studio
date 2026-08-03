@@ -45,7 +45,7 @@ export interface TranslationProviderOption {
 export const translationProviders: TranslationProviderOption[] = [
   {
     id: 'foundry',
-    label: 'Built-in Microsoft Foundry',
+    label: 'Microsoft Foundry',
     icon: 'simple-icons:microsoft',
     models: [
       {
@@ -57,6 +57,28 @@ export const translationProviders: TranslationProviderOption[] = [
         id: 'gpt-5-nano',
         label: 'GPT-5 nano',
         description: 'Fast, economical translation for quick previews.'
+      }
+    ]
+  },
+  {
+    id: 'gemini',
+    label: 'Google Gemini',
+    icon: 'simple-icons:googlegemini',
+    models: [
+      {
+        id: 'gemini-3.6-flash',
+        label: 'Gemini 3.6 Flash',
+        description: 'Current Gemini Flash model for balanced translation quality and speed.'
+      },
+      {
+        id: 'gemini-3.5-flash',
+        label: 'Gemini 3.5 Flash',
+        description: 'High-quality Gemini model for sustained translation workloads.'
+      },
+      {
+        id: 'gemini-3.5-flash-lite',
+        label: 'Gemini 3.5 Flash Lite',
+        description: 'Low-latency Gemini model for high-throughput chapter translation.'
       }
     ]
   }

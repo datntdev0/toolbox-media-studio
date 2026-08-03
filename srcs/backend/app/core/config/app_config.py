@@ -37,6 +37,11 @@ class AzureOpenAISettings:
 
 
 @dataclass
+class GeminiSettings:
+    api_key: str
+
+
+@dataclass
 class AzureSpeechSettings:
     endpoint: str
     api_key: str
@@ -93,6 +98,9 @@ class AppConfig:
         self.azure_openai: AzureOpenAISettings = AzureOpenAISettings(
             endpoint=os.environ.get("FAST_AZURE_OPENAI_ENDPOINT", ""),
             api_key=os.environ.get("FAST_AZURE_OPENAI_API_KEY", ""),
+        )
+        self.gemini: GeminiSettings = GeminiSettings(
+            api_key=os.environ.get("FAST_GEMINI_API_KEY", ""),
         )
         self.azure_speech: AzureSpeechSettings = AzureSpeechSettings(
             endpoint=os.environ.get("FAST_AZURE_SPEECH_ENDPOINT", ""),

@@ -21,3 +21,11 @@ def test_app_config_reads_azure_openai_environment(monkeypatch: pytest.MonkeyPat
     assert config.azure_openai.endpoint == "https://example.openai.azure.com/openai/v1/"
     assert config.azure_openai.api_key == "new-key"
     assert not hasattr(config, "ai_foundry")
+
+
+def test_app_config_reads_gemini_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FAST_GEMINI_API_KEY", "gemini-key")
+
+    config = importlib.reload(app_config_module).AppConfig()
+
+    assert config.gemini.api_key == "gemini-key"

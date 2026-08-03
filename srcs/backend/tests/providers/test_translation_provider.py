@@ -1,4 +1,4 @@
-"""Azure OpenAI translation provider tests."""
+"""Translation service provider tests."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import pytest
 
 from app.core.config.app_config import AppConfig
 from app.providers.translation_service_provider import (
+    GoogleGeminiServiceProvider,
     MicrosoftFoundryServiceProvider,
     TranslationPreview,
     TranslationServiceProviderError,
@@ -23,10 +24,14 @@ def _config(
     *,
     endpoint: str = "https://example.openai.azure.com/openai/v1/",
     api_key: str = "test-key",
+    gemini_api_key: str = "gemini-test-key",
 ) -> AppConfig:
     return cast(
         AppConfig,
-        SimpleNamespace(azure_openai=SimpleNamespace(endpoint=endpoint, api_key=api_key)),
+        SimpleNamespace(
+            azure_openai=SimpleNamespace(endpoint=endpoint, api_key=api_key),
+            gemini=SimpleNamespace(api_key=gemini_api_key),
+        ),
     )
 
 
@@ -61,17 +66,56 @@ def _install_fake_openai(
     class FakeOpenAI:
         def __init__(self, **kwargs: Any) -> None:
             calls["client"] = kwargs
-            self.beta = SimpleNamespace(
-                chat=SimpleNamespace(completions=FakeCompletions()),
-            )
+            self.chat = SimpleNamespace(completions=FakeCompletions())
 
     monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=FakeOpenAI))
+    return calls
+
+
+def _install_fake_genai(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    output_text: object = '{"title":" Translated title ","content":"First.\\n\\nSecond."}',
+    exception: Exception | None = None,
+) -> dict[str, Any]:
+    calls: dict[str, Any] = {"closed": False}
+
+    class FakeInteractions:
+        def create(self, **kwargs: Any) -> Any:
+            calls["create"] = kwargs
+            if exception is not None:
+                raise exception
+            return SimpleNamespace(output_text=output_text)
+
+    class FakeClient:
+        def __init__(self, **kwargs: Any) -> None:
+            calls["client"] = kwargs
+            self.interactions = FakeInteractions()
+
+        def close(self) -> None:
+            calls["closed"] = True
+
+    monkeypatch.setitem(
+        sys.modules,
+        "google",
+        SimpleNamespace(genai=SimpleNamespace(Client=FakeClient)),
+    )
     return calls
 
 
 def _translate(provider: MicrosoftFoundryServiceProvider) -> TranslationPreview:
     return provider.translate(
         model="gpt-5-mini",
+        language="Vietnamese",
+        instruction="Keep character names unchanged.",
+        chapter_title="Original title",
+        chapter_content=["Source first.", "Source second."],
+    )
+
+
+def _translate_with_gemini(provider: GoogleGeminiServiceProvider) -> TranslationPreview:
+    return provider.translate(
+        model="gemini-3.6-flash",
         language="Vietnamese",
         instruction="Keep character names unchanged.",
         chapter_title="Original title",
@@ -182,6 +226,107 @@ def test_translate_wraps_sdk_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(error.value.__cause__, RuntimeError)
 
 
+def test_gemini_translate_uses_interactions_structured_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _install_fake_genai(
+        monkeypatch,
+        output_text=(
+            '{"title":" Translated title ",'
+            '"content":" First line.\\ncontinued. \\n\\n Second paragraph. "}'
+        ),
+    )
+
+    result = _translate_with_gemini(GoogleGeminiServiceProvider(_config()))
+
+    assert result == TranslationPreview(
+        title="Translated title",
+        content=["First line.\ncontinued.", "Second paragraph."],
+    )
+    assert calls["client"] == {"api_key": "gemini-test-key"}
+    assert calls["closed"] is True
+    request = calls["create"]
+    assert request["model"] == "gemini-3.6-flash"
+    assert request["store"] is False
+    assert "Vietnamese" in request["system_instruction"]
+    assert "Keep character names unchanged." in request["system_instruction"]
+    assert request["input"] == (
+        "Title:\nOriginal title\n\nContent:\nSource first.\n\nSource second."
+    )
+    assert request["response_format"]["type"] == "text"
+    assert request["response_format"]["mime_type"] == "application/json"
+    response_schema = request["response_format"]["schema"]
+    assert response_schema["required"] == ["title", "content"]
+    assert response_schema["additionalProperties"] is False
+
+
+def test_gemini_translate_rejects_missing_api_key() -> None:
+    provider = GoogleGeminiServiceProvider(_config(gemini_api_key=""))
+
+    with pytest.raises(TranslationServiceProviderError, match="API key is not configured"):
+        _translate_with_gemini(provider)
+
+
+@pytest.mark.parametrize("output_text", [None, "", "   "])
+def test_gemini_translate_rejects_missing_output(
+    monkeypatch: pytest.MonkeyPatch,
+    output_text: object,
+) -> None:
+    calls = _install_fake_genai(monkeypatch, output_text=output_text)
+
+    with pytest.raises(TranslationServiceProviderError, match="no structured translation"):
+        _translate_with_gemini(GoogleGeminiServiceProvider(_config()))
+
+    assert calls["closed"] is True
+
+
+@pytest.mark.parametrize(
+    "output_text",
+    [
+        "not-json",
+        '{"content":"Translated content."}',
+        '{"title":42,"content":"Translated content."}',
+    ],
+)
+def test_gemini_translate_rejects_invalid_structured_output(
+    monkeypatch: pytest.MonkeyPatch,
+    output_text: str,
+) -> None:
+    _install_fake_genai(monkeypatch, output_text=output_text)
+
+    with pytest.raises(TranslationServiceProviderError, match="invalid structured translation"):
+        _translate_with_gemini(GoogleGeminiServiceProvider(_config()))
+
+
+@pytest.mark.parametrize(
+    "output_text",
+    [
+        '{"title":"","content":"Translated content."}',
+        '{"title":"Translated title","content":"  \\n\\n "}',
+    ],
+)
+def test_gemini_translate_rejects_empty_structured_fields(
+    monkeypatch: pytest.MonkeyPatch,
+    output_text: str,
+) -> None:
+    _install_fake_genai(monkeypatch, output_text=output_text)
+
+    with pytest.raises(TranslationServiceProviderError, match="invalid structured translation"):
+        _translate_with_gemini(GoogleGeminiServiceProvider(_config()))
+
+
+def test_gemini_translate_wraps_sdk_errors_and_closes_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _install_fake_genai(monkeypatch, exception=RuntimeError("request failed"))
+
+    with pytest.raises(TranslationServiceProviderError, match="translation failed") as error:
+        _translate_with_gemini(GoogleGeminiServiceProvider(_config()))
+
+    assert isinstance(error.value.__cause__, RuntimeError)
+    assert calls["closed"] is True
+
+
 def test_factory_normalizes_and_selects_a_provider() -> None:
     class FakeTranslationServiceProvider:
         def translate(
@@ -208,6 +353,7 @@ def test_default_factory_preserves_provider_aliases() -> None:
     assert factory.get("foundry") is provider
     assert factory.get("azure-ai-foundry") is provider
     assert factory.get("azure_ai_foundry") is provider
+    assert isinstance(factory.get(" GEMINI "), GoogleGeminiServiceProvider)
 
 
 def test_factory_rejects_an_unknown_provider() -> None:
