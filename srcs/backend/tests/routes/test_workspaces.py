@@ -304,7 +304,7 @@ def test_workspace_start_and_stop_queue_available_chapters(
         f"/api/workspaces/{workspace['id']}/start",
         headers=headers,
         json={
-            "provider": "Built-in Microsoft Foundry",
+            "provider": "Microsoft Foundry",
             "voice": "vi-VN-HoaiMyNeural",
             "chapterIndexFrom": 1,
             "chapterIndexTo": 2,
@@ -315,7 +315,7 @@ def test_workspace_start_and_stop_queue_available_chapters(
     detail = started.json()
     assert detail["progress"]["queued"] == 2
     assert [task["status"] for task in detail["tasks"]] == ["queued", "queued"]
-    assert all(task["provider"] == "Built-in Microsoft Foundry" for task in detail["tasks"])
+    assert all(task["provider"] == "Microsoft Foundry" for task in detail["tasks"])
     assert [name for name, _ in queue_publisher.messages] == [
         "workspaces-tasks",
         "workspaces-tasks",
@@ -326,7 +326,7 @@ def test_workspace_start_and_stop_queue_available_chapters(
         "workspaceId": workspace["id"],
         "createdBy": queue_publisher.messages[0][1]["createdBy"],
         "taskId": "chapter-1",
-        "provider": "Built-in Microsoft Foundry",
+        "provider": "Microsoft Foundry",
         "voice": "vi-VN-HoaiMyNeural",
         "refetch": True,
         "enqueuedAt": queue_publisher.messages[0][1]["enqueuedAt"],
@@ -379,7 +379,7 @@ def test_workspace_result_and_export_return_chapter_artifacts(
         f"/api/workspaces/{workspace_data['id']}/start",
         headers=headers,
         json={
-            "provider": "Built-in Microsoft Foundry",
+            "provider": "Microsoft Foundry",
             "voice": "voice-1",
             "chapterIndexFrom": 1,
             "chapterIndexTo": 1,
@@ -399,7 +399,7 @@ def test_workspace_result_and_export_return_chapter_artifacts(
             id="chapter-1",
             workspace_id=workspace.id,
             task_id="chapter-1",
-            provider="Built-in Microsoft Foundry",
+            provider="Microsoft Foundry",
             voice="voice-1",
             content_key=["hash-1", "hash-2"],
             audio_url="https://storage.test/audio.wav",
@@ -417,7 +417,7 @@ def test_workspace_result_and_export_return_chapter_artifacts(
     assert result.json() == {
         "taskId": "chapter-1",
         "workspaceId": workspace.id,
-        "provider": "Built-in Microsoft Foundry",
+        "provider": "Microsoft Foundry",
         "voice": "voice-1",
         "audioUrl": "https://storage.test/audio.wav",
         "subtitleUrl": "https://storage.test/captions.srt",
@@ -460,7 +460,7 @@ def test_workspace_result_rejects_legacy_schema(
         f"/api/workspaces/{workspace_data['id']}/start",
         headers=headers,
         json={
-            "provider": "Built-in Microsoft Foundry",
+            "provider": "Microsoft Foundry",
             "voice": "voice-1",
             "chapterIndexFrom": 1,
             "chapterIndexTo": 1,
@@ -478,7 +478,7 @@ def test_workspace_result_rejects_legacy_schema(
             id="chapter-1",
             workspace_id=workspace.id,
             task_id="chapter-1",
-            provider="Built-in Microsoft Foundry",
+            provider="Microsoft Foundry",
             voice="voice-1",
             schema_version=1,
             content_key=["hash"],

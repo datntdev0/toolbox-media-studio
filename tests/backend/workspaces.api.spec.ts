@@ -67,7 +67,7 @@ test.describe('/api/workspaces CRUD', () => {
       {
         headers,
         data: {
-          provider: 'Built-in Microsoft Foundry',
+          provider: 'Microsoft Foundry',
           voice: 'vi-VN-HoaiMyNeural',
           chapterIndexFrom: 2,
           chapterIndexTo: 1,
@@ -81,7 +81,7 @@ test.describe('/api/workspaces CRUD', () => {
       {
         headers,
         data: {
-          provider: 'Built-in Microsoft Foundry',
+          provider: 'Microsoft Foundry',
           voice: 'vi-VN-HoaiMyNeural',
           chapterIndexFrom: 1,
           chapterIndexTo: 1,

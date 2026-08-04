@@ -21,6 +21,31 @@ const filteredChapters = computed(() => {
     || String(chapter.chapterNumber || '').includes(query)
   )
 })
+
+const tasksByManifestIndex = computed(() => new Map(
+  props.workspace.tasks.map(task => [task.manifestIndex, task])
+))
+
+const chapterSubtitle = (chapter: AudioWorkspaceChapter) => {
+  if (!chapter.contentAvailable) {
+    return props.workspace.sourceType === 'translation'
+      ? 'Translation unavailable'
+      : 'Content unavailable'
+  }
+
+  const task = tasksByManifestIndex.value.get(chapter.manifestIndex)
+  if (!task) return null
+
+  if (task.status === 'failed') {
+    return task.lastError ? `Audio generation failed: ${task.lastError}` : 'Audio generation failed'
+  }
+  if (task.status === 'completed') {
+    return task.resultAvailable ? 'Audio ready' : 'Audio generation completed without a result'
+  }
+  if (task.status === 'running') return 'Generating audio'
+  if (task.status === 'queued') return 'Audio queued'
+  return 'Audio generation pending'
+}
 </script>
 
 <template>
@@ -225,8 +250,8 @@ const filteredChapters = computed(() => {
             </span>
             <span class="min-w-0 flex-1">
               <span class="block truncate text-sm font-medium text-highlighted">{{ chapter.title }}</span>
-              <span v-if="!chapter.contentAvailable" class="block text-xs text-muted">
-                {{ workspace.sourceType === 'translation' ? 'Translation unavailable' : 'Content unavailable' }}
+              <span v-if="chapterSubtitle(chapter)" aria-label="chapter-subtitle" class="block truncate text-xs text-muted">
+                {{ chapterSubtitle(chapter) }}
               </span>
             </span>
             <span class="flex shrink-0 gap-1">

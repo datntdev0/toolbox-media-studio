@@ -22,7 +22,7 @@ const emit = defineEmits<{
   stop: []
 }>()
 
-const providers = ['Built-in Microsoft Foundry']
+const providers = ['Microsoft Foundry']
 const voices = ['vi-VN-HoaiMyNeural', 'vi-VN-NamMinhNeural']
 const availableChapters = computed(() =>
   props.workspace.chapters.filter(chapter => chapter.contentAvailable && !chapter.sourceRemoved)

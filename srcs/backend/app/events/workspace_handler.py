@@ -27,7 +27,7 @@ from app.services.novel_language_service import NovelLanguageService
 WORKSPACE_TASK_QUEUE_NAME = "workspaces-tasks"
 WORKSPACE_TASK_EVENT_TYPE = "workspace.task.requested"
 WORKSPACE_TASK_EVENT_SCHEMA_VERSION = 1
-MICROSOFT_FOUNDRY_SPEECH_PROVIDER = "Built-in Microsoft Foundry"
+MICROSOFT_FOUNDRY_SPEECH_PROVIDER = "Microsoft Foundry"
 
 
 @dataclass(frozen=True, slots=True)
