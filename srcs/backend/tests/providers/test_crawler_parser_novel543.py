@@ -104,6 +104,8 @@ def test_novel543_chapter_parser_extracts_content_lines_and_part_metadata() -> N
           <div id="chaptercontent">
             ————————（腦子寄存處）<br>
             大虞王朝，燕山城。<br>
+            我每天的例行工作是做家事和讀書，還有和陌生叔叔……<br>
+            ☆☆☆☆☆<br>
             暴雪初降，城中百姓多受風寒。<br>
             溫馨提示: 如果覺得本書不錯, 請記得加入書架哦
           </div>

@@ -59,6 +59,9 @@ _ENGLISH_CHAPTER_PATTERN = re.compile(r"\b(?:chapter|ch)\.?\s*(?P<number>[0-9]+)
 _CHAPTER_PART_PATTERN = re.compile(
     r"[\(（]\s*(?P<part>[0-9]+)\s*/\s*(?P<count>[0-9]+)\s*[\)）]\s*$"
 )
+_CHAPTER_CONTENT_NOISE_LINES = frozenset(
+    {"我每天的例行工作是做家事和讀書，還有和陌生叔叔……"}
+)
 
 _AUTHOR_LABELS = ("作者", "作家")
 _CATEGORY_LABELS = ("類別", "类别", "分類", "分类", "類型", "类型")
@@ -271,6 +274,8 @@ def _trim_chapter_content_lines(lines: list[str], title: str) -> list[str]:
             continue
         if _is_chapter_content_stop_line(line):
             break
+        if _is_chapter_content_noise_line(line):
+            continue
         content.append(line)
     return content
 
@@ -295,6 +300,12 @@ def _is_chapter_content_stop_line(line: str) -> bool:
             "聯絡我們",
             "联系我们",
         )
+    )
+
+
+def _is_chapter_content_noise_line(line: str) -> bool:
+    return line in _CHAPTER_CONTENT_NOISE_LINES or not any(
+        character.isalnum() for character in line
     )
 
 
