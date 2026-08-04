@@ -37,6 +37,7 @@ function normalizeNovel(value: unknown): AudioWorkspaceNovel | null {
     language: novel.language ? String(novel.language) : null,
     author: novel.author ? String(novel.author) : null,
     tags: Array.isArray(novel.tags) ? novel.tags.map(String) : [],
+    status: String(novel.status || ''),
     chapterCount: Number(novel.chapterCount || 0)
   }
 }
@@ -90,15 +91,8 @@ function normalizeTaskResult(value: unknown): AudioWorkspaceTaskResult {
     workspaceId: String(result.workspaceId || ''),
     provider: String(result.provider || ''),
     voice: String(result.voice || ''),
-    sentences: Array.isArray(result.sentences)
-      ? result.sentences.map((value) => {
-          const sentence = asRecord(value)
-          return {
-            index: Number(sentence.index),
-            audioUrl: String(sentence.audioUrl || '')
-          }
-        })
-      : [],
+    audioUrl: String(result.audioUrl || ''),
+    subtitleUrl: String(result.subtitleUrl || ''),
     createdAt: asDateString(result.createdAt),
     updatedAt: asDateString(result.updatedAt)
   }

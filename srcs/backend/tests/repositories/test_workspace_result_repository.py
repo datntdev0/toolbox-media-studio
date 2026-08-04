@@ -21,6 +21,8 @@ def test_workspace_result_upsert_and_delete() -> None:
             provider="foundry",
             voice="voice-1",
             content_key=["first"],
+            audio_url="https://storage.test/audio.wav",
+            subtitle_url="https://storage.test/captions.srt",
             created_at=now,
             updated_at=now,
         )
@@ -44,14 +46,40 @@ def test_cosmos_workspace_result_wire_shape() -> None:
             provider="foundry",
             voice="voice-1",
             content_key=["hash"],
-            audio_urls=["https://storage.test/audio.wav"],
+            audio_url="https://storage.test/audio.wav",
+            subtitle_url="https://storage.test/captions.srt",
             created_at=now,
             updated_at=now,
         )
     )
 
-    assert WORKSPACE_RESULTS_CONTAINER_NAME == "workspace_results"
+    assert WORKSPACE_RESULTS_CONTAINER_NAME == "domain.workspace_results"
     assert item["id"] == "chapter-1"
     assert item["workspaceId"] == "workspace-1"
+    assert item["schemaVersion"] == 2
     assert item["contentKey"] == ["hash"]
-    assert item["audioUrls"] == ["https://storage.test/audio.wav"]
+    assert item["audioUrl"] == "https://storage.test/audio.wav"
+    assert item["subtitleUrl"] == "https://storage.test/captions.srt"
+    assert "audioUrls" not in item
+
+
+def test_cosmos_workspace_result_deserializes_legacy_result_as_obsolete() -> None:
+    now = datetime.now(UTC)
+    result = CosmosWorkspaceResultRepository._deserialize(
+        {
+            "id": "chapter-1",
+            "workspaceId": "workspace-1",
+            "taskId": "chapter-1",
+            "provider": "foundry",
+            "voice": "voice-1",
+            "contentKey": ["hash"],
+            "audioUrls": ["https://storage.test/0.wav"],
+            "createdAt": now.isoformat(),
+            "updatedAt": now.isoformat(),
+        }
+    )
+
+    assert result.schema_version == 1
+    assert result.audio_url is None
+    assert result.subtitle_url is None
+    assert result.artifacts_available is False

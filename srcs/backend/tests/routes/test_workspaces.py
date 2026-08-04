@@ -12,11 +12,15 @@ from app.domain.translations import (
     TranslationTask,
     TranslationTaskStatus,
 )
+from app.domain.workspace_results import WorkspaceResult
+from app.domain.workspaces import WorkspaceProgress, WorkspaceTaskStatus
 from app.repositories.novel_chapter_repository import InMemoryNovelChapterRepository
 from app.repositories.translation_repository import InMemoryTranslationRepository
 from app.repositories.translation_result_repository import (
     InMemoryTranslationResultRepository,
 )
+from app.repositories.workspace_repository import InMemoryWorkspaceRepository
+from app.repositories.workspace_result_repository import InMemoryWorkspaceResultRepository
 from tests.conftest import TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD, FakeQueuePublisher
 
 
@@ -346,6 +350,160 @@ def test_workspace_start_and_stop_queue_available_chapters(
             "chapterIndexTo": 1,
         },
     ).status_code == 422
+
+
+def test_workspace_result_and_export_return_chapter_artifacts(
+    client: TestClient,
+    novel_chapter_repository: InMemoryNovelChapterRepository,
+    workspace_repository: InMemoryWorkspaceRepository,
+    workspace_result_repository: InMemoryWorkspaceResultRepository,
+) -> None:
+    headers = _headers(_login(client))
+    novel = client.post(
+        "/api/novels",
+        headers=headers,
+        json={"title": "Artifact source", "language": "en"},
+    ).json()
+    novel_chapter_repository.save(_chapter(novel["id"], "chapter-1", 0))
+    workspace_data = client.post(
+        "/api/workspaces",
+        headers=headers,
+        json={
+            "title": "Artifact workspace",
+            "type": "audio",
+            "novelId": novel["id"],
+            "language": "en",
+        },
+    ).json()
+    started = client.patch(
+        f"/api/workspaces/{workspace_data['id']}/start",
+        headers=headers,
+        json={
+            "provider": "Built-in Microsoft Foundry",
+            "voice": "voice-1",
+            "chapterIndexFrom": 1,
+            "chapterIndexTo": 1,
+        },
+    )
+    assert started.status_code == 202
+
+    workspace = workspace_repository.get_by_id(workspace_data["id"])
+    assert workspace is not None
+    workspace.tasks[0].status = WorkspaceTaskStatus.COMPLETED
+    workspace.tasks[0].result_available = True
+    workspace.progress = WorkspaceProgress.from_tasks(workspace.tasks)
+    workspace_repository.update(workspace, workspace.etag)
+    now = datetime.now(UTC)
+    workspace_result_repository.upsert(
+        WorkspaceResult(
+            id="chapter-1",
+            workspace_id=workspace.id,
+            task_id="chapter-1",
+            provider="Built-in Microsoft Foundry",
+            voice="voice-1",
+            content_key=["hash-1", "hash-2"],
+            audio_url="https://storage.test/audio.wav",
+            subtitle_url="https://storage.test/captions.srt",
+            created_at=now,
+            updated_at=now,
+        )
+    )
+
+    result = client.get(
+        f"/api/workspaces/{workspace.id}/tasks/chapter-1/result",
+        headers=headers,
+    )
+    assert result.status_code == 200
+    assert result.json() == {
+        "taskId": "chapter-1",
+        "workspaceId": workspace.id,
+        "provider": "Built-in Microsoft Foundry",
+        "voice": "voice-1",
+        "audioUrl": "https://storage.test/audio.wav",
+        "subtitleUrl": "https://storage.test/captions.srt",
+        "createdAt": result.json()["createdAt"],
+        "updatedAt": result.json()["updatedAt"],
+    }
+
+    exported = client.get(
+        f"/api/workspaces/{workspace.id}/tasks/chapter-1/export",
+        headers=headers,
+    )
+    assert exported.status_code == 200
+    assert exported.json()["exportUrl"] == "https://storage.test/audio.wav"
+
+
+def test_workspace_result_rejects_legacy_schema(
+    client: TestClient,
+    novel_chapter_repository: InMemoryNovelChapterRepository,
+    workspace_repository: InMemoryWorkspaceRepository,
+    workspace_result_repository: InMemoryWorkspaceResultRepository,
+) -> None:
+    headers = _headers(_login(client))
+    novel = client.post(
+        "/api/novels",
+        headers=headers,
+        json={"title": "Legacy source", "language": "en"},
+    ).json()
+    novel_chapter_repository.save(_chapter(novel["id"], "chapter-1", 0))
+    workspace_data = client.post(
+        "/api/workspaces",
+        headers=headers,
+        json={
+            "title": "Legacy workspace",
+            "type": "audio",
+            "novelId": novel["id"],
+            "language": "en",
+        },
+    ).json()
+    client.patch(
+        f"/api/workspaces/{workspace_data['id']}/start",
+        headers=headers,
+        json={
+            "provider": "Built-in Microsoft Foundry",
+            "voice": "voice-1",
+            "chapterIndexFrom": 1,
+            "chapterIndexTo": 1,
+        },
+    )
+    workspace = workspace_repository.get_by_id(workspace_data["id"])
+    assert workspace is not None
+    workspace.tasks[0].status = WorkspaceTaskStatus.COMPLETED
+    workspace.tasks[0].result_available = True
+    workspace.progress = WorkspaceProgress.from_tasks(workspace.tasks)
+    workspace_repository.update(workspace, workspace.etag)
+    now = datetime.now(UTC)
+    workspace_result_repository.upsert(
+        WorkspaceResult(
+            id="chapter-1",
+            workspace_id=workspace.id,
+            task_id="chapter-1",
+            provider="Built-in Microsoft Foundry",
+            voice="voice-1",
+            schema_version=1,
+            content_key=["hash"],
+            created_at=now,
+            updated_at=now,
+        )
+    )
+
+    response = client.get(
+        f"/api/workspaces/{workspace.id}/tasks/chapter-1/result",
+        headers=headers,
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "Workspace task result is obsolete; regenerate the task"
+    )
+
+    exported = client.get(
+        f"/api/workspaces/{workspace.id}/tasks/chapter-1/export",
+        headers=headers,
+    )
+    assert exported.status_code == 409
+    assert exported.json()["detail"] == (
+        "Workspace task result is obsolete; regenerate the task"
+    )
 
 
 def _chapter(novel_id: str, chapter_id: str, index: int) -> NovelChapter:

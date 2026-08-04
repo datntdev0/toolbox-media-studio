@@ -84,17 +84,20 @@ export interface AudioChapterContent {
   content: string[]
 }
 
-export interface AudioWorkspaceTaskResultSentence {
-  index: number
-  audioUrl: string
-}
-
 export interface AudioWorkspaceTaskResult {
   taskId: string
   workspaceId: string
   provider: string
   voice: string
-  sentences: AudioWorkspaceTaskResultSentence[]
+  audioUrl: string
+  subtitleUrl: string
   createdAt: string
   updatedAt: string
+}
+
+export interface AudioSubtitleCue {
+  index: number
+  startSeconds: number
+  endSeconds: number
+  text: string
 }

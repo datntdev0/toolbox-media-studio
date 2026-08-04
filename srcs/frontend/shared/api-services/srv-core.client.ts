@@ -6709,7 +6709,8 @@ export class WorkspaceTaskResultResponse implements IWorkspaceTaskResultResponse
     workspaceId!: string;
     provider!: string;
     voice!: string;
-    sentences!: WorkspaceTaskResultSentenceResponse[];
+    audioUrl!: string;
+    subtitleUrl!: string;
     createdAt!: Date;
     updatedAt!: Date;
 
@@ -6721,9 +6722,6 @@ export class WorkspaceTaskResultResponse implements IWorkspaceTaskResultResponse
                 if (data.hasOwnProperty(property))
                     (this as any)[property] = (data as any)[property];
             }
-        }
-        if (!data) {
-            this.sentences = [];
         }
     }
 
@@ -6737,11 +6735,8 @@ export class WorkspaceTaskResultResponse implements IWorkspaceTaskResultResponse
             this.workspaceId = _data["workspaceId"];
             this.provider = _data["provider"];
             this.voice = _data["voice"];
-            if (Array.isArray(_data["sentences"])) {
-                this.sentences = [] as any;
-                for (let item of _data["sentences"])
-                    this.sentences!.push(WorkspaceTaskResultSentenceResponse.fromJS(item));
-            }
+            this.audioUrl = _data["audioUrl"];
+            this.subtitleUrl = _data["subtitleUrl"];
             this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
             this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
         }
@@ -6764,11 +6759,8 @@ export class WorkspaceTaskResultResponse implements IWorkspaceTaskResultResponse
         data["workspaceId"] = this.workspaceId;
         data["provider"] = this.provider;
         data["voice"] = this.voice;
-        if (Array.isArray(this.sentences)) {
-            data["sentences"] = [];
-            for (let item of this.sentences)
-                data["sentences"].push(item ? item.toJSON() : undefined as any);
-        }
+        data["audioUrl"] = this.audioUrl;
+        data["subtitleUrl"] = this.subtitleUrl;
         data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
         data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
         return data;
@@ -6781,63 +6773,10 @@ export interface IWorkspaceTaskResultResponse {
     workspaceId: string;
     provider: string;
     voice: string;
-    sentences: WorkspaceTaskResultSentenceResponse[];
+    audioUrl: string;
+    subtitleUrl: string;
     createdAt: Date;
     updatedAt: Date;
-
-    [key: string]: any;
-}
-
-/** One sentence audio file in a completed workspace task result. */
-export class WorkspaceTaskResultSentenceResponse implements IWorkspaceTaskResultSentenceResponse {
-    index!: number;
-    audioUrl!: string;
-
-    [key: string]: any;
-
-    constructor(data?: IWorkspaceTaskResultSentenceResponse) {
-        if (data) {
-            for (var property in data) {
-                if (data.hasOwnProperty(property))
-                    (this as any)[property] = (data as any)[property];
-            }
-        }
-    }
-
-    init(_data?: any) {
-        if (_data) {
-            for (var property in _data) {
-                if (_data.hasOwnProperty(property))
-                    this[property] = _data[property];
-            }
-            this.index = _data["index"];
-            this.audioUrl = _data["audioUrl"];
-        }
-    }
-
-    static fromJS(data: any): WorkspaceTaskResultSentenceResponse {
-        data = typeof data === 'object' ? data : {};
-        let result = new WorkspaceTaskResultSentenceResponse();
-        result.init(data);
-        return result;
-    }
-
-    toJSON(data?: any) {
-        data = typeof data === 'object' ? data : {};
-        for (var property in this) {
-            if (this.hasOwnProperty(property))
-                data[property] = this[property];
-        }
-        data["index"] = this.index;
-        data["audioUrl"] = this.audioUrl;
-        return data;
-    }
-}
-
-/** One sentence audio file in a completed workspace task result. */
-export interface IWorkspaceTaskResultSentenceResponse {
-    index: number;
-    audioUrl: string;
 
     [key: string]: any;
 }

@@ -296,15 +296,6 @@ class WorkspaceListResponse(BaseModel):
     continuation_token: str | None = Field(default=None, alias="continuationToken")
 
 
-class WorkspaceTaskResultSentenceResponse(BaseModel):
-    """One sentence audio file in a completed workspace task result."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-    index: int
-    audio_url: str = Field(alias="audioUrl")
-
-
 class WorkspaceTaskResultResponse(BaseModel):
     """Completed audio output for one workspace chapter task."""
 
@@ -314,7 +305,8 @@ class WorkspaceTaskResultResponse(BaseModel):
     workspace_id: str = Field(alias="workspaceId")
     provider: str
     voice: str
-    sentences: list[WorkspaceTaskResultSentenceResponse]
+    audio_url: str = Field(alias="audioUrl")
+    subtitle_url: str = Field(alias="subtitleUrl")
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
 
@@ -552,17 +544,18 @@ def _to_workspace_task_response(task: WorkspaceTask) -> WorkspaceTaskResponse:
 def to_workspace_task_result_response(
     result: WorkspaceResult,
 ) -> WorkspaceTaskResultResponse:
-    """Convert a complete workspace result to its indexed API representation."""
+    """Convert a complete workspace result to its artifact API representation."""
+
+    if result.audio_url is None or result.subtitle_url is None:
+        raise ValueError("Workspace result artifacts are unavailable")
 
     return WorkspaceTaskResultResponse(
         task_id=result.task_id,
         workspace_id=result.workspace_id,
         provider=result.provider,
         voice=result.voice,
-        sentences=[
-            WorkspaceTaskResultSentenceResponse(index=index, audio_url=audio_url)
-            for index, audio_url in enumerate(result.audio_urls)
-        ],
+        audio_url=result.audio_url,
+        subtitle_url=result.subtitle_url,
         created_at=result.created_at,
         updated_at=result.updated_at,
     )

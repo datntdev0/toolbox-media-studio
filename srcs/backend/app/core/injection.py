@@ -19,7 +19,6 @@ from app.events.sample_handler import SampleQueueListener
 from app.events.scraping_handler import ScrapingQueueListener
 from app.events.translation_handler import TranslationQueueListener
 from app.events.workspace_handler import WorkspaceTaskQueueListener
-from app.providers.audio_export_provider import AudioExportProvider, build_audio_export_provider
 from app.providers.blob_storage_provider import PublicBlobProvider, build_public_blob_provider
 from app.providers.cache_provider import CacheProvider, build_cosmos_cache_provider
 from app.providers.proxy_service_provider import ProxyProvider, build_proxy_provider
@@ -75,7 +74,6 @@ repository_workspace_result = build_cosmos_workspace_result_repository(config)
 # PROVIDER INSTANCES
 # ============================================================================
 
-provider_audio_export = build_audio_export_provider()
 provider_cache = build_cosmos_cache_provider(config)
 provider_proxy = build_proxy_provider(config)
 provider_public_blob = build_public_blob_provider(config)
@@ -182,7 +180,6 @@ ServiceNovelLanguageDep = Annotated[NovelLanguageService, Depends(_get_novel_lan
 ServiceWorkspaceDep = Annotated[WorkspaceService, Depends(_get_workspace_service)]
 
 # Provider dependencies - alphabetically ordered
-ProviderAudioExportDep = Annotated[AudioExportProvider, Depends(lambda: provider_audio_export)]
 ProviderCacheDep = Annotated[CacheProvider, Depends(lambda: provider_cache)]
 ProviderProxyDep = Annotated[ProxyProvider, Depends(lambda: provider_proxy)]
 ProviderPublicBlobDep = Annotated[PublicBlobProvider, Depends(lambda: provider_public_blob)]

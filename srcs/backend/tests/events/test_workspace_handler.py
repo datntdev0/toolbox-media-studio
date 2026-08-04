@@ -24,6 +24,7 @@ from app.events.workspace_handler import (
     WorkspaceTaskHandler,
     build_workspace_task_event,
 )
+from app.providers.speech_service_provider import SpeechSynthesisArtifact
 from app.repositories.novel_chapter_repository import InMemoryNovelChapterRepository
 from app.repositories.novel_repository import InMemoryNovelRepository
 from app.repositories.translation_repository import InMemoryTranslationRepository
@@ -45,34 +46,50 @@ class RecordingWorkspaceResultRepository(InMemoryWorkspaceResultRepository):
 
 
 class FakeSpeechProvider:
-    def __init__(self, fail_at: int | None = None) -> None:
-        self.calls: list[tuple[str, str]] = []
-        self._fail_at = fail_at
+    def __init__(self, *, should_fail: bool = False) -> None:
+        self.calls: list[tuple[list[str], str]] = []
+        self._should_fail = should_fail
 
-    def synthesize(self, text: str, voice: str) -> bytes:
-        call_index = len(self.calls)
-        self.calls.append((text, voice))
-        if call_index == self._fail_at:
+    def synthesize(self, sentences: list[str], voice: str) -> SpeechSynthesisArtifact:
+        self.calls.append((sentences, voice))
+        if self._should_fail:
             raise RuntimeError("mock TTS failure")
-        return f"audio:{voice}:{text}".encode()
-
-
+        return SpeechSynthesisArtifact(
+            audio_data=f"audio:{voice}:{'|'.join(sentences)}".encode(),
+            subtitle_data=b"1\n00:00:00,000 --> 00:00:01,000\nFirst sentence\n",
+        )
 class FakeAudioBlobProvider:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, str, int, bytes]] = []
+        self.audio_calls: list[tuple[str, str, bytes]] = []
+        self.subtitle_calls: list[tuple[str, str, bytes]] = []
+        self.cleanup_calls: list[tuple[str, str]] = []
+        self.fail_subtitle = False
 
-    def upload_audio(
+    def upload_task_audio(
         self,
         workspace_id: str,
         task_id: str,
-        index: int,
         content: bytes,
     ) -> str:
-        self.calls.append((workspace_id, task_id, index, content))
-        return f"https://storage.test/{workspace_id}/{task_id}/{index}.wav"
+        self.audio_calls.append((workspace_id, task_id, content))
+        return f"https://storage.test/{workspace_id}/{task_id}/audio.wav"
+
+    def upload_task_subtitle(
+        self,
+        workspace_id: str,
+        task_id: str,
+        content: bytes,
+    ) -> str:
+        self.subtitle_calls.append((workspace_id, task_id, content))
+        if self.fail_subtitle:
+            raise RuntimeError("mock subtitle upload failure")
+        return f"https://storage.test/{workspace_id}/{task_id}/captions.srt"
+
+    def delete_legacy_task_audio(self, workspace_id: str, task_id: str) -> None:
+        self.cleanup_calls.append((workspace_id, task_id))
 
 
-def test_handler_hashes_and_persists_each_sentence() -> None:
+def test_handler_synthesizes_and_persists_chapter_artifacts_atomically() -> None:
     workspaces, results, languages, queued = _queued_workspace()
     speech = FakeSpeechProvider()
     blobs = FakeAudioBlobProvider()
@@ -101,18 +118,17 @@ def test_handler_hashes_and_persists_each_sentence() -> None:
         sha256(sentence.encode("utf-8")).hexdigest()
         for sentence in ["First sentence", "Second sentence"]
     ]
-    assert [snapshot.content_key for snapshot in results.snapshots] == [
-        [],
-        [expected[0]],
-        expected,
-    ]
+    assert [snapshot.content_key for snapshot in results.snapshots] == [expected]
     result = results.get(queued.workspace.id, "chapter-1")
     assert result is not None
     assert result.content_key == expected
-    assert result.audio_urls == [
-        "https://storage.test/workspace-1/chapter-1/0.wav",
-        "https://storage.test/workspace-1/chapter-1/1.wav",
-    ]
+    assert result.schema_version == 2
+    assert result.audio_url == "https://storage.test/workspace-1/chapter-1/audio.wav"
+    assert result.subtitle_url == "https://storage.test/workspace-1/chapter-1/captions.srt"
+    assert speech.calls == [(["First sentence", "Second sentence"], "voice-1")]
+    assert len(blobs.audio_calls) == 1
+    assert len(blobs.subtitle_calls) == 1
+    assert blobs.cleanup_calls == [("workspace-1", "chapter-1")]
     completed = workspaces.get_by_id(queued.workspace.id)
     assert completed is not None
     assert completed.tasks[0].status == WorkspaceTaskStatus.COMPLETED
@@ -146,14 +162,16 @@ def test_handler_hashes_and_persists_each_sentence() -> None:
             ),
         )
     )
-    assert len(speech.calls) == 2
-    assert len(blobs.calls) == 2
-    assert len(results.snapshots) == 3
+    assert len(speech.calls) == 1
+    assert len(blobs.audio_calls) == 1
+    assert len(results.snapshots) == 1
 
 
-def test_handler_keeps_partial_result_and_marks_failure() -> None:
+def test_handler_does_not_persist_partial_result_and_marks_failure() -> None:
     workspaces, results, languages, queued = _queued_workspace()
-    speech = FakeSpeechProvider(fail_at=1)
+    speech = FakeSpeechProvider()
+    blobs = FakeAudioBlobProvider()
+    blobs.fail_subtitle = True
 
     handler = WorkspaceTaskHandler(
         getLogger("test.workspace"),
@@ -161,10 +179,10 @@ def test_handler_keeps_partial_result_and_marks_failure() -> None:
         results,
         languages,
         speech,
-        FakeAudioBlobProvider(),
+        blobs,
         RealtimeHub(),
     )
-    with pytest.raises(RuntimeError, match="mock TTS failure"):
+    with pytest.raises(RuntimeError, match="mock subtitle upload failure"):
         handler.handle(
             QueueMessage(
                 id="message-1",
@@ -176,9 +194,10 @@ def test_handler_keeps_partial_result_and_marks_failure() -> None:
             )
         )
 
-    partial = results.get(queued.workspace.id, "chapter-1")
-    assert partial is not None
-    assert len(partial.content_key) == 1
+    assert results.get(queued.workspace.id, "chapter-1") is None
+    assert len(blobs.audio_calls) == 1
+    assert len(blobs.subtitle_calls) == 1
+    assert blobs.cleanup_calls == []
     failed = workspaces.get_by_id(queued.workspace.id)
     assert failed is not None
     assert failed.tasks[0].status == WorkspaceTaskStatus.FAILED

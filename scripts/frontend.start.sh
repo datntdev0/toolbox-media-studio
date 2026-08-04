@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 cd "./srcs/frontend"
-pnpm dev
+pnpm dev --force

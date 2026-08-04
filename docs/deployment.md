@@ -70,7 +70,9 @@ flowchart LR
   crawler cache TTLs. Queue names, retry timing, consumer count, visibility timeout, cache TTLs,
   and simulated processing duration are application constants. Local development points
   `FAST_FLARESOLVERR_BASE_URL` at `http://localhost:8191/v1`.
-- **CORS:** FastAPI allows the Nuxt origin only; credentials mode as needed for the JWT.
+- **CORS:** FastAPI allows the Nuxt origin only; credentials mode as needed for the JWT. The
+  `media` Blob service must also allow `GET` and `HEAD` from the Nuxt origin so the audio reader
+  can fetch public `.srt` caption files and derive sentence playback timings.
 
 ## CI/CD (GitHub Actions)
 
@@ -156,8 +158,8 @@ Example: 20 chapters, full audio, ~50 illustrations, a few short video scenes. B
 
 - `az deployment group what-if` on the Bicep; confirm the two web apps land on one plan and the
   `crawler-jobs` and `crawler-jobs-dead-letter` queues exist.
-- Hit `web` and `api` health endpoints over HTTPS; confirm CORS from the Nuxt origin; log in with
-  the seeded admin.
+- Hit `web` and `api` health endpoints over HTTPS; confirm API CORS and a browser `GET` of a public
+  Blob `.srt` file from the Nuxt origin; log in with the seeded admin.
 - In local/dev, confirm FlareSolverr responds at `http://localhost:8191` and a
   `request.get` call can fetch an approved `novel543` metadata URL.
 - Confirm `api` has **Always On** on and its crawler queue consumer logs startup in App Insights.

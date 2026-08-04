@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import PurePosixPath
 from typing import Any
 from uuid import uuid4
 
@@ -12,6 +14,7 @@ from app.core.events.polling_queue_client import _storage_api_version
 MAX_COVER_SIZE_BYTES = 1024 * 1024
 _JPEG_SIGNATURE = b"\xff\xd8\xff"
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+_LEGACY_TASK_AUDIO_NAME = re.compile(r"^(?:\d+|export)\.wav$")
 
 
 class BlobStorageError(RuntimeError):
@@ -42,52 +45,78 @@ class PublicBlobProvider:
                 overwrite=True,
                 content_settings=ContentSettings(content_type=normalized_type),
             )
-            return blob.url
+            return str(blob.url)
         except Exception as exc:
             raise BlobStorageError("Cover image could not be uploaded") from exc
 
-    def upload_audio(
+    def upload_task_audio(
         self,
         workspace_id: str,
         task_id: str,
-        index: int,
         content: bytes,
     ) -> str:
-        """Upload a sentence's WAV audio and return its public URL."""
+        """Upload a chapter's deterministic WAV artifact."""
 
-        blob_name = f"workspaces/{workspace_id}/{task_id}/{index}.wav"
+        return self._upload_task_artifact(
+            workspace_id,
+            task_id,
+            "audio.wav",
+            content,
+            "audio/wav",
+            "Task audio could not be uploaded",
+        )
+
+    def upload_task_subtitle(
+        self,
+        workspace_id: str,
+        task_id: str,
+        content: bytes,
+    ) -> str:
+        """Upload a chapter's deterministic SRT artifact."""
+
+        return self._upload_task_artifact(
+            workspace_id,
+            task_id,
+            "captions.srt",
+            content,
+            "application/x-subrip; charset=utf-8",
+            "Task subtitles could not be uploaded",
+        )
+
+    def delete_legacy_task_audio(self, workspace_id: str, task_id: str) -> None:
+        """Delete only numeric sentence WAVs and the obsolete export WAV."""
+
+        prefix = f"workspaces/{workspace_id}/{task_id}/"
+        try:
+            container = self._service.get_container_client(self._container_name)
+            for item in container.list_blobs(name_starts_with=prefix):
+                name = str(item["name"] if isinstance(item, dict) else item.name)
+                if _LEGACY_TASK_AUDIO_NAME.fullmatch(PurePosixPath(name).name):
+                    container.delete_blob(name)
+        except Exception as exc:
+            raise BlobStorageError("Legacy task audio could not be deleted") from exc
+
+    def _upload_task_artifact(
+        self,
+        workspace_id: str,
+        task_id: str,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        error_message: str,
+    ) -> str:
+        blob_name = f"workspaces/{workspace_id}/{task_id}/{filename}"
         try:
             container = self._service.get_container_client(self._container_name)
             blob = container.get_blob_client(blob_name)
             blob.upload_blob(
                 content,
                 overwrite=True,
-                content_settings=ContentSettings(content_type="audio/wav"),
+                content_settings=ContentSettings(content_type=content_type),
             )
-            return blob.url
+            return str(blob.url)
         except Exception as exc:
-            raise BlobStorageError("Sentence audio could not be uploaded") from exc
-
-    def upload_task_export(
-        self,
-        workspace_id: str,
-        task_id: str,
-        content: bytes,
-    ) -> str:
-        """Upload a concatenated task audio export and return its public URL."""
-
-        blob_name = f"workspaces/{workspace_id}/{task_id}/export.wav"
-        try:
-            container = self._service.get_container_client(self._container_name)
-            blob = container.get_blob_client(blob_name)
-            blob.upload_blob(
-                content,
-                overwrite=True,
-                content_settings=ContentSettings(content_type="audio/wav"),
-            )
-            return blob.url
-        except Exception as exc:
-            raise BlobStorageError("Task export audio could not be uploaded") from exc
+            raise BlobStorageError(error_message) from exc
 
 
 def build_public_blob_provider(config: Any) -> PublicBlobProvider:

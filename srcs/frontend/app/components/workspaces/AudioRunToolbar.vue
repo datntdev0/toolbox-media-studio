@@ -51,45 +51,49 @@ const busy = computed(() => props.starting || props.stopping)
     </div>
 
     <div class="space-y-4">
-      <div class="flex flex-row flex-wrap justify-between gap-4">
-        <UFormField label="Provider">
-          <USelect
-            v-model="provider"
-            :items="providers"
-            :disabled="busy"
-            class="w-full"
-            aria-label="TTS provider"
-          />
-        </UFormField>
-        <UFormField label="Voice">
-          <USelect
-            v-model="voice"
-            :items="voices"
-            :disabled="busy"
-            class="w-full"
-            aria-label="TTS voice"
-          />
-        </UFormField>
-        <UFormField label="Chapter Index From" required>
-          <UInputNumber
-            v-model="chapterIndexFrom"
-            :min="firstChapterIndex"
-            :max="lastChapterIndex"
-            :step="1"
-            :disabled="busy || !availableChapters.length"
-            class="w-[150px]"
-          />
-        </UFormField>
-        <UFormField label="Chapter Index To" required>
-          <UInputNumber
-            v-model="chapterIndexTo"
-            :min="firstChapterIndex"
-            :max="lastChapterIndex"
-            :step="1"
-            :disabled="busy || !availableChapters.length"
-            class="w-[150px]"
-          />
-        </UFormField>
+      <div class="flex flex-row justify-between gap-4">
+        <div class="flex flex-row gap-2">
+          <UFormField label="Provider">
+            <USelect
+              v-model="provider"
+              :items="providers"
+              :disabled="busy"
+              class="w-full"
+              aria-label="TTS provider"
+            />
+          </UFormField>
+          <UFormField label="Voice">
+            <USelect
+              v-model="voice"
+              :items="voices"
+              :disabled="busy"
+              class="w-full"
+              aria-label="TTS voice"
+            />
+          </UFormField>
+        </div>
+        <div class="flex flex-row gap-2">
+          <UFormField label="Chapter Index From" required>
+            <UInputNumber
+              v-model="chapterIndexFrom"
+              :min="firstChapterIndex"
+              :max="lastChapterIndex"
+              :step="1"
+              :disabled="busy || !availableChapters.length"
+              class="w-[150px]"
+            />
+          </UFormField>
+          <UFormField label="Chapter Index To" required>
+            <UInputNumber
+              v-model="chapterIndexTo"
+              :min="firstChapterIndex"
+              :max="lastChapterIndex"
+              :step="1"
+              :disabled="busy || !availableChapters.length"
+              class="w-[150px]"
+            />
+          </UFormField>
+        </div>
       </div>
 
       <div class="flex flex-wrap items-start justify-between gap-x-5 gap-y-2">

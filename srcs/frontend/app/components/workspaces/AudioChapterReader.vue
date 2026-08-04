@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type {
   AudioChapterContent,
+  AudioSubtitleCue,
   AudioWorkspace,
   AudioWorkspaceChapter,
   AudioWorkspaceTaskResult
 } from '~/types/audio-workspace'
+import { parseChapterSrt } from '~/utils/audio-subtitles'
 
 const props = defineProps<{
   workspace: AudioWorkspace
@@ -37,9 +39,12 @@ const resultError = ref(false)
 const exporting = ref(false)
 const activeSentenceIndex = ref<number | null>(null)
 const playbackState = ref<'idle' | 'playing' | 'paused'>('idle')
-const sequentialPlayMode = ref(false)
+const playbackMode = ref<'chapter' | 'sentence' | null>(null)
+const subtitleCues = ref<AudioSubtitleCue[]>([])
 const toast = useToast()
 let activeAudio: HTMLAudioElement | null = null
+let subtitleAbortController: AbortController | null = null
+let sentenceEndTimer: ReturnType<typeof setTimeout> | null = null
 let contentRequestId = 0
 let resultRequestId = 0
 const selectedTask = computed(() =>
@@ -48,37 +53,23 @@ const selectedTask = computed(() =>
 const characterCount = computed(() =>
   formatCharacterCount(content.value?.content || [])
 )
-const audioUrls = computed(() => {
+const sequentialPlayMode = computed(() => playbackMode.value === 'chapter')
+const narrationReady = computed(() => {
   const sentenceCount = content.value?.content.length || 0
   const result = taskResult.value
   const task = selectedTask.value
-  if (
-    !result
-    || !task
-    || task.status !== 'completed'
-    || !task.resultAvailable
-    || task.sourceUpdated
-    || result.workspaceId !== props.workspace.id
-    || result.taskId !== task.id
-    || result.sentences.length !== sentenceCount
-  ) return []
-
-  const urls = Array<string>(sentenceCount)
-  for (const sentence of result.sentences) {
-    if (
-      !Number.isInteger(sentence.index)
-      || sentence.index < 0
-      || sentence.index >= sentenceCount
-      || !sentence.audioUrl
-      || urls[sentence.index]
-    ) return []
-    urls[sentence.index] = sentence.audioUrl
-  }
-  return urls.every(Boolean) ? urls : []
+  return Boolean(
+    sentenceCount
+    && result?.audioUrl
+    && result.subtitleUrl
+    && task?.status === 'completed'
+    && task.resultAvailable
+    && !task.sourceUpdated
+    && result.workspaceId === props.workspace.id
+    && result.taskId === task.id
+    && subtitleCues.value.length === sentenceCount
+  )
 })
-const narrationReady = computed(() =>
-  Boolean(content.value?.content.length) && audioUrls.value.length === content.value?.content.length
-)
 
 watch(
   () => [props.chapter?.id, props.workspace.language],
@@ -92,9 +83,10 @@ watch(
     props.workspace.language,
     selectedTask.value?.resultAvailable,
     selectedTask.value?.sourceUpdated,
-    selectedTask.value?.completedAt
+    selectedTask.value?.completedAt,
+    content.value
   ],
-  () => void loadTaskResult(),
+  () => void loadNarration(),
   { immediate: true }
 )
 
@@ -121,27 +113,61 @@ async function loadContent() {
   }
 }
 
-async function loadTaskResult() {
+async function loadNarration() {
   const requestId = ++resultRequestId
+  subtitleAbortController?.abort()
+  subtitleAbortController = null
   resetPlayback()
   taskResult.value = null
+  subtitleCues.value = []
   resultError.value = false
   const task = selectedTask.value
-  if (!task?.resultAvailable || task.sourceUpdated || !props.chapter) return
+  const chapterContent = content.value
+  if (
+    !task?.resultAvailable
+    || task.status !== 'completed'
+    || task.sourceUpdated
+    || !props.chapter
+    || !chapterContent
+    || chapterContent.id !== props.chapter.id
+    || !chapterContent.content.length
+  ) return
 
+  const abortController = new AbortController()
+  subtitleAbortController = abortController
   try {
     const result = await useAudioWorkspaceApi().getTaskResult(
       props.workspace.id,
       task.id
     )
-    if (requestId === resultRequestId) taskResult.value = result
-  } catch {
+    if (
+      result.workspaceId !== props.workspace.id
+      || result.taskId !== task.id
+      || !result.audioUrl
+      || !result.subtitleUrl
+    ) throw new Error('Narration result is incomplete')
+
+    const response = await fetch(result.subtitleUrl, {
+      signal: abortController.signal
+    })
+    if (!response.ok) throw new Error(`Unable to load subtitles (${response.status})`)
+    const cues = parseChapterSrt(await response.text(), chapterContent.content)
+    if (requestId === resultRequestId) {
+      taskResult.value = result
+      subtitleCues.value = cues
+    }
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === 'AbortError') return
     if (requestId === resultRequestId) resultError.value = true
+  } finally {
+    if (subtitleAbortController === abortController) subtitleAbortController = null
   }
 }
 
 function disposeAudio() {
+  clearSentenceEndTimer()
   if (!activeAudio) return
+  activeAudio.ontimeupdate = null
   activeAudio.onended = null
   activeAudio.onerror = null
   activeAudio.pause()
@@ -150,11 +176,17 @@ function disposeAudio() {
   activeAudio = null
 }
 
+function clearSentenceEndTimer() {
+  if (sentenceEndTimer == null) return
+  clearTimeout(sentenceEndTimer)
+  sentenceEndTimer = null
+}
+
 function resetPlayback() {
   disposeAudio()
   activeSentenceIndex.value = null
   playbackState.value = 'idle'
-  sequentialPlayMode.value = false
+  playbackMode.value = null
 }
 
 function handlePlaybackError(audio: HTMLAudioElement) {
@@ -163,75 +195,131 @@ function handlePlaybackError(audio: HTMLAudioElement) {
   resultError.value = true
 }
 
-async function playSegment(index: number) {
-  const url = audioUrls.value[index]
-  if (!url) return
+function cueIndexAtTime(time: number): number | null {
+  const index = subtitleCues.value.findIndex(cue => (
+    time >= cue.startSeconds && time < cue.endSeconds
+  ))
+  return index === -1 ? null : index
+}
 
-  if (activeSentenceIndex.value === index && activeAudio) {
-    const audio = activeAudio
-    try {
-      await audio.play()
-      if (activeAudio === audio) playbackState.value = 'playing'
-    } catch {
-      handlePlaybackError(audio)
-    }
-    return
-  }
+function finishPlayback(audio: HTMLAudioElement) {
+  if (activeAudio !== audio) return
+  clearSentenceEndTimer()
+  audio.pause()
+  playbackState.value = 'idle'
+  playbackMode.value = null
+  activeSentenceIndex.value = null
+}
 
-  disposeAudio()
+function ensureAudio(): HTMLAudioElement | null {
+  if (activeAudio) return activeAudio
+  const url = taskResult.value?.audioUrl
+  if (!url) return null
+
   const audio = new Audio(url)
   activeAudio = audio
-  activeSentenceIndex.value = index
-  playbackState.value = 'playing'
-  resultError.value = false
-  audio.onended = () => {
+  audio.preload = 'metadata'
+  audio.ontimeupdate = () => {
     if (activeAudio !== audio) return
-    const nextIndex = index + 1
-    if (sequentialPlayMode.value && audioUrls.value[nextIndex]) {
-      void playSegment(nextIndex)
+    if (playbackMode.value === 'chapter') {
+      activeSentenceIndex.value = cueIndexAtTime(audio.currentTime)
       return
     }
-    resetPlayback()
+    if (playbackMode.value !== 'sentence' || activeSentenceIndex.value == null) return
+    const cue = subtitleCues.value[activeSentenceIndex.value]
+    if (cue && audio.currentTime >= cue.endSeconds) finishPlayback(audio)
   }
+  audio.onended = () => finishPlayback(audio)
   audio.onerror = () => handlePlaybackError(audio)
+  return audio
+}
 
+function scheduleSentenceEnd(audio: HTMLAudioElement) {
+  clearSentenceEndTimer()
+  const index = activeSentenceIndex.value
+  const cue = index == null ? null : subtitleCues.value[index]
+  if (!cue || playbackMode.value !== 'sentence') return
+  const remainingMilliseconds = Math.max(0, (cue.endSeconds - audio.currentTime) * 1000)
+  sentenceEndTimer = setTimeout(() => {
+    if (activeAudio === audio && playbackMode.value === 'sentence') finishPlayback(audio)
+  }, remainingMilliseconds)
+}
+
+async function resumeAudio(audio: HTMLAudioElement) {
+  if (activeAudio === audio) playbackState.value = 'playing'
   try {
     await audio.play()
-  } catch {
+    if (activeAudio === audio && playbackState.value === 'playing') {
+      scheduleSentenceEnd(audio)
+    }
+  } catch (cause) {
+    if (
+      activeAudio === audio
+      && playbackState.value === 'paused'
+      && cause instanceof DOMException
+      && cause.name === 'AbortError'
+    ) return
     handlePlaybackError(audio)
   }
 }
 
+function playSentence(index: number) {
+  const cue = subtitleCues.value[index]
+  const audio = ensureAudio()
+  if (!cue || !audio) return
+
+  clearSentenceEndTimer()
+  const isResuming = playbackMode.value === 'sentence'
+    && activeSentenceIndex.value === index
+    && playbackState.value === 'paused'
+    && audio.currentTime >= cue.startSeconds
+    && audio.currentTime < cue.endSeconds
+  if (!isResuming) audio.currentTime = cue.startSeconds
+  playbackMode.value = 'sentence'
+  activeSentenceIndex.value = index
+  resultError.value = false
+  void resumeAudio(audio)
+}
+
 function toggleSentencePlayback(index: number) {
-  if (!audioUrls.value[index]) return
-  if (activeSentenceIndex.value === index && playbackState.value === 'playing') {
-    sequentialPlayMode.value = false
+  if (!subtitleCues.value[index]) return
+  if (
+    playbackMode.value === 'sentence'
+    && activeSentenceIndex.value === index
+    && playbackState.value === 'playing'
+  ) {
     pausePlayback()
     return
   }
 
-  sequentialPlayMode.value = false
-  void playSegment(index)
+  playSentence(index)
 }
 
 function pausePlayback() {
   if (playbackState.value !== 'playing' || !activeAudio) return
+  clearSentenceEndTimer()
   activeAudio.pause()
   playbackState.value = 'paused'
 }
 
 function playAllSentences() {
   if (!narrationReady.value) return
-  if (playbackState.value === 'playing' && sequentialPlayMode.value) {
+  if (playbackState.value === 'playing' && playbackMode.value === 'chapter') {
     pausePlayback()
     return
   }
-  if (playbackState.value === 'paused' && sequentialPlayMode.value) {
-    void playSegment(activeSentenceIndex.value ?? 0)
+  const audio = ensureAudio()
+  if (!audio) return
+  if (playbackState.value === 'paused' && playbackMode.value === 'chapter') {
+    void resumeAudio(audio)
     return
   }
-  sequentialPlayMode.value = true
-  void playSegment(0)
+  clearSentenceEndTimer()
+  audio.currentTime = 0
+  playbackMode.value = 'chapter'
+  activeSentenceIndex.value = cueIndexAtTime(0)
+  resultError.value = false
+  void resumeAudio(audio)
 }
 
 function stopAllSentences() {
@@ -273,7 +361,10 @@ async function exportAudio() {
   }
 }
 
-onBeforeUnmount(resetPlayback)
+onBeforeUnmount(() => {
+  subtitleAbortController?.abort()
+  resetPlayback()
+})
 </script>
 
 <template>
@@ -446,7 +537,7 @@ onBeforeUnmount(resetPlayback)
                 variant="ghost"
                 size="sm"
                 square
-                :disabled="!audioUrls[index]"
+                :disabled="!subtitleCues[index]"
                 :aria-label="activeSentenceIndex === index && playbackState === 'playing'
                   ? `Playing sentence ${index + 1}`
                   : `Play sentence ${index + 1}`"

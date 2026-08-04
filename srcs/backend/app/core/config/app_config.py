@@ -45,7 +45,8 @@ class GeminiSettings:
 class AzureSpeechSettings:
     endpoint: str
     api_key: str
-    timeout_seconds: int
+    batch_timeout_seconds: int
+    poll_interval_seconds: int
 
 CACHE_TTL_DEFAULT = 3600
 CACHE_TTL_CRAWLER = 3600 * 24 * 30
@@ -105,5 +106,10 @@ class AppConfig:
         self.azure_speech: AzureSpeechSettings = AzureSpeechSettings(
             endpoint=os.environ.get("FAST_AZURE_SPEECH_ENDPOINT", ""),
             api_key=os.environ.get("FAST_AZURE_SPEECH_API_KEY", ""),
-            timeout_seconds=int(os.environ.get("FAST_AZURE_SPEECH_TIMEOUT_SECONDS", "60")),
+            batch_timeout_seconds=int(
+                os.environ.get("FAST_AZURE_SPEECH_BATCH_TIMEOUT_SECONDS", "1800")
+            ),
+            poll_interval_seconds=int(
+                os.environ.get("FAST_AZURE_SPEECH_POLL_INTERVAL_SECONDS", "5")
+            ),
         )

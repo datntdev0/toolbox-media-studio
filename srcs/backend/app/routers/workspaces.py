@@ -6,8 +6,6 @@ from fastapi import APIRouter, Body, HTTPException, Path, Query, Response, statu
 
 from app.core.injection import (
     PollingQueuePublisherDep,
-    ProviderAudioExportDep,
-    ProviderPublicBlobDep,
     RealtimeHubDep,
     RepositoryWorkspaceDep,
     RepositoryWorkspaceResultDep,
@@ -137,7 +135,7 @@ def get_workspace_task_result_route(
     id: str,
     task_id: Annotated[str, Path(alias="taskId")],
 ) -> WorkspaceTaskResultResponse:
-    """Return sentence audio URLs for one completed workspace task."""
+    """Return chapter audio and subtitle URLs for one completed task."""
 
     del session_user
     try:
@@ -170,10 +168,15 @@ def get_workspace_task_result_route(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Workspace task result is unavailable",
         ) from exc
-    if result is None or len(result.content_key) != len(result.audio_urls):
+    if result is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Workspace task result is unavailable",
+        )
+    if not result.artifacts_available:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace task result is obsolete; regenerate the task",
         )
     return to_workspace_task_result_response(result)
 
@@ -187,12 +190,10 @@ def export_workspace_task_audio_route(
     session_user: SessionUser,
     repository_workspace: RepositoryWorkspaceDep,
     repository_workspace_result: RepositoryWorkspaceResultDep,
-    audio_export_provider: ProviderAudioExportDep,
-    blob_provider: ProviderPublicBlobDep,
     id: str,
     task_id: Annotated[str, Path(alias="taskId")],
 ) -> WorkspaceTaskExportResponse:
-    """Concatenate all sentence audio files for a task and return the export URL."""
+    """Return the existing chapter audio artifact as the export URL."""
 
     del session_user
     try:
@@ -225,43 +226,21 @@ def export_workspace_task_audio_route(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Workspace task result is unavailable",
         ) from exc
-    if result is None or len(result.content_key) != len(result.audio_urls):
+    if result is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Workspace task result is unavailable",
         )
-    if not result.audio_urls:
+    if not result.artifacts_available:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Workspace task has no audio files to export",
+            detail="Workspace task result is obsolete; regenerate the task",
         )
-
-    try:
-        concatenated_audio = audio_export_provider.concatenate_audio_files(
-            result.audio_urls
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Audio concatenation failed",
-        ) from exc
-
-    try:
-        export_url = blob_provider.upload_task_export(
-            workspace.id,
-            task.id,
-            concatenated_audio,
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Export upload failed",
-        ) from exc
-
     from datetime import UTC, datetime
 
+    assert result.audio_url is not None
     return WorkspaceTaskExportResponse(
-        export_url=export_url,
+        export_url=result.audio_url,
         created_at=datetime.now(UTC),
     )
 

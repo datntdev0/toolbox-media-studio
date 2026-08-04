@@ -63,7 +63,7 @@ class WorkspaceTaskEvent:
 
 
 class WorkspaceTaskHandler(MessageHandler):
-    """Build progressive sentence-hash output for one queued chapter."""
+    """Build chapter-level audio and subtitle output for one queued task."""
 
     def __init__(
         self,
@@ -111,6 +111,7 @@ class WorkspaceTaskHandler(MessageHandler):
                 and not event.refetch
                 and existing.provider == event.provider
                 and existing.voice == event.voice
+                and existing.artifacts_available
             )
             if reusable:
                 completed_at = datetime.now(UTC)
@@ -132,54 +133,40 @@ class WorkspaceTaskHandler(MessageHandler):
                     claimed.language,
                 )
                 now = datetime.now(UTC)
-                result = self._results.upsert(
+                content_key = [
+                    sha256(sentence.encode("utf-8")).hexdigest()
+                    for sentence in sentences
+                ]
+                self._logger.info(
+                    "Workspace task %s synthesizing %d sentences",
+                    claimed_task.id,
+                    len(sentences),
+                )
+                artifacts = self._speech.synthesize(sentences, event.voice)
+                audio_url = self._blob.upload_task_audio(
+                    claimed.id,
+                    claimed_task.id,
+                    artifacts.audio_data,
+                )
+                subtitle_url = self._blob.upload_task_subtitle(
+                    claimed.id,
+                    claimed_task.id,
+                    artifacts.subtitle_data,
+                )
+                self._results.upsert(
                     WorkspaceResult(
                         id=claimed_task.id,
                         workspace_id=claimed.id,
                         task_id=claimed_task.id,
                         provider=event.provider,
                         voice=event.voice,
-                        content_key=[],
-                        audio_urls=[],
+                        content_key=content_key,
+                        audio_url=audio_url,
+                        subtitle_url=subtitle_url,
                         created_at=now,
                         updated_at=now,
                     )
                 )
-                for index, sentence in enumerate(sentences):
-                    content_key = sha256(sentence.encode("utf-8")).hexdigest()
-                    self._logger.info(
-                        "Workspace task %s sentence %d/%d hash %s",
-                        claimed_task.id,
-                        index + 1,
-                        len(sentences),
-                        content_key,
-                    )
-                    audio_bytes = self._speech.synthesize(sentence, event.voice)
-                    self._logger.info(
-                        "Workspace task %s sentence %d/%d hash %s synthesized %d bytes",
-                        claimed_task.id,
-                        index + 1,
-                        len(sentences),
-                        content_key,
-                        len(audio_bytes),
-                    )
-                    audio_url = self._blob.upload_audio(
-                        claimed.id,
-                        claimed_task.id,
-                        index,
-                        audio_bytes,
-                    )
-                    self._logger.info(
-                        "Workspace task %s sentence %d/%d hash %s uploaded to %s",
-                        claimed_task.id,
-                        index + 1,
-                        len(sentences),
-                        content_key,
-                        audio_url,
-                    )
-                    result.content_key.append(content_key)
-                    result.audio_urls.append(audio_url)
-                    result = self._results.upsert(result)
                 completed_at = datetime.now(UTC)
                 completed = self._update_task_with_retry(
                     claimed,
@@ -192,6 +179,14 @@ class WorkspaceTaskHandler(MessageHandler):
                     source_chapter_updated_at=chapter.updated_at,
                     clear_source_updated=True,
                 )
+                try:
+                    self._blob.delete_legacy_task_audio(claimed.id, claimed_task.id)
+                except Exception:
+                    self._logger.warning(
+                        "Workspace task %s legacy audio cleanup failed",
+                        claimed_task.id,
+                        exc_info=True,
+                    )
             self._publish_update(completed, claimed_task.id)
         except Exception as exc:
             latest = self._workspaces.get_by_id(claimed.id) or claimed
