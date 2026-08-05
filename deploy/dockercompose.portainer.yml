@@ -36,7 +36,7 @@ services:
     pull_policy: always
     container_name: toolbox-backend
     ports:
-      - "${BACKEND_PORT:-8080}:8000"
+      - "${BACKEND_PORT:-8080}:8000" # 8000 is taken by Portainer host, so we map to 8080 by default
     networks:
       - toolbox-network
     depends_on:
@@ -60,6 +60,10 @@ services:
       FAST_AZURE_SPEECH_API_KEY: ${AZURE_SPEECH_API_KEY:-}
       FAST_AZURE_SPEECH_BATCH_TIMEOUT_SECONDS: ${AZURE_SPEECH_BATCH_TIMEOUT_SECONDS:-1800}
       FAST_AZURE_SPEECH_POLL_INTERVAL_SECONDS: ${AZURE_SPEECH_POLL_INTERVAL_SECONDS:-5}
+      FAST_QUEUE_WORKERS_SAMPLE: ${QUEUE_WORKERS_SAMPLE:-1}
+      FAST_QUEUE_WORKERS_SCRAPINGS: ${QUEUE_WORKERS_SCRAPINGS:-1}
+      FAST_QUEUE_WORKERS_TRANSLATIONS: ${QUEUE_WORKERS_TRANSLATIONS:-1}
+      FAST_QUEUE_WORKERS_WORKSPACES_TASKS: ${QUEUE_WORKERS_WORKSPACES_TASKS:-1}
     volumes:
       - backend-logs:/app/logs
     restart: unless-stopped

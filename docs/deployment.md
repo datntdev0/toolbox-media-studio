@@ -67,8 +67,10 @@ flowchart LR
 - **FastAPI settings:** all FastAPI app settings use the `FAST_` prefix, grouped by domain where
   useful: `FAST_SECURITY_*`, `FAST_AZ_*`, and `FAST_FLARESOLVERR_*`.
 - **Crawler settings:** `FAST_FLARESOLVERR_BASE_URL`, `FAST_FLARESOLVERR_MAX_TIMEOUT_MS`, and
-  crawler cache TTLs. Queue names, retry timing, consumer count, visibility timeout, cache TTLs,
-  and simulated processing duration are application constants. Local development points
+  crawler cache TTLs. Queue names, retry timing, visibility timeout, cache TTLs, and simulated
+  processing duration are application constants. Configure each queue's worker count with
+  `FAST_QUEUE_WORKERS_SAMPLE`, `FAST_QUEUE_WORKERS_SCRAPINGS`, `FAST_QUEUE_WORKERS_TRANSLATIONS`,
+  and `FAST_QUEUE_WORKERS_WORKSPACES_TASKS`. Local development points
   `FAST_FLARESOLVERR_BASE_URL` at `http://localhost:8191/v1`.
 - **CORS:** FastAPI allows the Nuxt origin only; credentials mode as needed for the JWT. The
   `media` Blob service must also allow `GET` and `HEAD` from the Nuxt origin so the audio reader

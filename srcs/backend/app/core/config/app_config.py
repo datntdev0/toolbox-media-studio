@@ -48,6 +48,14 @@ class AzureSpeechSettings:
     batch_timeout_seconds: int
     poll_interval_seconds: int
 
+
+@dataclass
+class QueueWorkerSettings:
+    sample: int
+    scrapings: int
+    translations: int
+    workspaces_tasks: int
+
 CACHE_TTL_DEFAULT = 3600
 CACHE_TTL_CRAWLER = 3600 * 24 * 30
 
@@ -112,4 +120,10 @@ class AppConfig:
             poll_interval_seconds=int(
                 os.environ.get("FAST_AZURE_SPEECH_POLL_INTERVAL_SECONDS", "5")
             ),
+        )
+        self.queue_workers: QueueWorkerSettings = QueueWorkerSettings(
+            sample=int(os.environ.get("FAST_QUEUE_WORKERS_SAMPLE", "1")),
+            scrapings=int(os.environ.get("FAST_QUEUE_WORKERS_SCRAPINGS", "2")),
+            translations=int(os.environ.get("FAST_QUEUE_WORKERS_TRANSLATIONS", "1")),
+            workspaces_tasks=int(os.environ.get("FAST_QUEUE_WORKERS_WORKSPACES_TASKS", "1")),
         )

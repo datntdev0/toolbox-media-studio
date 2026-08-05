@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
+import pytest
+
 from app.core.events.message_handler import QueueMessage
 from app.domain.scraping_results import ScrapingResult
 from app.domain.scrapings import (
@@ -32,15 +34,45 @@ class _ProxyResult:
 
 
 class _Proxy:
-    def __init__(self, error: Exception | None = None) -> None:
+    def __init__(self, error: Exception | None = None, failures: int = 0) -> None:
         self.error = error
+        self.failures = failures
         self.calls: list[str] = []
 
     def get(self, url: str) -> _ProxyResult:
         self.calls.append(url)
-        if self.error is not None:
+        if self.error is not None and (
+            self.failures == 0 or len(self.calls) <= self.failures
+        ):
             raise self.error
         return _ProxyResult()
+
+
+def test_handler_retries_transient_chapter_fetch_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _disable_retry_sleep(monkeypatch)
+    scrapings = InMemoryScrapingRepository()
+    results = InMemoryScrapingResultRepository()
+    scraping = scrapings.create_or_merge(_scraping()).scraping
+    queued = scrapings.queue_tasks(
+        scraping.id,
+        scraping.created_by,
+        chapter_index_from=1,
+        chapter_index_to=1,
+        force=False,
+        etag=scraping.etag,
+    )
+    proxy = _Proxy(error=RuntimeError("temporary"), failures=2)
+
+    _handler(scrapings, results, proxy).handle(
+        _message(queued.scraping, queued.tasks[0], refetch=True)
+    )
+
+    stored = scrapings.get_by_id(scraping.id, scraping.created_by)
+    assert stored is not None
+    assert stored.tasks[0].status == ScrapingTaskStatus.COMPLETED
+    assert len(proxy.calls) == 3
 
 
 def test_handler_processes_only_the_queued_message_task() -> None:
@@ -152,7 +184,10 @@ def test_refetch_bypasses_existing_result_and_overwrites_content() -> None:
     assert len(proxy.calls) == 1
 
 
-def test_failed_refetch_preserves_previous_result_availability() -> None:
+def test_failed_refetch_preserves_previous_result_availability(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _disable_retry_sleep(monkeypatch)
     scrapings = InMemoryScrapingRepository()
     results = InMemoryScrapingResultRepository()
     scraping = scrapings.create_or_merge(_scraping()).scraping
@@ -204,6 +239,10 @@ def _handler(
         cache_provider=InMemoryCacheProvider(),
         proxy_provider=proxy,
     )
+
+
+def _disable_retry_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.core.utilities.time.sleep", lambda _: None)
 
 
 def _scraping() -> Scraping:

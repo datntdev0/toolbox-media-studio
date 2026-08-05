@@ -53,9 +53,6 @@ from app.services.workspace_service import WorkspaceService
 log_manager = LogManager()
 config = AppConfig()
 
-# Constants
-QUEUE_WORKERS = 1
-
 # ============================================================================
 # REPOSITORY INSTANCES
 # ============================================================================
@@ -122,7 +119,7 @@ queue_publisher = AzureStorageQueuePublisher(config)
 
 queue_subscriber_sample = SampleQueueListener(
     logger=log_manager.getLogger("queue.sample"),
-    workers=QUEUE_WORKERS,
+    workers=config.queue_workers.sample,
 )
 
 queue_listener_scraping = ScrapingQueueListener(
@@ -132,7 +129,7 @@ queue_listener_scraping = ScrapingQueueListener(
     cache_provider=provider_cache,
     proxy_provider=provider_proxy,
     realtime_hub=realtime_hub,
-    workers=QUEUE_WORKERS,
+    workers=config.queue_workers.scrapings,
 )
 
 queue_listener_translation = TranslationQueueListener(
@@ -142,7 +139,7 @@ queue_listener_translation = TranslationQueueListener(
     novel_chapter_repository=repository_novel_chapter,
     realtime_hub=realtime_hub,
     translation_service_provider_factory=provider_translation_service_factory,
-    workers=QUEUE_WORKERS,
+    workers=config.queue_workers.translations,
 )
 
 queue_listener_workspace = WorkspaceTaskQueueListener(
@@ -153,7 +150,7 @@ queue_listener_workspace = WorkspaceTaskQueueListener(
     speech_provider=provider_speech_service,
     blob_provider=provider_public_blob,
     realtime_hub=realtime_hub,
-    workers=QUEUE_WORKERS,
+    workers=config.queue_workers.workspaces_tasks,
 )
 
 # ============================================================================

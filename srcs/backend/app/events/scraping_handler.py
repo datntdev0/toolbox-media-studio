@@ -11,6 +11,7 @@ from typing import Any
 from app.core.events.message_handler import MessageHandler, QueueMessage
 from app.core.events.polling_queue_subscriber import PollingQueueSubscriber
 from app.core.realtime import RealtimeHub
+from app.core.utilities import retry_with_exponential_backoff
 from app.domain.scraping_results import ScrapingResult
 from app.domain.scrapings import Scraping, ScrapingTask, ScrapingTaskStatus
 from app.providers.cache_provider import CacheProvider
@@ -110,13 +111,16 @@ class ScrapingHandler(MessageHandler):
                     completed_at=existing.updated_at,
                 )
             else:
-                chapter = fetch_chapter_content(
-                    crawler_id=claimed.crawler_id,
-                    chapter_url=task.source_url,
-                    cache_provider=self._cache,
-                    proxy_provider=self._proxy,
-                    use_cache=not event.refetch,
-                )
+                def fetch() -> Any:
+                    return fetch_chapter_content(
+                        crawler_id=claimed.crawler_id,
+                        chapter_url=task.source_url,
+                        cache_provider=self._cache,
+                        proxy_provider=self._proxy,
+                        use_cache=not event.refetch,
+                    )
+
+                chapter = retry_with_exponential_backoff(fetch)
                 now = datetime.now(UTC)
                 result = self._results.upsert(
                     ScrapingResult(
